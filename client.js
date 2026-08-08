@@ -64,6 +64,13 @@
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+[data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
+[data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  [data-dsh-pet] .pet-stage { animation: none; }
+  [data-dsh-pet] .pet-heart { animation: none; opacity: 0; }
+  [data-dsh-pet] .pet-bubble { animation: none; }
+}
 `;
   function apply() {
     const style = document.createElement("style");
@@ -71,10 +78,16 @@
     document.head.appendChild(style);
     const host = document.createElement("div");
     host.setAttribute("data-dsh-pet", "");
+    host.setAttribute("role", "group");
+    host.setAttribute("aria-label", "\u684C\u9762\u5BA0\u7269");
+    host.setAttribute("aria-expanded", "false");
     host.setAttribute("title", "dsh-pet\uFF1A\u70B9\u51FB\u4E92\u52A8\uFF0C\u62D6\u62FD\u79FB\u52A8");
     document.body.appendChild(host);
     const stage = document.createElement("div");
     stage.className = "pet-stage";
+    stage.setAttribute("role", "button");
+    stage.setAttribute("tabindex", "0");
+    stage.setAttribute("aria-label", "\u4E92\u52A8\u83DC\u5355\uFF1A\u56DE\u8F66\u6216\u7A7A\u683C\u6253\u5F00");
     const sprite = document.createElement("div");
     sprite.className = "pet-sprite";
     stage.appendChild(sprite);
@@ -94,6 +107,12 @@
     playBtn.textContent = "\u{1F3BE} \u73A9\u800D";
     menu.append(feedBtn, playBtn);
     host.append(stage, status, menu);
+    const toggleMenu = (open) => {
+      const next = open ?? !menu.classList.contains("open");
+      menu.classList.toggle("open", next);
+      host.setAttribute("aria-expanded", String(next));
+      return next;
+    };
     let pet = null;
     let activity = { name: "idle", until: 0 };
     let manifest = { states: {} };
@@ -272,6 +291,25 @@
     let startY = 0;
     let offsetX = 0;
     let offsetY = 0;
+    const POS_KEY = "dsh-pet:pos";
+    const savePos = () => {
+      try {
+        if (host.style.left && host.style.top) {
+          localStorage.setItem(POS_KEY, JSON.stringify({ x: parseFloat(host.style.left), y: parseFloat(host.style.top) }));
+        }
+      } catch {
+      }
+    };
+    try {
+      const raw = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
+      if (raw && Number.isFinite(raw.x) && Number.isFinite(raw.y)) {
+        host.style.left = `${raw.x}px`;
+        host.style.top = `${raw.y}px`;
+        host.style.right = "auto";
+        host.style.bottom = "auto";
+      }
+    } catch {
+    }
     host.addEventListener("pointerdown", (e) => {
       dragging = true;
       moved = false;
@@ -298,21 +336,59 @@
     host.addEventListener("pointerup", (e) => {
       dragging = false;
       if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
-      if (!moved && !e.target.closest("button")) menu.classList.toggle("open");
+      if (moved) savePos();
+      if (!moved && !e.target.closest("button")) toggleMenu();
     });
     host.addEventListener("pointercancel", () => {
       dragging = false;
       moved = false;
     });
+    stage.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleMenu();
+      }
+    });
+    const onDocPointerDown = (e) => {
+      if (!host.contains(e.target)) toggleMenu(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") toggleMenu(false);
+    };
+    document.addEventListener("pointerdown", onDocPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     feedBtn.addEventListener("click", () => interact("feed"));
     playBtn.addEventListener("click", () => interact("play"));
     loadAssets();
     refresh();
     const timer = setInterval(refresh, POLL_MS);
     const animTimer = setInterval(tick, TICK_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    const onResize = () => {
+      if (!host.style.left) return;
+      const x = Math.max(0, Math.min(parseFloat(host.style.left) || 0, window.innerWidth - host.offsetWidth));
+      const y = Math.max(0, Math.min(parseFloat(host.style.top) || 0, window.innerHeight - host.offsetHeight));
+      host.style.left = `${x}px`;
+      host.style.top = `${y}px`;
+    };
+    window.addEventListener("resize", onResize);
+    const syncInert = () => {
+      host.toggleAttribute("data-dsh-pet-inert", document.querySelector('[role="dialog"]') !== null);
+    };
+    const dialogObserver = new MutationObserver(syncInert);
+    dialogObserver.observe(document.body, { childList: true, subtree: true });
+    syncInert();
     return () => {
       clearInterval(timer);
       clearInterval(animTimer);
+      dialogObserver.disconnect();
+      document.removeEventListener("pointerdown", onDocPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("resize", onResize);
       host.remove();
       style.remove();
     };

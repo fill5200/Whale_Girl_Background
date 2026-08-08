@@ -48,6 +48,13 @@ const CSS = `
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+[data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
+[data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  [data-dsh-pet] .pet-stage { animation: none; }
+  [data-dsh-pet] .pet-heart { animation: none; opacity: 0; }
+  [data-dsh-pet] .pet-bubble { animation: none; }
+}
 `
 
 export function apply() {
@@ -57,11 +64,17 @@ export function apply() {
 
   const host = document.createElement('div')
   host.setAttribute('data-dsh-pet', '')
+  host.setAttribute('role', 'group')
+  host.setAttribute('aria-label', '桌面宠物')
+  host.setAttribute('aria-expanded', 'false')
   host.setAttribute('title', 'dsh-pet：点击互动，拖拽移动')
   document.body.appendChild(host)
 
   const stage = document.createElement('div')
   stage.className = 'pet-stage'
+  stage.setAttribute('role', 'button')
+  stage.setAttribute('tabindex', '0')
+  stage.setAttribute('aria-label', '互动菜单：回车或空格打开')
   const sprite = document.createElement('div')
   sprite.className = 'pet-sprite'
   stage.appendChild(sprite)
@@ -84,6 +97,14 @@ export function apply() {
   menu.append(feedBtn, playBtn)
 
   host.append(stage, status, menu)
+
+  // 菜单开关（同步 aria-expanded；open 缺省时切换）。
+  const toggleMenu = (open) => {
+    const next = open ?? !menu.classList.contains('open')
+    menu.classList.toggle('open', next)
+    host.setAttribute('aria-expanded', String(next))
+    return next
+  }
 
   // ---- 运行时状态 ----
   let pet = null
@@ -291,6 +312,29 @@ export function apply() {
   let offsetX = 0
   let offsetY = 0
 
+  // 位置持久化（localStorage；损坏数据忽略，回退默认右下角）。
+  const POS_KEY = 'dsh-pet:pos'
+  const savePos = () => {
+    try {
+      if (host.style.left && host.style.top) {
+        localStorage.setItem(POS_KEY, JSON.stringify({ x: parseFloat(host.style.left), y: parseFloat(host.style.top) }))
+      }
+    } catch {
+      // localStorage 不可用（隐私模式）忽略
+    }
+  }
+  try {
+    const raw = JSON.parse(localStorage.getItem(POS_KEY) ?? 'null')
+    if (raw && Number.isFinite(raw.x) && Number.isFinite(raw.y)) {
+      host.style.left = `${raw.x}px`
+      host.style.top = `${raw.y}px`
+      host.style.right = 'auto'
+      host.style.bottom = 'auto'
+    }
+  } catch {
+    // 损坏数据忽略
+  }
+
   // capture 只在越过拖拽阈值后启用：纯点击不捕获，菜单按钮的 click 正常派发。
   host.addEventListener('pointerdown', (e) => {
     dragging = true
@@ -318,13 +362,29 @@ export function apply() {
   host.addEventListener('pointerup', (e) => {
     dragging = false
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId)
+    if (moved) savePos() // 拖拽结束落盘位置
     // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
-    if (!moved && !e.target.closest('button')) menu.classList.toggle('open')
+    if (!moved && !e.target.closest('button')) toggleMenu()
   })
   host.addEventListener('pointercancel', () => {
     dragging = false
     moved = false
   })
+  // 键盘（a11y）：Enter/Space 切换菜单；Esc 关闭；点外部关闭。
+  stage.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      toggleMenu()
+    }
+  })
+  const onDocPointerDown = (e) => {
+    if (!host.contains(e.target)) toggleMenu(false)
+  }
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') toggleMenu(false)
+  }
+  document.addEventListener('pointerdown', onDocPointerDown)
+  document.addEventListener('keydown', onKeyDown)
   feedBtn.addEventListener('click', () => interact('feed'))
   playBtn.addEventListener('click', () => interact('play'))
 
@@ -334,9 +394,38 @@ export function apply() {
   const timer = setInterval(refresh, POLL_MS)
   const animTimer = setInterval(tick, TICK_MS)
 
+  // 回前台立即刷新（后台标签轮询被节流，状态可能陈旧）。
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') refresh()
+  }
+  document.addEventListener('visibilitychange', onVisibility)
+
+  // 窗口缩放后把已拖拽的位置重新 clamp 进视口。
+  const onResize = () => {
+    if (!host.style.left) return // 默认右下角锚定无需处理
+    const x = Math.max(0, Math.min(parseFloat(host.style.left) || 0, window.innerWidth - host.offsetWidth))
+    const y = Math.max(0, Math.min(parseFloat(host.style.top) || 0, window.innerHeight - host.offsetHeight))
+    host.style.left = `${x}px`
+    host.style.top = `${y}px`
+  }
+  window.addEventListener('resize', onResize)
+
+  // 弹窗感知：DSH 打开 dialog 时宠物降为 inert（不遮挡、不拦截点击）。
+  const syncInert = () => {
+    host.toggleAttribute('data-dsh-pet-inert', document.querySelector('[role="dialog"]') !== null)
+  }
+  const dialogObserver = new MutationObserver(syncInert)
+  dialogObserver.observe(document.body, { childList: true, subtree: true })
+  syncInert()
+
   return () => {
     clearInterval(timer)
     clearInterval(animTimer)
+    dialogObserver.disconnect()
+    document.removeEventListener('pointerdown', onDocPointerDown)
+    document.removeEventListener('keydown', onKeyDown)
+    document.removeEventListener('visibilitychange', onVisibility)
+    window.removeEventListener('resize', onResize)
     host.remove()
     style.remove()
   }
