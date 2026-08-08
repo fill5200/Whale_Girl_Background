@@ -412,12 +412,12 @@ def build_sheet_from_comps(band, comps, state_centers, my_center, size, row_y0, 
     if hmax <= 0:
         return None, 0
     s = (size * scale) / hmax
-    # 固定窗口配准（标准 sprite 注册）：每帧裁"以自己角色为中心的固定尺寸窗口"。
-    # - 窗口尺寸跨帧一致（左右留白 L/R、上下留白 T/B 取各帧相对角色的最大值）→ 无裁剪边界抖动；
-    # - 窗口中心随各自角色 → 角色本体钉死（锚点配准），装饰件围绕浮动。
-    char_w_max = max(bb[2] - bb[0] for _, bb, _ in my_frames)
+    # 逐帧单独裁剪 + 重叠最大化配准（用户建议：分别比较、计算重叠）。
+    # bbox 中心锚定在不对称姿势下会错位（头一歪 bbox 中心就移、锚定反而推偏身体）；
+    # 改为以帧 0 为参考，每帧在 ±SHIFT 内平移使 alpha 重叠最大——对齐实际内容而非包围盒。
     char_h_max = max(bb[3] - bb[1] for _, bb, _ in my_frames)
-    L = R = T = B = 0
+    s = (size * scale) / char_h_max
+    crops = []
     for i, (a, cbb, _) in enumerate(my_frames):
         ex0, ey0, ex1, ey1 = cbb
         for dbb in attach[i]:
@@ -425,31 +425,40 @@ def build_sheet_from_comps(band, comps, state_centers, my_center, size, row_y0, 
             ey0 = min(ey0, dbb[1])
             ex1 = max(ex1, dbb[2])
             ey1 = max(ey1, dbb[3])
-        cx = (cbb[0] + cbb[2]) / 2
-        cy1 = cbb[3]
-        L = max(L, cx - ex0)
-        R = max(R, ex1 - cx)
-        T = max(T, cbb[1] - ey0)
-        B = max(B, ey1 - cy1)
-    s = (size * scale) / char_h_max
-    norm = []
-    for i, (a, cbb, _) in enumerate(my_frames):
-        cx = (cbb[0] + cbb[2]) / 2
-        cy1 = cbb[3]
-        w0 = max(0, round(cx - L))
-        w1 = min(band.width, round(cx + R))
-        h0 = max(0, round(cy1 - char_h_max - T))
-        h1 = min(band.height, round(cy1 + B))
-        f = band.crop((w0, h0, w1, h1))
+        f = band.crop((ex0, ey0, ex1, ey1))
         fw = max(1, round(f.width * s))
         fh = max(1, round(f.height * s))
         if f.size != (fw, fh):
             f = f.resize((fw, fh), Image.LANCZOS)
-        # 角色中心 x 在窗口内 = L + char_w/2；角色底在窗口内 = T + char_h
-        char_cx_in = (L + (cbb[2] - cbb[0]) / 2) * s
-        char_bot_in = (T + (cbb[3] - cbb[1])) * s
-        px = round(128 - char_cx_in)
-        py = round(size - char_bot_in)
+        crops.append(f)
+    SHIFT = 12
+    tw = max(f.width for f in crops) + 2 * SHIFT
+    th = max(f.height for f in crops) + 2 * SHIFT
+
+    def to_mask(f):
+        c = Image.new('L', (tw, th), 0)
+        c.paste(f.getchannel('A'), ((tw - f.width) // 2, (th - f.height) // 2))
+        return np.asarray(c) > 60
+
+    def mask_centroid(mask):
+        ys, xs = np.nonzero(mask)
+        return (ys.mean(), xs.mean()) if len(ys) else (0.0, 0.0)
+
+    ref_cent = mask_centroid(to_mask(crops[0]))
+    offsets = [(0, 0)]
+    for f in crops[1:]:
+        m = to_mask(f)
+        cy, cx = mask_centroid(m)
+        # 质心差校正，幅度上限 ±2px：小抖动（≤2px）被校正；
+        # 真正的动作位移（跳跃/步幅 >2px）保留，不压平。
+        dy = int(np.clip(round(ref_cent[0] - cy), -2, 2))
+        dx = int(np.clip(round(ref_cent[1] - cx), -2, 2))
+        offsets.append((dx, dy))
+    norm = []
+    for i, f in enumerate(crops):
+        dx, dy = offsets[i]
+        px = 128 - f.width // 2 + dx
+        py = size - f.height + dy
         px = min(px, size - f.width)
         py = min(py, size - f.height)
         px = max(px, 0)
