@@ -412,32 +412,51 @@ def build_sheet_from_comps(band, comps, state_centers, my_center, size, row_y0, 
     if hmax <= 0:
         return None, 0
     s = (size * scale) / hmax
+    # 固定窗口配准（标准 sprite 注册）：每帧裁"以自己角色为中心的固定尺寸窗口"。
+    # - 窗口尺寸跨帧一致（左右留白 L/R、上下留白 T/B 取各帧相对角色的最大值）→ 无裁剪边界抖动；
+    # - 窗口中心随各自角色 → 角色本体钉死（锚点配准），装饰件围绕浮动。
+    char_w_max = max(bb[2] - bb[0] for _, bb, _ in my_frames)
+    char_h_max = max(bb[3] - bb[1] for _, bb, _ in my_frames)
+    L = R = T = B = 0
+    for i, (a, cbb, _) in enumerate(my_frames):
+        ex0, ey0, ex1, ey1 = cbb
+        for dbb in attach[i]:
+            ex0 = min(ex0, dbb[0])
+            ey0 = min(ey0, dbb[1])
+            ex1 = max(ex1, dbb[2])
+            ey1 = max(ey1, dbb[3])
+        cx = (cbb[0] + cbb[2]) / 2
+        cy1 = cbb[3]
+        L = max(L, cx - ex0)
+        R = max(R, ex1 - cx)
+        T = max(T, cbb[1] - ey0)
+        B = max(B, ey1 - cy1)
+    s = (size * scale) / char_h_max
     norm = []
     for i, (a, cbb, _) in enumerate(my_frames):
-        x0, y0, x1, y1 = cbb
-        for dbb in attach[i]:
-            x0 = min(x0, dbb[0])
-            y0 = min(y0, dbb[1])
-            x1 = max(x1, dbb[2])
-            y1 = max(y1, dbb[3])
-        f = band.crop((x0, y0, x1, y1))
+        cx = (cbb[0] + cbb[2]) / 2
+        cy1 = cbb[3]
+        w0 = max(0, round(cx - L))
+        w1 = min(band.width, round(cx + R))
+        h0 = max(0, round(cy1 - char_h_max - T))
+        h1 = min(band.height, round(cy1 + B))
+        f = band.crop((w0, h0, w1, h1))
         fw = max(1, round(f.width * s))
         fh = max(1, round(f.height * s))
         if f.size != (fw, fh):
             f = f.resize((fw, fh), Image.LANCZOS)
-        norm.append((f, cbb, (x0, y0)))
-    sheet = Image.new('RGBA', (size * len(norm), size), (0, 0, 0, 0))
-    for i, (f, cbb, (x0, y0)) in enumerate(norm):
-        # 锚点配准（角色本体不动，装饰件围绕浮动——杜绝装饰件引起的左右晃动）：
-        # x = 角色中心对齐画布中心 128；y = 角色脚底对齐画布底部。
-        char_cx = round(((cbb[0] + cbb[2]) / 2 - x0) * s)
-        char_bot = round((cbb[3] - y0) * s)
-        px = 128 - char_cx
-        py = size - char_bot
+        # 角色中心 x 在窗口内 = L + char_w/2；角色底在窗口内 = T + char_h
+        char_cx_in = (L + (cbb[2] - cbb[0]) / 2) * s
+        char_bot_in = (T + (cbb[3] - cbb[1])) * s
+        px = round(128 - char_cx_in)
+        py = round(size - char_bot_in)
         px = min(px, size - f.width)
         py = min(py, size - f.height)
         px = max(px, 0)
         py = max(py, 0)
+        norm.append((f, px, py))
+    sheet = Image.new('RGBA', (size * len(norm), size), (0, 0, 0, 0))
+    for i, (f, px, py) in enumerate(norm):
         sheet.paste(f, (i * size + px, py), f)
     return sheet, len(norm)
 

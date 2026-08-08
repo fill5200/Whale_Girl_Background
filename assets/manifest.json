@@ -50,8 +50,8 @@
     },
     "drag": {
       "sheet": "drag.png",
-      "frames": 3,
-      "fps": 6,
+      "frames": 2,
+      "fps": 5,
       "loop": true
     },
     "walk": {
