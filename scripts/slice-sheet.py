@@ -182,11 +182,15 @@ def main():
     ap.add_argument('--key-hi', type=int, default=28, help='色键阈值上界（默认 28）')
     ap.add_argument('--out', default='assets/raw/slices')
     ap.add_argument('--size', type=int, default=256)
+    ap.add_argument('--crop-margin', type=int, default=0, help='切分前从四边裁剪 N px（去掉 AI 加的网格外框线）')
     args = ap.parse_args()
 
     if not (args.grid or args.auto or args.sheet):
         ap.error('必须提供 --grid ROWSxCOLS / --auto / --sheet ROWSxCOLS 之一')
     img = Image.open(args.input).convert('RGBA')
+    if args.crop_margin > 0:
+        img = img.crop((args.crop_margin, args.crop_margin, img.width - args.crop_margin, img.height - args.crop_margin))
+        print(f'cropped margin {args.crop_margin}px', file=sys.stderr)
 
     if args.key:
         if args.key == 'gray':
