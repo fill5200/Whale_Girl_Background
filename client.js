@@ -1,30 +1,30 @@
 (() => {
   // client/logic.mjs
   var TRANSIENT_MS = 1500;
+  var JOY_MS = 3e3;
   var EMOJI = {
     idle: "\u{1F423}",
-    happy: "\u{1F425}",
-    hungry: "\u{1F97A}",
-    sad: "\u{1F61E}",
+    working: "\u{1F914}",
+    celebrate: "\u{1F389}",
+    error: "\u{1F631}",
+    disappointed: "\u{1F61E}",
+    joy: "\u{1F425}",
     eat: "\u{1F60B}",
     play: "\u{1F3BE}",
     drag: "\u{1F635}",
     sleep: "\u{1F4A4}",
     wake: "\u{1F62A}",
-    working: "\u{1F914}",
-    celebrate: "\u{1F389}",
-    error: "\u{1F631}"
+    welcome: "\u{1F44B}"
   };
-  function pickState({ activity, pet, dragging, transient, sleeping, now = Date.now() }) {
+  function pickState({ activity, dragging, transient, sleeping, joyUntil = 0, now = Date.now() }) {
     if (dragging) return "drag";
     if (transient !== null) return transient;
-    if (activity.name === "celebrate" && activity.until > now) return "celebrate";
-    if (activity.name === "error" && activity.until > now) return "error";
+    if (activity.name !== "idle" && activity.name !== "working" && activity.until > now) {
+      return activity.name;
+    }
     if (activity.name === "working") return "working";
+    if (now < joyUntil) return "joy";
     if (sleeping) return "sleep";
-    if (pet && pet.hunger > 70) return "hungry";
-    if (pet && pet.mood < 30) return "sad";
-    if (pet && pet.mood >= 80 && pet.hunger < 40) return "happy";
     return "idle";
   }
 
@@ -48,10 +48,9 @@
 [data-dsh-pet] .pet-status { min-width: 120px; margin-top: 6px; padding: 6px 8px;
   background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
   display: grid; gap: 3px; }
-[data-dsh-pet] .pet-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.18); overflow: hidden; }
-[data-dsh-pet] .pet-bar > i { display: block; height: 100%; border-radius: 3px; transition: width .4s ease; }
-[data-dsh-pet] .pet-bar.satiety > i { background: #4ade80; }
-[data-dsh-pet] .pet-bar.mood > i { background: #facc15; }
+[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+  background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
+  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out; }
 [data-dsh-pet] .pet-meta { display: flex; justify-content: space-between; color: rgba(255,255,255,.75); }
 [data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
@@ -64,6 +63,7 @@
 @keyframes dsh-pet-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
+@keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 `;
   function apply() {
     const style = document.createElement("style");
@@ -81,12 +81,10 @@
     const status = document.createElement("div");
     status.className = "pet-status";
     status.innerHTML = `
-    <div class="pet-bar satiety"><i style="width:0%"></i></div>
-    <div class="pet-bar mood"><i style="width:0%"></i></div>
-    <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-note">\u2026</span></div>`;
-    const barSatiety = status.querySelector(".pet-bar.satiety > i");
-    const barMood = status.querySelector(".pet-bar.mood > i");
+    <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-stats">0 \u4EFB\u52A1</span></div>
+    <div class="pet-note">\u2026</div>`;
     const metaLv = status.querySelector(".pet-lv");
+    const metaStats = status.querySelector(".pet-stats");
     const metaNote = status.querySelector(".pet-note");
     const menu = document.createElement("div");
     menu.className = "pet-menu";
@@ -105,6 +103,7 @@
     let moved = false;
     let transient = null;
     let transientUntil = 0;
+    let joyUntil = 0;
     let showingSprite = false;
     let lastActiveAt = Date.now();
     let sleeping = false;
@@ -114,10 +113,10 @@
     let lastFrameAt = 0;
     const renderStatus = () => {
       if (pet) {
-        barSatiety.style.width = `${Math.round(100 - pet.hunger)}%`;
-        barMood.style.width = `${Math.round(pet.mood)}%`;
         metaLv.textContent = `Lv.${pet.level}`;
-        metaNote.textContent = `\u9971 ${Math.round(100 - pet.hunger)}% \u5FC3 ${Math.round(pet.mood)}`;
+        metaStats.textContent = `${pet.stats.tasksDone} \u4EFB\u52A1 \xB7 ${pet.stats.failures} \u5931\u8D25`;
+        const last = pet.memory[pet.memory.length - 1];
+        metaNote.textContent = last ?? (pet.titles.length > 0 ? `\u79F0\u53F7\u300C${pet.titles.join("\u300D\u300C")}\u300D` : "\u2026");
       }
     };
     const showEmoji = (name) => {
@@ -177,13 +176,18 @@
       } catch {
       }
     };
+    const resetTransient = (now) => {
+      const wasFun = transient === "eat" || transient === "play";
+      transient = null;
+      transientUntil = 0;
+      if (wasFun) joyUntil = now + JOY_MS;
+    };
     const tick = () => {
       const now = Date.now();
       if (transient !== null && now >= transientUntil) {
-        transient = null;
-        transientUntil = 0;
+        resetTransient(now);
       }
-      const target = pickState({ activity, pet, dragging, transient, sleeping, now });
+      const target = pickState({ activity, dragging, transient, sleeping, joyUntil, now });
       setState(target);
       const cfg = manifest.states[animState];
       if (cfg && loaded.has(cfg.sheet)) {
@@ -203,8 +207,7 @@
             else {
               frame = cfg.frames - 1;
               if (transient !== null) {
-                transient = null;
-                transientUntil = 0;
+                resetTransient(now);
               }
             }
           }
@@ -223,16 +226,25 @@
         heart.addEventListener("animationend", () => heart.remove());
       }
     };
+    const showReply = (text) => {
+      const bubble = document.createElement("div");
+      bubble.className = "pet-bubble";
+      bubble.textContent = text;
+      stage.appendChild(bubble);
+      setTimeout(() => bubble.remove(), 2500);
+    };
     const interact = async (action) => {
       transient = action === "feed" ? "eat" : "play";
       transientUntil = Date.now() + TRANSIENT_MS;
       lastActiveAt = Date.now();
       try {
-        await fetch(INTERACT_PATH, {
+        const res = await fetch(INTERACT_PATH, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ action })
         });
+        const body = await res.json().catch(() => null);
+        if (body?.reply) showReply(body.reply);
         spawnHearts();
       } catch {
       }

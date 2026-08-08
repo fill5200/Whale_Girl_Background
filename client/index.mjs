@@ -10,7 +10,7 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { EMOJI, TRANSIENT_MS, pickState } from './logic.mjs'
+import { EMOJI, TRANSIENT_MS, JOY_MS, pickState } from './logic.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
@@ -32,10 +32,9 @@ const CSS = `
 [data-dsh-pet] .pet-status { min-width: 120px; margin-top: 6px; padding: 6px 8px;
   background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
   display: grid; gap: 3px; }
-[data-dsh-pet] .pet-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.18); overflow: hidden; }
-[data-dsh-pet] .pet-bar > i { display: block; height: 100%; border-radius: 3px; transition: width .4s ease; }
-[data-dsh-pet] .pet-bar.satiety > i { background: #4ade80; }
-[data-dsh-pet] .pet-bar.mood > i { background: #facc15; }
+[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+  background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
+  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out; }
 [data-dsh-pet] .pet-meta { display: flex; justify-content: space-between; color: rgba(255,255,255,.75); }
 [data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
@@ -48,6 +47,7 @@ const CSS = `
 @keyframes dsh-pet-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
+@keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 `
 
 export function apply() {
@@ -69,12 +69,10 @@ export function apply() {
   const status = document.createElement('div')
   status.className = 'pet-status'
   status.innerHTML = `
-    <div class="pet-bar satiety"><i style="width:0%"></i></div>
-    <div class="pet-bar mood"><i style="width:0%"></i></div>
-    <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-note">…</span></div>`
-  const barSatiety = status.querySelector('.pet-bar.satiety > i')
-  const barMood = status.querySelector('.pet-bar.mood > i')
+    <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-stats">0 任务</span></div>
+    <div class="pet-note">…</div>`
   const metaLv = status.querySelector('.pet-lv')
+  const metaStats = status.querySelector('.pet-stats')
   const metaNote = status.querySelector('.pet-note')
 
   const menu = document.createElement('div')
@@ -95,8 +93,9 @@ export function apply() {
   const sheetSize = new Map() // sheet 名 → { w, h }（自然尺寸）
   let dragging = false
   let moved = false
-  let transient = null // 'eat' | 'play' | null（点击后播一次）
+  let transient = null // 'eat' | 'play' | 'wake' | null（点击/睡醒后播一次）
   let transientUntil = 0 // 超时兜底：sheet 缺失/未播完也保证复位
+  let joyUntil = 0 // 互动后短时喜悦（JOY_MS）
   let showingSprite = false // 当前 animState 是否以 sprite 呈现（迟到加载后换肤）
   let lastActiveAt = Date.now()
   let sleeping = false
@@ -108,10 +107,10 @@ export function apply() {
   // ---- 渲染 ----
   const renderStatus = () => {
     if (pet) {
-      barSatiety.style.width = `${Math.round(100 - pet.hunger)}%`
-      barMood.style.width = `${Math.round(pet.mood)}%`
       metaLv.textContent = `Lv.${pet.level}`
-      metaNote.textContent = `饱 ${Math.round(100 - pet.hunger)}% 心 ${Math.round(pet.mood)}`
+      metaStats.textContent = `${pet.stats.tasksDone} 任务 · ${pet.stats.failures} 失败`
+      const last = pet.memory[pet.memory.length - 1]
+      metaNote.textContent = last ?? (pet.titles.length > 0 ? `称号「${pet.titles.join('」「')}」` : '…')
     }
   }
 
@@ -181,14 +180,20 @@ export function apply() {
   }
 
   // ---- 动画主循环 ----
+  // 瞬发复位（eat/play/wake 播完或超时）→ 互动类瞬发后接短时喜悦（joy）。
+  const resetTransient = (now) => {
+    const wasFun = transient === 'eat' || transient === 'play'
+    transient = null
+    transientUntil = 0
+    if (wasFun) joyUntil = now + JOY_MS
+  }
   const tick = () => {
     const now = Date.now()
     // 瞬发动画超时兜底：无论 sheet 是否存在/是否播完，到点必复位（不卡死）。
     if (transient !== null && now >= transientUntil) {
-      transient = null
-      transientUntil = 0
+      resetTransient(now)
     }
-    const target = pickState({ activity, pet, dragging, transient, sleeping, now })
+    const target = pickState({ activity, dragging, transient, sleeping, joyUntil, now })
     setState(target)
     const cfg = manifest.states[animState]
     if (cfg && loaded.has(cfg.sheet)) {
@@ -209,8 +214,7 @@ export function apply() {
           else {
             frame = cfg.frames - 1
             if (transient !== null) {
-              transient = null // 非循环 sheet 播完即复位（早于超时）
-              transientUntil = 0
+              resetTransient(now) // 非循环 sheet 播完即复位（早于超时）
             }
           }
         }
@@ -232,16 +236,27 @@ export function apply() {
     }
   }
 
+  // 宠物回话气泡（互动后显示，2.5s 消失）。
+  const showReply = (text) => {
+    const bubble = document.createElement('div')
+    bubble.className = 'pet-bubble'
+    bubble.textContent = text
+    stage.appendChild(bubble)
+    setTimeout(() => bubble.remove(), 2500)
+  }
+
   const interact = async (action) => {
     transient = action === 'feed' ? 'eat' : 'play'
     transientUntil = Date.now() + TRANSIENT_MS
     lastActiveAt = Date.now()
     try {
-      await fetch(INTERACT_PATH, {
+      const res = await fetch(INTERACT_PATH, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action }),
       })
+      const body = await res.json().catch(() => null)
+      if (body?.reply) showReply(body.reply)
       spawnHearts()
     } catch {
       // 瞬态网络错误：下轮轮询会恢复
