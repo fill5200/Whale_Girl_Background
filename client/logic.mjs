@@ -10,12 +10,13 @@ export const JOY_MS = 3000
 
 export const EMOJI = {
   idle: '🐣', working: '🤔', celebrate: '🎉', error: '😱', disappointed: '😞',
-  joy: '🐥', eat: '😋', play: '🎾', drag: '😵', sleep: '💤', wake: '😪', welcome: '👋',
+  joy: '🐥', eat: '😋', play: '🎾', drag: '😵', walk: '🚶', sleep: '💤', wake: '😪', welcome: '👋',
 }
 
 /** 选择当前应播放的动画状态名（now 显式传入，测试确定性）。 */
-export function pickState({ activity, dragging, transient, sleeping, joyUntil = 0, now = Date.now() }) {
+export function pickState({ activity, dragging, walking, transient, sleeping, joyUntil = 0, now = Date.now() }) {
   if (dragging) return 'drag'
+  if (walking) return 'walk'
   if (transient !== null) return transient
   if (activity.name !== 'idle' && activity.name !== 'working' && activity.until > now) {
     return activity.name // welcome / celebrate / error / disappointed

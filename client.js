@@ -12,12 +12,14 @@
     eat: "\u{1F60B}",
     play: "\u{1F3BE}",
     drag: "\u{1F635}",
+    walk: "\u{1F6B6}",
     sleep: "\u{1F4A4}",
     wake: "\u{1F62A}",
     welcome: "\u{1F44B}"
   };
-  function pickState({ activity, dragging, transient, sleeping, joyUntil = 0, now = Date.now() }) {
+  function pickState({ activity, dragging, walking, transient, sleeping, joyUntil = 0, now = Date.now() }) {
     if (dragging) return "drag";
+    if (walking) return "walk";
     if (transient !== null) return transient;
     if (activity.name !== "idle" && activity.name !== "working" && activity.until > now) {
       return activity.name;
@@ -37,13 +39,18 @@
   var TICK_MS = 50;
   var SLEEP_AFTER_MS = 6e4;
   var SPRITE_MAX = 150;
+  var WANDER_MIN_WAIT_MS = 18e3;
+  var WANDER_MAX_WAIT_MS = 4e4;
+  var WALK_MIN_MS = 3e3;
+  var WALK_MAX_MS = 6e3;
+  var WALK_SPEED_PX_S = 45;
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
 [data-dsh-pet] .pet-stage { width: 150px; height: 150px; display: grid; place-items: center;
   font-size: 56px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
-[data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; }
+[data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 [data-dsh-pet] .pet-status { min-width: 120px; margin-top: 6px; padding: 6px 8px;
   background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
@@ -61,25 +68,26 @@
 [data-dsh-pet] .pet-heart { position: absolute; font-size: 18px; pointer-events: none;
   animation: dsh-pet-float 1s ease-out forwards; }
 /* \u72B6\u6001\u8FD0\u52A8\u914D\u65B9\uFF08manifest.motion \u2192 \u821E\u53F0 CSS \u7C7B\uFF1Bframes>1 \u8D70\u5E27\u64AD\u653E\u5668\uFF0Cframes=1 \u8D70\u6B64\u52A8\u753B\uFF09\u3002
-   \u52A8\u753B\u4F5C\u7528\u4E8E\u821E\u53F0\uFF08\u65E0\u5185\u8054 transform\uFF09\uFF0C\u4E0E sprite \u7684\u5185\u8054 scale \u4E0D\u51B2\u7A81\u3002 */
-[data-dsh-pet] .pet-stage.pet-motion-bob { animation: dsh-pet-m-bob 2s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-wiggle { animation: dsh-pet-m-wiggle .5s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-squash { animation: dsh-pet-m-squash .6s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-shake { animation: dsh-pet-m-shake .25s linear infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-sigh { animation: dsh-pet-m-sigh 1.2s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-hop { animation: dsh-pet-m-hop .5s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-tilt { animation: dsh-pet-m-tilt 1s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-float { animation: dsh-pet-m-float 3s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-wave { animation: dsh-pet-m-wave .8s ease-in-out infinite; }
-@keyframes dsh-pet-m-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-@keyframes dsh-pet-m-wiggle { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
-@keyframes dsh-pet-m-squash { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.15,.85); } }
-@keyframes dsh-pet-m-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
-@keyframes dsh-pet-m-sigh { 0%,100% { transform: translateY(0) scale(1,1); } 50% { transform: translateY(2px) scale(1,.97); } }
-@keyframes dsh-pet-m-hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes dsh-pet-m-tilt { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
-@keyframes dsh-pet-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-@keyframes dsh-pet-m-wave { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+   \u52A8\u753B\u4F5C\u7528\u4E8E\u821E\u53F0\uFF08\u65E0\u5185\u8054 transform\uFF09\uFF0C\u4E0E sprite \u7684\u5185\u8054 scale \u4E0D\u51B2\u7A81\u3002
+   \u5E45\u5EA6\u514B\u5236\uFF08\xB12~6px/deg\uFF09+ \u4E2D\u95F4\u5173\u952E\u5E27\uFF080\u21921/4\u21921/2\u21923/4\u21921\uFF09\uFF1A\u65E0\u7A81\u53D8\u7684\u5F80\u590D\u3002 */
+[data-dsh-pet] .pet-stage.pet-motion-bob { animation: dsh-pet-m-bob 2.4s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-wiggle { animation: dsh-pet-m-wiggle .9s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-squash { animation: dsh-pet-m-squash .7s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-shake { animation: dsh-pet-m-shake .3s linear infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-sigh { animation: dsh-pet-m-sigh 1.6s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-hop { animation: dsh-pet-m-hop .6s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-tilt { animation: dsh-pet-m-tilt 1.2s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-float { animation: dsh-pet-m-float 3.2s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-wave { animation: dsh-pet-m-wave 1s ease-in-out infinite; }
+@keyframes dsh-pet-m-bob { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-3px); } 60% { transform: translateY(-4px); } }
+@keyframes dsh-pet-m-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+@keyframes dsh-pet-m-squash { 0%,100% { transform: scale(1,1); } 25% { transform: scale(1.06,.94); } 50% { transform: scale(.96,1.04); } 75% { transform: scale(1.03,.97); } }
+@keyframes dsh-pet-m-shake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-2px); } 60% { transform: translateX(2px); } 80% { transform: translateX(-1px); } }
+@keyframes dsh-pet-m-sigh { 0%,100% { transform: translateY(0) scale(1,1); } 40% { transform: translateY(1.5px) scale(1,.98); } }
+@keyframes dsh-pet-m-hop { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } 70% { transform: translateY(0); } }
+@keyframes dsh-pet-m-tilt { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
+@keyframes dsh-pet-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes dsh-pet-m-wave { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } }
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
@@ -156,6 +164,11 @@
     let animState = null;
     let frame = 0;
     let lastFrameAt = 0;
+    let walking = false;
+    let walkDir = 1;
+    let flip = 1;
+    let wanderTimer = null;
+    let walkRaf = null;
     const renderStatus = () => {
       if (pet) {
         metaLv.textContent = `Lv.${pet.level}`;
@@ -182,7 +195,7 @@
       sprite.style.backgroundSize = `${size.w}px ${size.h}px`;
       sprite.style.width = `${frameW}px`;
       sprite.style.height = `${size.h}px`;
-      sprite.style.transform = scale < 1 ? `scale(${scale})` : "none";
+      sprite.style.transform = `scale(${scale}) scaleX(${flip})`;
       applyFrame(frameW, frame);
     };
     const applyFrame = (frameW, idx) => {
@@ -204,6 +217,10 @@
         showEmoji(name);
         showingSprite = false;
       }
+      stage.style.opacity = "0";
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        stage.style.opacity = "1";
+      }));
     };
     const preload = (name, cfg) => new Promise((resolve) => {
       const img = new Image();
@@ -235,7 +252,7 @@
       if (transient !== null && now >= transientUntil) {
         resetTransient(now);
       }
-      const target = pickState({ activity, dragging, transient, sleeping, joyUntil, now });
+      const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now });
       setState(target);
       const cfg = manifest.states[animState];
       if (cfg && loaded.has(cfg.sheet)) {
@@ -359,6 +376,7 @@
     host.addEventListener("pointerdown", (e) => {
       dragging = true;
       moved = false;
+      stopWalk();
       lastActiveAt = Date.now();
       startX = e.clientX;
       startY = e.clientY;
@@ -409,10 +427,58 @@
     document.addEventListener("keydown", onKeyDown);
     feedBtn.addEventListener("click", () => interact("feed"));
     playBtn.addEventListener("click", () => interact("play"));
+    const stopWalk = () => {
+      walking = false;
+      if (walkRaf !== null) {
+        cancelAnimationFrame(walkRaf);
+        walkRaf = null;
+      }
+    };
+    const scheduleWander = () => {
+      clearTimeout(wanderTimer);
+      const wait = WANDER_MIN_WAIT_MS + Math.random() * (WANDER_MAX_WAIT_MS - WANDER_MIN_WAIT_MS);
+      wanderTimer = setTimeout(() => {
+        if (sleeping) {
+          scheduleWander();
+          return;
+        }
+        wander();
+      }, wait);
+    };
+    const wander = () => {
+      walking = true;
+      walkDir = Math.random() < 0.5 ? 1 : -1;
+      flip = walkDir;
+      const duration = WALK_MIN_MS + Math.random() * (WALK_MAX_MS - WALK_MIN_MS);
+      const start = performance.now();
+      const maxX = Math.max(0, window.innerWidth - host.offsetWidth);
+      const bottomY = Math.max(0, window.innerHeight - host.offsetHeight - 16);
+      const startLeft = Math.min(Math.max(parseFloat(host.style.left) || maxX - 16, 0), maxX);
+      host.style.right = "auto";
+      host.style.bottom = "auto";
+      const step = (t) => {
+        if (sleeping || dragging) {
+          stopWalk();
+          return;
+        }
+        const x = startLeft + walkDir * WALK_SPEED_PX_S * ((t - start) / 1e3);
+        if (x <= 0 || x >= maxX || t - start >= duration) {
+          host.style.left = `${Math.min(maxX, Math.max(0, x))}px`;
+          host.style.top = `${bottomY}px`;
+          stopWalk();
+          return;
+        }
+        host.style.left = `${x}px`;
+        host.style.top = `${bottomY}px`;
+        walkRaf = requestAnimationFrame(step);
+      };
+      walkRaf = requestAnimationFrame(step);
+    };
     loadAssets();
     refresh();
     const timer = setInterval(refresh, POLL_MS);
     const animTimer = setInterval(tick, TICK_MS);
+    scheduleWander();
     const onVisibility = () => {
       if (document.visibilityState === "visible") refresh();
     };
@@ -439,6 +505,8 @@
     return () => {
       clearInterval(timer);
       clearInterval(animTimer);
+      clearTimeout(wanderTimer);
+      if (walkRaf !== null) cancelAnimationFrame(walkRaf);
       for (const t of bubbleTimers) clearTimeout(t);
       bubbleTimers.clear();
       dialogObserver.disconnect();
