@@ -79,6 +79,21 @@ test('拒绝：motion 配 frames>1（与帧播放器互斥）', () => {
   assert.match(errors.join('\n'), /motion 配方要求 frames === 1/)
 })
 
+test('接受：定向例外 error 多帧+运动叠加（2帧+shake，仅 error 放行）', () => {
+  const good = { states: { error: { sheet: 'error.png', frames: 2, fps: 8, loop: false, motion: 'shake' } } }
+  const root = makeTree({ 'assets/manifest.json': good, 'assets/error.png': fakePng(512, 256) })
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
+})
+
+test('拒绝：error 之外的状态多帧+运动叠加（例外不扩散）', () => {
+  const bad = { states: { drag: { sheet: 'drag.png', frames: 2, fps: 5, loop: true, motion: 'tilt' } } }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/drag.png': fakePng(512, 256) })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /motion 配方要求 frames === 1/)
+})
+
 /** 构造最小 PNG 头（宽高可指定；门禁只读 IHDR 尺寸）。 */
 function fakePng(w, h) {
   const buf = Buffer.alloc(24)
