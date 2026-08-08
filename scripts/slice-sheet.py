@@ -143,9 +143,10 @@ def bg_floodfill(img, bg_colors, tol):
 
 
 def closed_islands_cleanup(img, bg_colors):
-    """封闭岛清理：洪泛只删与图边连通的背景；被角色轮廓包围的**极饱和洋红**岛
-    （sp=min(R,B)-G > 120，如 (224,32,224) 的 G=32 暗洋红）不连通而残留——
-    这里按颜色直接删。角色哑光粉/紫内饰 sp≈30~70 且距背景色远，不受影响。"""
+    """封闭岛清理 + 极洋红微斑清除：
+    1) 洪泛只删与图边连通的背景；被角色轮廓包围的**极饱和洋红**岛（sp>120，如 G=32 暗洋红）
+       不连通而残留——按颜色删。角色哑光粉/紫内饰 sp≈30~90 且距背景色远，不受影响。
+    2) 散布的极洋红微斑（sp>120 且 r,b>170,g<130）——角色按契约不含洋红，直接删。"""
     import numpy as np
     from PIL import Image as _Image
 
@@ -155,7 +156,8 @@ def closed_islands_cleanup(img, bg_colors):
     sp = np.minimum(r, b) - g
     dists = [np.linalg.norm(arr - np.asarray(bg, dtype=np.int16), axis=2) for bg in bg_colors]
     dmin = np.min(np.stack(dists), axis=0)
-    kill = (sp > 120) & (dmin < 45) & (a > 0)
+    kill = ((sp > 120) & (dmin < 45)) | ((sp > 120) & (r > 170) & (b > 170) & (g < 130))
+    kill &= a > 0
     new_a = np.where(kill, 0, a).astype(np.uint8)
     out = img.convert('RGBA')
     out.putalpha(_Image.fromarray(new_a, 'L'))
