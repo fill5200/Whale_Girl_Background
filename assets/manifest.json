@@ -8,9 +8,6 @@
     "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 6,  "loop": false },
     "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "loop": false },
     "play":         { "sheet": "play.png",         "frames": 3, "fps": 8,  "loop": false },
-    "drag":         { "sheet": "drag.png",         "frames": 3, "fps": 6,  "loop": true },
-    "sleep":        { "sheet": "sleep.png",        "frames": 1, "fps": 1,  "loop": true,  "motion": "float" },
-    "wake":         { "sheet": "wake.png",         "frames": 1, "fps": 5,  "loop": false },
-    "welcome":      { "sheet": "welcome.png",      "frames": 1, "fps": 6,  "loop": false, "motion": "wave" }
+    "drag":         { "sheet": "drag.png",         "frames": 3, "fps": 6,  "loop": true }
   }
 }
