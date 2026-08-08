@@ -29,13 +29,14 @@ export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = f
   const failed = []
   for (const t of tasks) {
     const prev = known.get(t.id)
-    if (prev === 'running' && (t.status === 'completed' || t.status === 'killed')) {
+    if (prev === 'running' && t.status === 'completed') {
       completed.push(t.id)
       burst = betterBurst(burst, { name: 'celebrate', until: nowMs + BURST_MS })
     } else if (prev === 'running' && t.status === 'failed') {
       failed.push(t.id)
       burst = betterBurst(burst, { name: 'error', until: nowMs + BURST_MS })
     }
+    // killed（用户取消）中性：不进 completed/failed、不触发 burst（账本由 onTaskDone 同样中性处理）。
     known.set(t.id, t.status)
   }
   // 任务从列表消失也视为完成（列表可能只保留活跃任务）。

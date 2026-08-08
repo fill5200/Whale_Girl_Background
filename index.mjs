@@ -115,16 +115,8 @@ export function apply(ctx) {
     const tasks = collectTasks(ctx)
     const derived = deriveActivity({ tasks, nowMs: now, known, wasWorking })
     wasWorking = derived.wasWorking
-    for (const id of derived.completed) {
-      // 回忆用任务 label（非原始 id——UUID 截断无意义）；缺 label 用通用占位。
-      const label = tasks.find((t) => t.id === id)?.label
-      state = recordTaskCompleted(state, label ?? '未命名任务', now).state
-      scheduleSave()
-    }
-    for (const id of derived.failed) {
-      state = recordFailure(state, now).state
-      scheduleSave()
-    }
+    // 账本记账（+XP/失败计数/回忆）已迁入 ctx.tasks.onTaskDone 事件驱动——
+    // 页面关闭/轮询缺席时任务终态不漏记；此处只保留展示（working/burst）与活跃时长。
     if (derived.working) {
       state = recordActive(state, now - lastActiveCheck, now).state
       scheduleSave()
@@ -155,6 +147,19 @@ export function apply(ctx) {
 
   ctx.effect(() => {
     const disposers = [
+      // 事件驱动记账（F1）：任务终态恰回调一次，与浏览器轮询解耦——
+      // GUI 关闭期间完成/失败的任务也入账（此前靠轮询观察 running 翻转，漏记窗口大）。
+      // killed（用户取消）中性：不计 XP、不记失败、不写回忆（F4 语义）。
+      ctx.tasks.onTaskDone((snapshot) => {
+        const now = Date.now()
+        if (snapshot.status === 'completed') {
+          state = recordTaskCompleted(state, snapshot.label ?? '未命名任务', now).state
+          scheduleSave()
+        } else if (snapshot.status === 'failed') {
+          state = recordFailure(state, now).state
+          scheduleSave()
+        }
+      }),
       ctx.on('agent/request-error', () => {
         // 请求错误（LLM API 抖动，重试后可能成功）只触发 error/disappointed 情绪，
         // 不记入 stats.failures / 回忆——「任务失败」计数只认任务状态翻转（deriveActivity），
