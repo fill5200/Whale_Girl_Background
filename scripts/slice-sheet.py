@@ -319,17 +319,61 @@ def detect_grid(img, max_cells=8):
     return row_bounds, col_bounds
 
 
-def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88):
-    """把一行（同一状态的帧）做成帧 sheet（图形学式逐对象配准）：
-    先抠图（调用方已完成）→ 每帧**独立**裁到自身内容 bbox → **统一缩放因子**
-    （scale = 目标高 / 全帧最大内容高；最高帧达目标高，其余按真实比例更矮——
-    逐帧归一化会把"抬手帧压扁/蹲伏帧拉伸"造成忽大忽小与过裁感）→
-    **底中对齐**（脚着地；x 居中消除左右漂移）。空帧跳过。"""
+def largest_blob_bbox(cell):
+    """轮廓法：cell 内 4-连通**最大连通域**的 bbox。
+    取代简单 alpha 包围盒——格子放宽后邻格角色的小块会误入，包围盒会包含它们；
+    最大连通域只取角色本体（邻块是独立小连通域，被排除）。"""
+    from collections import deque
+
+    alpha = np.asarray(cell.getchannel('A'))
+    mask = alpha > 40
+    h, w = mask.shape
+    visited = np.zeros_like(mask)
+    best = None
+    for y0 in range(h):
+        for x0 in range(w):
+            if not mask[y0, x0] or visited[y0, x0]:
+                continue
+            area = 0
+            minx = maxx = x0
+            miny = maxy = y0
+            q = deque([(y0, x0)])
+            visited[y0, x0] = True
+            while q:
+                y, x = q.popleft()
+                area += 1
+                if x < minx:
+                    minx = x
+                if x > maxx:
+                    maxx = x
+                if y < miny:
+                    miny = y
+                if y > maxy:
+                    maxy = y
+                for ny, nx in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
+                    if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not visited[ny, nx]:
+                        visited[ny, nx] = True
+                        q.append((ny, nx))
+            if best is None or area > best[0]:
+                best = (area, (minx, miny, maxx, maxy))
+    return best[1] if best else None
+
+
+def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88, expand=45):
+    """把一行（同一状态的帧）做成帧 sheet（轮廓法逐对象配准）：
+    先抠图（调用方完成）→ **格子垂直放宽 expand px**（格子边界不再切角色头顶）→
+    每帧取**最大连通域** bbox（排除邻格误入的小块）→ 统一缩放因子 → 底中对齐。
+    这是用户指点的正确顺序：宽松取域 + 轮廓定位，避免过裁与邻图误入。"""
     frames = []
     for c in cols:
         (yt, yb), (xl, xr) = row_bounds[row], col_bounds[c]
-        cell = img.crop((xl, yt, xr, yb))
-        bb = content_bbox(cell)
+        # 放宽：格子边界可能切进角色（头顶被裁/邻图误入的根因）；轮廓法会重新定位本体
+        cx0 = max(0, xl - expand)
+        cx1 = min(img.width, xr + expand)
+        cy0 = max(0, yt - expand)
+        cy1 = min(img.height, yb + expand)
+        cell = img.crop((cx0, cy0, cx1, cy1))
+        bb = largest_blob_bbox(cell)
         if bb is None:
             continue
         frames.append((cell, bb))
