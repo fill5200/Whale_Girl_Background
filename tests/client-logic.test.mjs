@@ -11,6 +11,7 @@ test('拖拽优先于一切', () => {
 
 test('瞬发 transient 覆盖派生状态', () => {
   assert.equal(pickState({ ...IDLE, transient: 'eat' }), 'eat')
+  assert.equal(pickState({ ...IDLE, transient: 'wake' }), 'wake')
 })
 
 test('burst 在窗口内生效、过期后回退', () => {
@@ -43,7 +44,7 @@ test('确定性：显式 now 时相同输入相同输出', () => {
 
 test('TRANSIENT_MS 与 EMOJI 完整性（每个可达状态都有兜底表情）', () => {
   assert.equal(TRANSIENT_MS, 1500)
-  for (const s of ['idle', 'happy', 'hungry', 'sad', 'eat', 'play', 'drag', 'sleep', 'working', 'celebrate', 'error']) {
+  for (const s of ['idle', 'happy', 'hungry', 'sad', 'eat', 'play', 'drag', 'sleep', 'wake', 'working', 'celebrate', 'error']) {
     assert.ok(EMOJI[s] !== undefined, `EMOJI 缺 ${s}`)
   }
 })

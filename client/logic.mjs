@@ -7,7 +7,7 @@ export const TRANSIENT_MS = 1500
 
 export const EMOJI = {
   idle: '🐣', happy: '🐥', hungry: '🥺', sad: '😞', eat: '😋', play: '🎾',
-  drag: '😵', sleep: '💤', working: '🤔', celebrate: '🎉', error: '😱',
+  drag: '😵', sleep: '💤', wake: '😪', working: '🤔', celebrate: '🎉', error: '😱',
 }
 
 /** 选择当前应播放的动画状态名（now 显式传入，测试确定性）。 */

@@ -100,6 +100,7 @@ export function apply() {
   let showingSprite = false // 当前 animState 是否以 sprite 呈现（迟到加载后换肤）
   let lastActiveAt = Date.now()
   let sleeping = false
+  let wasSleeping = false // 睡醒过渡（wake 瞬发）触发依据
   let animState = null
   let frame = 0
   let lastFrameAt = 0
@@ -257,6 +258,12 @@ export function apply() {
       activity = body.activity ?? { name: 'idle', until: 0 }
       if (activity.name !== 'idle' || activity.until > Date.now()) lastActiveAt = Date.now()
       sleeping = activity.name === 'idle' && Date.now() - lastActiveAt > SLEEP_AFTER_MS
+      // 睡醒过渡：sleep → 非 sleep 时播一次 wake（受 TRANSIENT_MS 超时兜底）。
+      if (wasSleeping && !sleeping && transient === null) {
+        transient = 'wake'
+        transientUntil = Date.now() + TRANSIENT_MS
+      }
+      wasSleeping = sleeping
       renderStatus()
     } catch {
       // 瞬态网络错误：保留上次状态

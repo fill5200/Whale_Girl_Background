@@ -10,6 +10,7 @@
     play: "\u{1F3BE}",
     drag: "\u{1F635}",
     sleep: "\u{1F4A4}",
+    wake: "\u{1F62A}",
     working: "\u{1F914}",
     celebrate: "\u{1F389}",
     error: "\u{1F631}"
@@ -107,6 +108,7 @@
     let showingSprite = false;
     let lastActiveAt = Date.now();
     let sleeping = false;
+    let wasSleeping = false;
     let animState = null;
     let frame = 0;
     let lastFrameAt = 0;
@@ -245,6 +247,11 @@
         activity = body.activity ?? { name: "idle", until: 0 };
         if (activity.name !== "idle" || activity.until > Date.now()) lastActiveAt = Date.now();
         sleeping = activity.name === "idle" && Date.now() - lastActiveAt > SLEEP_AFTER_MS;
+        if (wasSleeping && !sleeping && transient === null) {
+          transient = "wake";
+          transientUntil = Date.now() + TRANSIENT_MS;
+        }
+        wasSleeping = sleeping;
         renderStatus();
       } catch {
       }
