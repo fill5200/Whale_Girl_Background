@@ -47,3 +47,11 @@ test('拒绝：frames 非法', () => {
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /frames 必须是正整数/)
 })
+
+test('拒绝：sheet 扩展名不在 MIME 白名单', () => {
+  const bad = { states: { idle: { sheet: 'idle.txt', frames: 4, fps: 4, loop: true } } }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/idle.txt': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /扩展名不在白名单/)
+})

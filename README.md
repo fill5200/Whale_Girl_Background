@@ -17,8 +17,10 @@ dsh registry enable vlln/dsh-pet # 启用（实时挂载；浏览器端需刷新
 node scripts/gates/run.mjs          # 本地门禁组（链接/决策格式/assets manifest/生成物新鲜度）
 node --test 'tests/*.test.mjs'      # Node half 单测
 node scripts/build-client.mjs       # 改 client/ 源码后重新生成 client.js（勿手改产物）
-dsh registry disable vlln/dsh-pet && dsh registry enable vlln/dsh-pet   # 改完重挂载
+dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh registry enable vlln/dsh-pet
 ```
+
+**进程边界（易错）**：`dsh registry enable` 在 CLI 进程注册，**已运行的 web 不感知**——disable/enable 对运行中实例无效。改 `index.mjs`（Node half）后需 **web 重启**；改 `client/` 或 `assets/` 后重装（上例把新 `client.js`/sheet 复制进安装目录）+ **刷新页面**即可（`serveBundle` 按请求读磁盘，页面刷新即取新文件）。
 
 ## 素材（sprite sheet）契约
 
