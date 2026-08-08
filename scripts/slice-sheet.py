@@ -18,6 +18,8 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np  # 内容感知边界等主流程用（本机已验证可用）
+
 from PIL import Image
 
 ALPHA_THRESHOLD = 16
@@ -100,37 +102,63 @@ def harden_alpha(img):
 
 
 def despill(img, bg_colors):
-    """去溢色（色键残边）：
-    1) 半透明边缘像素按最近背景色反解真实颜色 c_true = (c - (1-α)·bg) / α；
-    2) 不透明混合残留（α≈255 但距背景 < 120 且洋红主导 R,B≫G）做溢色抑制：补 G、降 R/B。
-    角色被提示约束为不含洋红，故距背景近的洋红主导像素可安全视为残边。"""
+    """去溢色（色键残边）：对距背景色近（<120）且洋红主导（R,B≫G）的像素做溢色抑制
+    （补 G、降 R/B），消除角色边缘洋红描边/光晕。
+    不做反解：低 alpha 像素反解 c=(c-(1-α)bg)/α 会把噪声放大成饱和色环（实测）。"""
     import numpy as np
 
     arr = np.asarray(img.convert('RGBA'), dtype=np.float64)
     rgb = arr[:, :, :3]
-    a = arr[:, :, 3] / 255.0  # (h,w) 2D，避免与 3D 通道广播出巨数组
+    a = arr[:, :, 3] / 255.0
     dists = np.stack([np.linalg.norm(rgb - np.asarray(b, dtype=np.float64), axis=2) for b in bg_colors])
-    nearest = np.argmin(dists, axis=0)
     dmin = np.min(dists, axis=0)
-    bg = np.stack([np.asarray(b, dtype=np.float64) for b in bg_colors])[nearest]
-    # 1) 半透明反解
-    a_safe = np.maximum(a, 1e-3)
-    corrected = np.clip((rgb - (1 - a_safe)[:, :, None] * bg) / a_safe[:, :, None], 0, 255)
-    semi_mask = (a > 0.02) & (a < 0.98)
-    rgb = np.where(semi_mask[:, :, None], corrected, rgb)
-    # 2) 不透明溢色抑制
     r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
     sp = np.clip(np.minimum(r, b) - g, 0, 255)  # 洋红溢色量
-    opaque_mask = (a >= 0.98) & (dmin < 120) & (sp > 8)
+    mask = (dmin < 120) & (sp > 8) & (a > 0.05)
     rgb = np.stack([
-        np.where(opaque_mask, r - sp * 0.35, r),
-        np.where(opaque_mask, g + sp * 0.7, g),
-        np.where(opaque_mask, b - sp * 0.35, b),
+        np.where(mask, r - sp * 0.35, r),
+        np.where(mask, g + sp * 0.7, g),
+        np.where(mask, b - sp * 0.35, b),
     ], axis=2)
     out = img.convert('RGBA')
     data = np.asarray(out, dtype=np.uint8).copy()
     data[:, :, :3] = np.clip(rgb, 0, 255).astype(np.uint8)
     return Image.fromarray(data)
+
+
+def profile_bounds(mask, axis, n):
+    """内容感知网格边界：沿 axis（0=行，1=列）找空白带，取中间最宽的 n-1 条中心作切分线。
+    等分切分会切进相邻角色（实测截脚）；此函数对齐实际格距。返回 n+1 边界；不足时 None。"""
+    total = mask.sum(axis=axis)
+    length = len(total)
+    blank = [i for i, v in enumerate(total) if v < 3]
+    gaps = []
+    if blank:
+        start = prev = blank[0]
+        for i in blank[1:]:
+            if i - prev > 2:
+                gaps.append((start, prev))
+                start = i
+            prev = i
+        gaps.append((start, prev))
+    mid = [g for g in gaps if g[0] > length * 0.05 and g[1] < length * 0.95]
+    if len(mid) < n - 1:
+        return None
+    mid.sort(key=lambda g: g[1] - g[0], reverse=True)
+    cuts = sorted((g[0] + g[1]) // 2 for g in mid[: n - 1])
+    return [0] + cuts + [length]
+
+
+def content_extent_bounds(mask, axis, n):
+    """内容范围等分：在内容实际起止内均匀切 n 段（比整画布等分更贴角色高度）。
+    供 profile 无空白带时回退。"""
+    total = mask.sum(axis=axis)
+    idx = np.nonzero(total > 3)[0]
+    if len(idx) < 2:
+        return None
+    lo, hi = int(idx[0]), int(idx[-1])
+    span = hi - lo
+    return [lo + round(span * i / n) for i in range(n + 1)]
 
 
 def detect_grid(img, max_cells=8):
@@ -249,8 +277,27 @@ def main():
         rows_s, cols_s = (args.sheet or args.grid).lower().split('x')
         rows, cols = int(rows_s), int(cols_s)
         w, h = img.size
-        row_bounds = [(round(h * r / rows), round(h * (r + 1) / rows)) for r in range(rows)]
-        col_bounds = [(round(w * c / cols), round(w * (c + 1) / cols)) for c in range(cols)]
+        if args.sheet:
+            # 内容感知边界：对齐实际格距（等分会切进相邻角色——实测截脚）；
+            # profile 无空白带时回退内容范围等分，再回退整画布等分。
+            mask = np.asarray(img.getchannel('A')) > 30
+            rb = profile_bounds(mask, 0, rows) or content_extent_bounds(mask, 0, rows)
+            cb = profile_bounds(mask, 1, cols) or content_extent_bounds(mask, 1, cols)
+            if rb is not None and cb is not None:
+                row_bounds = [(rb[i], rb[i + 1]) for i in range(rows)]
+                col_bounds = [(cb[i], cb[i + 1]) for i in range(cols)]
+                print(f'content-aware bounds: rows={rb} cols={cb}', file=sys.stderr)
+            else:
+                row_bounds = [(round(h * r / rows), round(h * (r + 1) / rows)) for r in range(rows)]
+                col_bounds = [(round(w * c / cols), round(w * (c + 1) / cols)) for c in range(cols)]
+                print('content bounds failed, fallback equal division', file=sys.stderr)
+            # 安全内缩：剥掉相邻角色的残余（截脚），union-bbox 会重新收回到真实内容。
+            inset = 12
+            row_bounds = [(a + inset, b - inset) for (a, b) in row_bounds if b - a > 2 * inset]
+            col_bounds = [(a + inset, b - inset) for (a, b) in col_bounds if b - a > 2 * inset]
+        else:
+            row_bounds = [(round(h * r / rows), round(h * (r + 1) / rows)) for r in range(rows)]
+            col_bounds = [(round(w * c / cols), round(w * (c + 1) / cols)) for c in range(cols)]
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
