@@ -6,7 +6,11 @@
 //
 // 视觉：sprite sheet 帧播放器（assets/manifest.json 声明 状态→sheet/frames/fps/loop，
 // 每状态一张横排帧图，透明背景）；sheet 缺失/未加载时用 emoji 兜底，增量替换。
-// 状态选择优先级：drag > 瞬发 eat/play > burst(celebrate/error) > working > sleep > hungry/sad > idle。
+// 状态选择与表情映射是纯函数（client/logic.mjs，可单测）；本文件只做 DOM 与计时。
+// 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
+// pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
+
+import { EMOJI, TRANSIENT_MS, pickState } from './logic.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
@@ -17,15 +21,9 @@ const TICK_MS = 50
 const SLEEP_AFTER_MS = 60000
 const SPRITE_MAX = 150
 
-// 表情兜底（sheet 缺失/加载失败时）。
-const EMOJI = {
-  idle: '🐣', happy: '🐥', hungry: '🥺', sad: '😞', eat: '😋', play: '🎾',
-  drag: '😵', sleep: '💤', working: '🤔', celebrate: '🎉', error: '😱',
-}
-
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; }
+  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
 [data-dsh-pet] .pet-stage { width: 96px; height: 96px; display: grid; place-items: center;
   font-size: 56px; line-height: 1; text-align: center; animation: dsh-pet-bob 2s ease-in-out infinite;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
@@ -39,7 +37,8 @@ const CSS = `
 [data-dsh-pet] .pet-bar.satiety > i { background: #4ade80; }
 [data-dsh-pet] .pet-bar.mood > i { background: #facc15; }
 [data-dsh-pet] .pet-meta { display: flex; justify-content: space-between; color: rgba(255,255,255,.75); }
-[data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; }
+[data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
+  background: rgba(20,20,28,.72); }
 [data-dsh-pet] .pet-menu.open { display: flex; }
 [data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 12px; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; }
@@ -51,20 +50,6 @@ const CSS = `
   100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
 `
 
-/** 状态选择：返回当前应播放的动画状态名。 */
-function pickState({ activity, pet, dragging, transient, sleeping }) {
-  if (dragging) return 'drag'
-  if (transient !== null) return transient
-  const now = Date.now()
-  if (activity.name === 'celebrate' && activity.until > now) return 'celebrate'
-  if (activity.name === 'error' && activity.until > now) return 'error'
-  if (activity.name === 'working') return 'working'
-  if (sleeping) return 'sleep'
-  if (pet && pet.hunger > 70) return 'hungry'
-  if (pet && pet.mood < 30) return 'sad'
-  return 'idle'
-}
-
 export function apply() {
   const style = document.createElement('style')
   style.textContent = CSS
@@ -73,7 +58,6 @@ export function apply() {
   const host = document.createElement('div')
   host.setAttribute('data-dsh-pet', '')
   host.setAttribute('title', 'dsh-pet：点击互动，拖拽移动')
-  host.style.position = 'relative'
   document.body.appendChild(host)
 
   const stage = document.createElement('div')
@@ -112,6 +96,8 @@ export function apply() {
   let dragging = false
   let moved = false
   let transient = null // 'eat' | 'play' | null（点击后播一次）
+  let transientUntil = 0 // 超时兜底：sheet 缺失/未播完也保证复位
+  let showingSprite = false // 当前 animState 是否以 sprite 呈现（迟到加载后换肤）
   let lastActiveAt = Date.now()
   let sleeping = false
   let animState = null
@@ -161,8 +147,13 @@ export function apply() {
     frame = 0
     lastFrameAt = 0
     const cfg = manifest.states[name]
-    if (cfg && loaded.has(cfg.sheet)) showSprite(name, cfg)
-    else showEmoji(name)
+    if (cfg && loaded.has(cfg.sheet)) {
+      showSprite(name, cfg)
+      showingSprite = true
+    } else {
+      showEmoji(name)
+      showingSprite = false
+    }
   }
 
   // ---- 资产加载 ----
@@ -191,12 +182,24 @@ export function apply() {
   // ---- 动画主循环 ----
   const tick = () => {
     const now = Date.now()
-    const target = pickState({ activity, pet, dragging, transient, sleeping })
+    // 瞬发动画超时兜底：无论 sheet 是否存在/是否播完，到点必复位（不卡死）。
+    if (transient !== null && now >= transientUntil) {
+      transient = null
+      transientUntil = 0
+    }
+    const target = pickState({ activity, pet, dragging, transient, sleeping, now })
     setState(target)
     const cfg = manifest.states[animState]
     if (cfg && loaded.has(cfg.sheet)) {
       const size = sheetSize.get(cfg.sheet)
       const frameW = size.w / cfg.frames
+      if (!showingSprite) {
+        // sprite 迟到加载完成：当前状态仍以 emoji 显示 → 换肤。
+        showSprite(animState, cfg)
+        showingSprite = true
+        frame = 0
+        lastFrameAt = 0
+      }
       if (now - lastFrameAt >= 1000 / cfg.fps) {
         lastFrameAt = now
         frame += 1
@@ -204,7 +207,10 @@ export function apply() {
           if (cfg.loop) frame = 0
           else {
             frame = cfg.frames - 1
-            if (transient !== null) transient = null // 瞬发动画播完回到派生状态
+            if (transient !== null) {
+              transient = null // 非循环 sheet 播完即复位（早于超时）
+              transientUntil = 0
+            }
           }
         }
         applyFrame(frameW, frame)
@@ -227,6 +233,7 @@ export function apply() {
 
   const interact = async (action) => {
     transient = action === 'feed' ? 'eat' : 'play'
+    transientUntil = Date.now() + TRANSIENT_MS
     lastActiveAt = Date.now()
     try {
       await fetch(INTERACT_PATH, {
@@ -262,6 +269,7 @@ export function apply() {
   let offsetX = 0
   let offsetY = 0
 
+  // capture 只在越过拖拽阈值后启用：纯点击不捕获，菜单按钮的 click 正常派发。
   host.addEventListener('pointerdown', (e) => {
     dragging = true
     moved = false
@@ -270,11 +278,13 @@ export function apply() {
     startY = e.clientY
     offsetX = e.clientX - host.offsetLeft
     offsetY = e.clientY - host.offsetTop
-    host.setPointerCapture(e.pointerId)
   })
   host.addEventListener('pointermove', (e) => {
     if (!dragging) return
-    if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) moved = true
+    if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
+      if (!moved) host.setPointerCapture(e.pointerId)
+      moved = true
+    }
     if (!moved) return
     const x = Math.max(0, Math.min(e.clientX - offsetX, window.innerWidth - host.offsetWidth))
     const y = Math.max(0, Math.min(e.clientY - offsetY, window.innerHeight - host.offsetHeight))
@@ -283,9 +293,15 @@ export function apply() {
     host.style.right = 'auto'
     host.style.bottom = 'auto'
   })
-  host.addEventListener('pointerup', () => {
+  host.addEventListener('pointerup', (e) => {
     dragging = false
-    if (!moved) menu.classList.toggle('open')
+    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId)
+    // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
+    if (!moved && !e.target.closest('button')) menu.classList.toggle('open')
+  })
+  host.addEventListener('pointercancel', () => {
+    dragging = false
+    moved = false
   })
   feedBtn.addEventListener('click', () => interact('feed'))
   playBtn.addEventListener('click', () => interact('play'))
