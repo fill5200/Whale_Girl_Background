@@ -2,12 +2,33 @@
   // client/index.mjs
   var STATE_PATH = "/plugins/vlln/dsh-pet/state";
   var INTERACT_PATH = "/plugins/vlln/dsh-pet/interact";
+  var ASSETS_URL = "/plugins/vlln/dsh-pet/assets";
+  var MANIFEST_URL = `${ASSETS_URL}/manifest.json`;
   var POLL_MS = 3e3;
+  var TICK_MS = 50;
+  var SLEEP_AFTER_MS = 6e4;
+  var SPRITE_MAX = 150;
+  var EMOJI = {
+    idle: "\u{1F423}",
+    happy: "\u{1F425}",
+    hungry: "\u{1F97A}",
+    sad: "\u{1F61E}",
+    eat: "\u{1F60B}",
+    play: "\u{1F3BE}",
+    drag: "\u{1F635}",
+    sleep: "\u{1F4A4}",
+    working: "\u{1F914}",
+    celebrate: "\u{1F389}",
+    error: "\u{1F631}"
+  };
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; }
-[data-dsh-pet] .pet-face { font-size: 56px; line-height: 1; text-align: center;
-  animation: dsh-pet-bob 2s ease-in-out infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+[data-dsh-pet] .pet-stage { width: 96px; height: 96px; display: grid; place-items: center;
+  font-size: 56px; line-height: 1; text-align: center; animation: dsh-pet-bob 2s ease-in-out infinite;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+[data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; }
+[data-dsh-pet] .pet-sprite.ready { display: block; }
 [data-dsh-pet] .pet-status { min-width: 120px; margin-top: 6px; padding: 6px 8px;
   background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
   display: grid; gap: 3px; }
@@ -21,14 +42,23 @@
 [data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 12px; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; }
 [data-dsh-pet] .pet-menu button:hover { background: rgba(255,255,255,.28); }
+[data-dsh-pet] .pet-heart { position: absolute; font-size: 18px; pointer-events: none;
+  animation: dsh-pet-float 1s ease-out forwards; }
 @keyframes dsh-pet-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
+  100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
 `;
-  function faceFor(state) {
-    if (!state) return "\u{1F423}";
-    if (state.hunger > 70) return "\u{1F97A}";
-    if (state.mood < 30) return "\u{1F61E}";
-    if (state.level >= 2) return "\u{1F425}";
-    return "\u{1F423}";
+  function pickState({ activity, pet, dragging, transient, sleeping }) {
+    if (dragging) return "drag";
+    if (transient !== null) return transient;
+    const now = Date.now();
+    if (activity.name === "celebrate" && activity.until > now) return "celebrate";
+    if (activity.name === "error" && activity.until > now) return "error";
+    if (activity.name === "working") return "working";
+    if (sleeping) return "sleep";
+    if (pet && pet.hunger > 70) return "hungry";
+    if (pet && pet.mood < 30) return "sad";
+    return "idle";
   }
   function apply() {
     const style = document.createElement("style");
@@ -37,10 +67,13 @@
     const host = document.createElement("div");
     host.setAttribute("data-dsh-pet", "");
     host.setAttribute("title", "dsh-pet\uFF1A\u70B9\u51FB\u4E92\u52A8\uFF0C\u62D6\u62FD\u79FB\u52A8");
+    host.style.position = "relative";
     document.body.appendChild(host);
-    const face = document.createElement("div");
-    face.className = "pet-face";
-    face.textContent = "\u{1F423}";
+    const stage = document.createElement("div");
+    stage.className = "pet-stage";
+    const sprite = document.createElement("div");
+    sprite.className = "pet-sprite";
+    stage.appendChild(sprite);
     const status = document.createElement("div");
     status.className = "pet-status";
     status.innerHTML = `
@@ -58,24 +91,123 @@
     const playBtn = document.createElement("button");
     playBtn.textContent = "\u{1F3BE} \u73A9\u800D";
     menu.append(feedBtn, playBtn);
-    host.append(face, status, menu);
-    let state = null;
-    const render = () => {
-      face.textContent = faceFor(state);
-      if (state) {
-        barSatiety.style.width = `${Math.round(100 - state.hunger)}%`;
-        barMood.style.width = `${Math.round(state.mood)}%`;
-        metaLv.textContent = `Lv.${state.level}`;
-        metaNote.textContent = state.xp >= 0 ? `\u9971 ${Math.round(100 - state.hunger)}% \u5FC3 ${Math.round(state.mood)}` : "";
+    host.append(stage, status, menu);
+    let pet = null;
+    let activity = { name: "idle", until: 0 };
+    let manifest = { states: {} };
+    const loaded = /* @__PURE__ */ new Set();
+    const sheetSize = /* @__PURE__ */ new Map();
+    let dragging = false;
+    let moved = false;
+    let transient = null;
+    let lastActiveAt = Date.now();
+    let sleeping = false;
+    let animState = null;
+    let frame = 0;
+    let lastFrameAt = 0;
+    const renderStatus = () => {
+      if (pet) {
+        barSatiety.style.width = `${Math.round(100 - pet.hunger)}%`;
+        barMood.style.width = `${Math.round(pet.mood)}%`;
+        metaLv.textContent = `Lv.${pet.level}`;
+        metaNote.textContent = `\u9971 ${Math.round(100 - pet.hunger)}% \u5FC3 ${Math.round(pet.mood)}`;
+      }
+    };
+    const showEmoji = (name) => {
+      sprite.classList.remove("ready");
+      stage.textContent = EMOJI[name] ?? "\u{1F423}";
+    };
+    const showSprite = (name, cfg) => {
+      const size = sheetSize.get(cfg.sheet);
+      if (!size) {
+        showEmoji(name);
+        return;
+      }
+      stage.textContent = "";
+      const frameW = size.w / cfg.frames;
+      const scale = Math.min(SPRITE_MAX / frameW, SPRITE_MAX / size.h, 1);
+      sprite.className = "pet-sprite ready";
+      sprite.style.backgroundImage = `url("${ASSETS_URL}/${cfg.sheet}")`;
+      sprite.style.backgroundSize = `${size.w}px ${size.h}px`;
+      sprite.style.width = `${frameW}px`;
+      sprite.style.height = `${size.h}px`;
+      sprite.style.transform = scale < 1 ? `scale(${scale})` : "none";
+      applyFrame(frameW, frame);
+    };
+    const applyFrame = (frameW, idx) => {
+      sprite.style.backgroundPosition = `-${frameW * idx}px 0`;
+    };
+    const setState = (name) => {
+      if (name === animState) return;
+      animState = name;
+      frame = 0;
+      lastFrameAt = 0;
+      const cfg = manifest.states[name];
+      if (cfg && loaded.has(cfg.sheet)) showSprite(name, cfg);
+      else showEmoji(name);
+    };
+    const preload = (name, cfg) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        sheetSize.set(cfg.sheet, { w: img.naturalWidth, h: img.naturalHeight });
+        loaded.add(cfg.sheet);
+        resolve();
+      };
+      img.onerror = resolve;
+      img.src = `${ASSETS_URL}/${cfg.sheet}`;
+    });
+    const loadAssets = async () => {
+      try {
+        const res = await fetch(MANIFEST_URL);
+        if (!res.ok) return;
+        manifest = await res.json();
+        await Promise.all(Object.entries(manifest.states).map(([n, cfg]) => preload(n, cfg)));
+      } catch {
+      }
+    };
+    const tick = () => {
+      const now = Date.now();
+      const target = pickState({ activity, pet, dragging, transient, sleeping });
+      setState(target);
+      const cfg = manifest.states[animState];
+      if (cfg && loaded.has(cfg.sheet)) {
+        const size = sheetSize.get(cfg.sheet);
+        const frameW = size.w / cfg.frames;
+        if (now - lastFrameAt >= 1e3 / cfg.fps) {
+          lastFrameAt = now;
+          frame += 1;
+          if (frame >= cfg.frames) {
+            if (cfg.loop) frame = 0;
+            else {
+              frame = cfg.frames - 1;
+              if (transient !== null) transient = null;
+            }
+          }
+          applyFrame(frameW, frame);
+        }
+      }
+    };
+    const spawnHearts = () => {
+      for (let i = 0; i < 4; i++) {
+        const heart = document.createElement("div");
+        heart.className = "pet-heart";
+        heart.textContent = "\u{1F497}";
+        heart.style.left = `${8 + Math.random() * 48}px`;
+        heart.style.top = `${8 + Math.random() * 24}px`;
+        stage.appendChild(heart);
+        heart.addEventListener("animationend", () => heart.remove());
       }
     };
     const interact = async (action) => {
+      transient = action === "feed" ? "eat" : "play";
+      lastActiveAt = Date.now();
       try {
         await fetch(INTERACT_PATH, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ action })
         });
+        spawnHearts();
       } catch {
       }
       await refresh();
@@ -84,13 +216,15 @@
       try {
         const res = await fetch(STATE_PATH);
         if (!res.ok) return;
-        state = (await res.json()).pet;
-        render();
+        const body = await res.json();
+        pet = body.pet;
+        activity = body.activity ?? { name: "idle", until: 0 };
+        if (activity.name !== "idle" || activity.until > Date.now()) lastActiveAt = Date.now();
+        sleeping = activity.name === "idle" && Date.now() - lastActiveAt > SLEEP_AFTER_MS;
+        renderStatus();
       } catch {
       }
     };
-    let dragging = false;
-    let moved = false;
     let startX = 0;
     let startY = 0;
     let offsetX = 0;
@@ -98,6 +232,7 @@
     host.addEventListener("pointerdown", (e) => {
       dragging = true;
       moved = false;
+      lastActiveAt = Date.now();
       startX = e.clientX;
       startY = e.clientY;
       offsetX = e.clientX - host.offsetLeft;
@@ -121,10 +256,13 @@
     });
     feedBtn.addEventListener("click", () => interact("feed"));
     playBtn.addEventListener("click", () => interact("play"));
+    loadAssets();
     refresh();
     const timer = setInterval(refresh, POLL_MS);
+    const animTimer = setInterval(tick, TICK_MS);
     return () => {
       clearInterval(timer);
+      clearInterval(animTimer);
       host.remove();
       style.remove();
     };

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="96" viewBox="0 0 384 96">
+  <!-- 占位 idle sheet：4 帧横排（每帧 96×96），圆形上下浮动演示帧播放器。由真实角色图替换。 -->
+  <g>
+    <circle cx="48" cy="58" r="26" fill="#4a9eff"/>
+    <text x="48" y="63" font-size="16" text-anchor="middle" fill="#fff" font-family="sans-serif">0</text>
+  </g>
+  <g>
+    <circle cx="144" cy="44" r="26" fill="#4a9eff"/>
+    <text x="144" y="49" font-size="16" text-anchor="middle" fill="#fff" font-family="sans-serif">1</text>
+  </g>
+  <g>
+    <circle cx="240" cy="50" r="26" fill="#4a9eff"/>
+    <text x="240" y="55" font-size="16" text-anchor="middle" fill="#fff" font-family="sans-serif">2</text>
+  </g>
+  <g>
+    <circle cx="336" cy="58" r="26" fill="#4a9eff"/>
+    <text x="336" y="63" font-size="16" text-anchor="middle" fill="#fff" font-family="sans-serif">3</text>
+  </g>
+</svg>

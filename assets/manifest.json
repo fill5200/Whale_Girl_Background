@@ -1,0 +1,5 @@
+{
+  "states": {
+    "idle": { "sheet": "idle.svg", "frames": 4, "fps": 4, "loop": true }
+  }
+}

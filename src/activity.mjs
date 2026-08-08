@@ -1,0 +1,44 @@
+// 宠物活动推导：纯函数，从任务快照列表派生 activity（零宿主依赖，可单测）。
+// 契约：
+// - tasks: [{ id, status }] 任务快照视图（Node half 负责收集 owned+unowned，见 index.mjs）。
+// - known: Map<taskId, 上次状态>，跨调用保持的记账（宿主持有）。
+// - wasWorking: 上次调用是否处于工作态（宿主持有）。
+// - 返回 { working, burst, known, wasWorking }；burst 为 null 或 { name: 'celebrate'|'error', until }。
+
+export const BURST_MS = 6000
+
+function betterBurst(a, b) {
+  if (a === null) return b
+  return b.until > a.until ? b : a
+}
+
+/**
+ * 从任务快照推导活动状态。
+ * @param {{ tasks: Array<{id: string, status: string}>, nowMs: number, known?: Map<string,string>, wasWorking?: boolean }} input
+ */
+export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = false }) {
+  const running = tasks.filter((t) => t.status === 'running' || t.status === 'stopping')
+  const working = running.length > 0
+  let burst = null
+  for (const t of tasks) {
+    const prev = known.get(t.id)
+    if (prev === 'running' && (t.status === 'completed' || t.status === 'killed')) {
+      burst = betterBurst(burst, { name: 'celebrate', until: nowMs + BURST_MS })
+    } else if (prev === 'running' && t.status === 'failed') {
+      burst = betterBurst(burst, { name: 'error', until: nowMs + BURST_MS })
+    }
+    known.set(t.id, t.status)
+  }
+  // 任务从列表消失也视为完成（列表可能只保留活跃任务）。
+  if (wasWorking && !working) {
+    burst = betterBurst(burst, { name: 'celebrate', until: nowMs + BURST_MS })
+  }
+  return { working, burst, known, wasWorking: working }
+}
+
+/** 合并两个 burst：取 until 更晚者（事件驱动 burst 优先于任务派生 burst 的同名覆盖）。 */
+export function mergeBurst(a, b) {
+  if (a === null) return b
+  if (b === null) return a
+  return b.until >= a.until ? b : a
+}

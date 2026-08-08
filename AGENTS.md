@@ -11,9 +11,11 @@ dsh-pet 是一个 plugin-registry 插件：在 DSH Web GUI 内悬浮的桌面宠
 ## 目录布局
 
 ```
-src/          Node half 纯逻辑（宠物状态机，零宿主依赖，可脱离 dsh 单测）
-client/       client bundle 源码（纯 DOM 自渲染，零平台模块依赖）
+src/          Node half 纯逻辑（宠物状态机/活动推导/assets 守卫，零宿主依赖，可单测）
+client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
 client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
+assets/       sprite sheet + manifest.json（静态服务；manifest↔文件由 verify-assets 门禁守护）
+originals/    生图参考原图（不参与服务）
 scripts/      门禁编排器与生成器；门禁清单的权威在 scripts/gates/run.mjs
 tests/        Node half 单测（node:test）
 docs/         文档；标准见 docs/AGENTS.md
@@ -39,6 +41,7 @@ node scripts/build-client.mjs --check   # 校验 client.js 新鲜度（只读）
 | src/ 状态机行为 | `node --test 'tests/pet-state.test.mjs'` |
 | client/ 源码或构建配置 | `node scripts/build-client.mjs --check`，改完跑 `node scripts/build-client.mjs` |
 | 文档、决策记录 | `node scripts/gates/run.mjs` |
+| assets/ sheet 或 manifest | `node scripts/gates/verify-assets.mjs`（引用文件必须存在） |
 | dsh.plugin.json / index.mjs（插件接线） | `node scripts/gates/run.mjs` + 验证站 `dsh registry install/enable` |
 | 门禁本身 | 对应门禁的自证测试（`node --test 'scripts/gates/*.test.mjs'`） |
 
