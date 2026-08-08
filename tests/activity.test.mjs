@@ -34,6 +34,13 @@ test('running→failed 翻转 → error burst 且 failed 带任务 id', () => {
   assert.deepEqual(r.completed, [])
 })
 
+test('errorMs 参数：失败 burst 用指定窗口（默认 BURST_MS，宿主可统一负面窗口）', () => {
+  const known = new Map([['t1', 'running']])
+  const r = deriveActivity({ tasks: [{ id: 't1', status: 'failed' }], nowMs: 1000, known, errorMs: 4000 })
+  assert.equal(r.burst.name, 'error')
+  assert.equal(r.burst.until, 5000)
+})
+
 test('上次工作且任务消失（列表只留活跃）→ celebrate burst', () => {
   const r = deriveActivity({ tasks: [], nowMs: 1000, known: new Map([['t1', 'running']]), wasWorking: true })
   assert.equal(r.burst.name, 'celebrate')

@@ -3,7 +3,8 @@
 // 路由路径与 client bundle 一致（见 client/index.mjs 的 STATE_PATH/INTERACT_PATH/ASSETS_URL）；
 // activity 是派生字段，不写入账本（账本保持纯函数积累，见 src/pet-state.mjs）。
 // 事件机制（v2，零负反馈）：任务完成 → 资历 +XP/称号/回忆 + celebrate；失败 → 只计数 +
-// error(4s) → disappointed(12s) 瞬发；新会话 → welcome；工作态累加活跃时长。
+// error(4s) → disappointed(6s) 瞬发（任务失败与请求错误同一负面窗口，总 10s）；新会话 → welcome；
+// 工作态累加活跃时长。
 // 安全：/interact 校验跨源（CSRF）；body 上限 1KB；assets 路径净化拒绝 `\` 段（Windows 穿越）。
 // 持久化：状态存 <dshHome>/data/dsh-pet/state.json（.tmp + rename 原子写，1s 防抖，
 // 事件记账时落盘；disable 时末次落盘）。
@@ -11,7 +12,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
-  INITIAL_STATE, titleName, recordTaskCompleted, recordFailure, recordSession, recordActive, describe,
+  INITIAL_STATE, titleName, recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive, describe,
 } from './src/pet-state.mjs'
 import { deriveActivity } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
@@ -27,9 +28,9 @@ export const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
 
-/** 瞬发窗口：错误惊吓 4s → 失落尾 12s；欢迎 6s。 */
+/** 瞬发窗口：错误惊吓 4s → 失落尾 6s（总负面 10s，任务失败与请求错误统一）；欢迎 6s。 */
 const ERROR_MS = 4000
-const DISAPPOINTED_MS = 12000
+const DISAPPOINTED_MS = 6000
 const WELCOME_MS = 6000
 
 /** 状态文件：<dshHome>/data/dsh-pet/state.json（不放插件目录——uninstall 会删）。 */
@@ -113,7 +114,7 @@ export function apply(ctx) {
   const activity = () => {
     const now = Date.now()
     const tasks = collectTasks(ctx)
-    const derived = deriveActivity({ tasks, nowMs: now, known, wasWorking })
+    const derived = deriveActivity({ tasks, nowMs: now, known, wasWorking, errorMs: ERROR_MS })
     wasWorking = derived.wasWorking
     // 账本记账（+XP/失败计数/回忆）已迁入 ctx.tasks.onTaskDone 事件驱动——
     // 页面关闭/轮询缺席时任务终态不漏记；此处只保留展示（working/burst）与活跃时长。
@@ -122,6 +123,12 @@ export function apply(ctx) {
       scheduleSave()
     }
     lastActiveCheck = now
+    // 任务失败与请求错误同一负面窗口：error(ERROR_MS) → disappointed(尾段 DISAPPOINTED_MS)。
+    // 窗口取 max：同一窗口内多次失败/错误只延长不缩短（越挫越勇不因并发被吞）。
+    if (derived.burst?.name === 'error') {
+      errorUntil = Math.max(errorUntil, derived.burst.until)
+      disappointedUntil = Math.max(disappointedUntil, derived.burst.until + DISAPPOINTED_MS)
+    }
     // burst 级联：welcome > error > disappointed > celebrate > working > idle。
     // welcome 不打断进行中的 error/disappointed 尾段（失败失落不该被新会话欢迎盖掉）。
     let name = derived.working ? 'working' : 'idle'
@@ -164,15 +171,22 @@ export function apply(ctx) {
         // 请求错误（LLM API 抖动，重试后可能成功）只触发 error/disappointed 情绪，
         // 不记入 stats.failures / 回忆——「任务失败」计数只认任务状态翻转（deriveActivity），
         // 避免一次坏任务多次请求错误刷出「越挫越勇」称号、回忆里出现虚假的「任务失败」。
+        // 窗口与任务失败统一：error(ERROR_MS) → disappointed(尾段)。
         const now = Date.now()
-        errorUntil = now + ERROR_MS
-        disappointedUntil = now + DISAPPOINTED_MS
+        errorUntil = Math.max(errorUntil, now + ERROR_MS)
+        disappointedUntil = Math.max(disappointedUntil, now + ERROR_MS + DISAPPOINTED_MS)
       }),
-      ctx.on('agent/session-start', () => {
+      ctx.on('agent/session-start', (payload) => {
         const now = Date.now()
-        state = recordSession(state, now).state
+        // source 区分新会话（startup）与续接/延续（resume/compact/clear）——XP 不同：
+        // 新会话 +5 + 计数 + welcome；续接 +2 不计数不 welcome（避免切换即欢迎的噪音）。
+        if (payload.source === 'startup') {
+          state = recordSession(state, now).state
+          welcomeUntil = now + WELCOME_MS
+        } else {
+          state = recordSessionResume(state, now).state
+        }
         scheduleSave()
-        welcomeUntil = now + WELCOME_MS
       }),
       ctx.tools.register(defineTool({
         name: 'pet_feed',

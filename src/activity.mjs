@@ -16,9 +16,10 @@ function betterBurst(a, b) {
 
 /**
  * 从任务快照推导活动状态。
- * @param {{ tasks: Array<{id: string, status: string}>, nowMs: number, known?: Map<string,string>, wasWorking?: boolean }} input
+ * @param {{ tasks: Array<{id: string, status: string}>, nowMs: number, known?: Map<string,string>, wasWorking?: boolean, errorMs?: number }} input
+ *        errorMs：失败 burst 窗口（默认 BURST_MS；宿主可传更短的统一负面窗口）。
  */
-export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = false }) {
+export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = false, errorMs = BURST_MS }) {
   // 任务列表为空时清空记账：无任务可跟踪，且 wasWorking 必为 false，无翻转可丢
   // （防长会话下 known 随历史任务 id 无限增长——内存泄漏）。
   if (tasks.length === 0) known.clear()
@@ -35,7 +36,7 @@ export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = f
       burst = betterBurst(burst, { name: 'celebrate', until: nowMs + BURST_MS })
     } else if (prev === 'running' && t.status === 'failed') {
       failed.push(t.id)
-      burst = betterBurst(burst, { name: 'error', until: nowMs + BURST_MS })
+      burst = betterBurst(burst, { name: 'error', until: nowMs + errorMs })
     } else if (prev === 'running' && t.status === 'killed') {
       sawKill = true
     }
