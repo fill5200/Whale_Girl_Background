@@ -101,13 +101,53 @@ def harden_alpha(img):
     return out
 
 
-def despill(img, bg_colors):
-    """去溢色（色键残边）两段式：
-    1) 全域：距背景 <200 且粉调（sp>8）→ 中等抑制（去明显混合；角色深粉内饰 dmin≥200 不受影响）。
-    2) 边缘带补充：alpha 过渡区（20<a<245）内粉调像素，半径 255 全覆盖 + 强抑制
-       （深色角色 15~20% 混合的 dmin 可达 200~255，全域段漏网，只可能在边缘出现）。
-    只动边缘带，不动角色内饰色。"""
+def bg_floodfill(img, bg_colors, tol):
+    """图形学去背景：背景 = 与图像边界 4-连通 的"近背景色"区域（洪泛填充）。
+    关键优势：角色内部与背景同色的区域（如粉色脸 vs 粉底）因被轮廓包围而**不连通**→保留；
+    颜色键做不到这一点（同色即删）。边缘抗锯齿像素（距背景色稍远）成为"墙"阻断洪泛→
+    保留后在 despill 边缘带清理。"""
     import numpy as np
+    from PIL import Image as _Image
+
+    arr = np.asarray(img.convert('RGB'), dtype=np.int16)
+    dists = [np.linalg.norm(arr - np.asarray(b, dtype=np.int16), axis=2) for b in bg_colors]
+    dmin = np.min(np.stack(dists), axis=0)
+    bg_mask = dmin < tol
+    h, w = bg_mask.shape
+    visited = np.zeros_like(bg_mask)
+    stack = []
+    for x in range(w):
+        if bg_mask[0, x] and not visited[0, x]:
+            visited[0, x] = True
+            stack.append((0, x))
+        if bg_mask[h - 1, x] and not visited[h - 1, x]:
+            visited[h - 1, x] = True
+            stack.append((h - 1, x))
+    for y in range(h):
+        if bg_mask[y, 0] and not visited[y, 0]:
+            visited[y, 0] = True
+            stack.append((y, 0))
+        if bg_mask[y, w - 1] and not visited[y, w - 1]:
+            visited[y, w - 1] = True
+            stack.append((y, w - 1))
+    while stack:
+        y, x = stack.pop()
+        for ny, nx in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
+            if 0 <= ny < h and 0 <= nx < w and bg_mask[ny, nx] and not visited[ny, nx]:
+                visited[ny, nx] = True
+                stack.append((ny, nx))
+    alpha = np.where(visited, 0, 255).astype(np.uint8)
+    out = img.convert('RGBA')
+    out.putalpha(_Image.fromarray(alpha, 'L'))
+    return out
+
+
+def despill(img, bg_colors):
+    """去溢色（色键残边）：**只处理空间边缘带**（距透明像素 ≤3px）内的粉调像素——
+    背景混合只可能出现在轮廓处；角色内饰色（粉脸/衣服）绝不碰（全域抑制会把粉脸灰化，实测）。"""
+    import numpy as np
+    from PIL import Image as _Image
+    from PIL import ImageFilter as _IF
 
     arr = np.asarray(img.convert('RGBA'), dtype=np.float64)
     rgb = arr[:, :, :3]
@@ -115,18 +155,14 @@ def despill(img, bg_colors):
     dists = np.stack([np.linalg.norm(rgb - np.asarray(b, dtype=np.float64), axis=2) for b in bg_colors])
     dmin = np.min(dists, axis=0)
     r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
-    sp = np.clip(np.minimum(r, b) - g, 0, 255)  # 粉调量
-    # 空间边缘带：距透明像素（α<0.08）≤3px 的像素（含不透明混合残留），与自身 alpha 无关。
-    from PIL import Image as _Image
-    from PIL import ImageFilter as _IF
+    sp = np.clip(np.minimum(r, b) - g, 0, 255)
     trans = _Image.fromarray(((a < 0.08) * 255).astype(np.uint8), 'L')
-    spatial_edge = np.asarray(trans.filter(_IF.MaxFilter(7))) > 0
-    m1 = (dmin < 200) & (sp > 8) & (a > 0.05)
-    m2 = spatial_edge & (dmin < 255) & (sp > 8)
+    spatial_edge = np.asarray(trans.filter(_IF.MaxFilter(7))) > 0  # 距透明 ≤3px
+    mask = spatial_edge & (dmin < 255) & (sp > 8)
     rgb = np.stack([
-        np.where(m1 | m2, r - np.where(m2, sp * 0.5, sp * 0.35), r),
-        np.where(m1 | m2, g + np.where(m2, sp * 1.0, sp * 0.7), g),
-        np.where(m1 | m2, b - np.where(m2, sp * 0.5, sp * 0.35), b),
+        np.where(mask, r - sp * 0.45, r),
+        np.where(mask, g + sp * 0.9, g),
+        np.where(mask, b - sp * 0.45, b),
     ], axis=2)
     out = img.convert('RGBA')
     data = np.asarray(out, dtype=np.uint8).copy()
@@ -219,10 +255,11 @@ def detect_grid(img, max_cells=8):
     return row_bounds, col_bounds
 
 
-def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, padding=14):
-    """把一行（同一状态的帧）按 union-bbox 对齐后横排拼接成 sheet。
-    对齐保证各帧同尺同锚（不各自归一化导致动画抖动）；空帧跳过。
-    padding：union-bbox 四周留白（防角色顶/脚贴到帧边，视觉像被裁）。"""
+def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88):
+    """把一行（同一状态的帧）做成帧 sheet（图形学式逐对象配准）：
+    每帧**独立**裁到自身内容 bbox（非 union——union 保留源帧漂移造成左右移动，
+    且含更低内容的帧会缩小整体导致头顶丢失）→ 统一高度缩放 → **底中对齐**锚点
+    （脚着地；左右漂移被 x 居中消除）。空帧跳过。"""
     frames = []
     for c in cols:
         (yt, yb), (xl, xr) = row_bounds[row], col_bounds[c]
@@ -233,25 +270,23 @@ def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, padding=14):
         frames.append((cell, bb))
     if not frames:
         return None, 0
-    x0 = max(0, min(bb[0] for _, bb in frames) - padding)
-    y0 = max(0, min(bb[1] for _, bb in frames) - padding)
-    x1 = min(cell.width, max(bb[2] for _, bb in frames) + padding)
-    y1 = min(cell.height, max(bb[3] for _, bb in frames) + padding)
-    side = max(x1 - x0, y1 - y0)
-    if side <= 0:
-        return None, 0
+    hmax = max(bb[3] - bb[1] for _, bb in frames)
+    target_h = round(size * scale)
     norm = []
-    for cell, _ in frames:
-        f = cell.crop((x0, y0, x0 + side, y0 + side))
-        # 最终帧 = 画布留白：内容缩放至 88% 居中（更慷慨的边距，显示不显局促）
-        canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        fsize = round(size * 0.88)
-        f = f.resize((fsize, fsize), Image.LANCZOS)
-        canvas.paste(f, ((size - fsize) // 2, (size - fsize) // 2), f)
-        norm.append(canvas)
+    for cell, (x0, y0, x1, y1) in frames:
+        if x1 <= x0 or y1 <= y0:
+            continue
+        f = cell.crop((x0, y0, x1, y1))
+        fh = target_h
+        fw = max(1, round(f.width * fh / f.height))
+        if f.size != (fw, fh):
+            f = f.resize((fw, fh), Image.LANCZOS)
+        norm.append(f)
+    if not norm:
+        return None, 0
     sheet = Image.new('RGBA', (size * len(norm), size), (0, 0, 0, 0))
     for i, f in enumerate(norm):
-        sheet.paste(f, (i * size, 0), f)
+        sheet.paste(f, (i * size + (size - f.width) // 2, size - f.height), f)  # x 居中、底对齐
     return sheet, len(norm)
 
 
@@ -287,10 +322,10 @@ def main():
             print('keyed: gray-mask', file=sys.stderr)
         else:
             bgs = [detect_bg(img)] if args.key == 'auto' else [[int(v) for v in c.split(',')] for c in args.key.split('|')]
-            img = chroma_key(img, bgs, args.key_lo, args.key_hi)
-            img = despill(img, bgs)  # 去边缘溢色（洋红描边）
-            img = defringe(img, erode=2)  # 侵蚀 2px 剥掉混合环 + 羽化
-            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi} +despill +defringe2', file=sys.stderr)
+            img = bg_floodfill(img, bgs, tol=35)  # 边界洪泛去背景（连通性分割，保住与底色同色的角色部位）
+            img = despill(img, bgs)  # 边缘带去溢色（内饰色不碰）
+            img = defringe(img, erode=1)  # 侵蚀 1px + 羽化
+            print(f'keyed: bg={bgs} floodfill+despill+defringe', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
