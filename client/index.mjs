@@ -58,6 +58,11 @@ const CSS = `
 `
 
 export function apply() {
+  // 幂等守卫：bundle 重复执行（dev/HMR 重建、loader 重跑）时不双宠物双 style。
+  if (document.querySelector('[data-dsh-pet]') !== null) {
+    console.warn('[dsh-pet] apply 已存在实例，跳过重复挂载')
+    return () => {}
+  }
   const style = document.createElement('style')
   style.textContent = CSS
   document.head.appendChild(style)
@@ -260,13 +265,18 @@ export function apply() {
     }
   }
 
-  // 宠物回话气泡（互动后显示，2.5s 消失）。
+  // 宠物回话气泡（互动后显示，2.5s 消失；超时记入清理表，dispose 时一并清）。
+  const bubbleTimers = new Set()
   const showReply = (text) => {
     const bubble = document.createElement('div')
     bubble.className = 'pet-bubble'
     bubble.textContent = text
     stage.appendChild(bubble)
-    setTimeout(() => bubble.remove(), 2500)
+    const timer = setTimeout(() => {
+      bubbleTimers.delete(timer)
+      bubble.remove()
+    }, 2500)
+    bubbleTimers.add(timer)
   }
 
   const interact = async (action) => {
@@ -291,12 +301,14 @@ export function apply() {
 
   // 互斥：并发 refresh（visibilitychange 与定时器）乱序回写会制造假 wake 边沿。
   let refreshing = false
+  // 离线指示：连续失败 ≥3 次后状态条显示离线标记，成功即清除。
+  let failStreak = 0
   const refresh = async () => {
     if (refreshing) return
     refreshing = true
     try {
       const res = await fetch(STATE_PATH)
-      if (!res.ok) return
+      if (!res.ok) throw new Error(`state ${res.status}`)
       const body = await res.json()
       pet = body.pet
       activity = body.activity ?? { name: 'idle', until: 0 }
@@ -310,9 +322,12 @@ export function apply() {
         transientUntil = Date.now() + TRANSIENT_MS
       }
       wasSleeping = sleeping
+      failStreak = 0
       renderStatus()
     } catch {
-      // 瞬态网络错误：保留上次状态
+      // 瞬态网络错误：保留上次状态；连续失败则提示离线（宠物冻结时用户有感知）。
+      failStreak += 1
+      if (failStreak >= 3) metaNote.textContent = '📡 离线…'
     } finally {
       refreshing = false
     }
@@ -431,8 +446,14 @@ export function apply() {
   window.addEventListener('resize', onResize)
 
   // 弹窗感知：DSH 打开 dialog 时宠物降为 inert（不遮挡、不拦截点击）。
+  // 边沿触发：只在 dialog 存在状态翻转时改属性——聊天 GUI 高频增删节点时不全量重扫。
+  let dialogOpen = false
   const syncInert = () => {
-    host.toggleAttribute('data-dsh-pet-inert', document.querySelector('[role="dialog"]') !== null)
+    const open = document.querySelector('[role="dialog"]') !== null
+    if (open !== dialogOpen) {
+      dialogOpen = open
+      host.toggleAttribute('data-dsh-pet-inert', open)
+    }
   }
   const dialogObserver = new MutationObserver(syncInert)
   dialogObserver.observe(document.body, { childList: true, subtree: true })
@@ -441,6 +462,8 @@ export function apply() {
   return () => {
     clearInterval(timer)
     clearInterval(animTimer)
+    for (const t of bubbleTimers) clearTimeout(t) // 气泡残留计时器一并清
+    bubbleTimers.clear()
     dialogObserver.disconnect()
     document.removeEventListener('pointerdown', onDocPointerDown)
     document.removeEventListener('keydown', onKeyDown)

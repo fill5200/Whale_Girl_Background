@@ -73,6 +73,11 @@
 }
 `;
   function apply() {
+    if (document.querySelector("[data-dsh-pet]") !== null) {
+      console.warn("[dsh-pet] apply \u5DF2\u5B58\u5728\u5B9E\u4F8B\uFF0C\u8DF3\u8FC7\u91CD\u590D\u6302\u8F7D");
+      return () => {
+      };
+    }
     const style = document.createElement("style");
     style.textContent = CSS;
     document.head.appendChild(style);
@@ -246,12 +251,17 @@
         heart.addEventListener("animationend", () => heart.remove());
       }
     };
+    const bubbleTimers = /* @__PURE__ */ new Set();
     const showReply = (text) => {
       const bubble = document.createElement("div");
       bubble.className = "pet-bubble";
       bubble.textContent = text;
       stage.appendChild(bubble);
-      setTimeout(() => bubble.remove(), 2500);
+      const timer2 = setTimeout(() => {
+        bubbleTimers.delete(timer2);
+        bubble.remove();
+      }, 2500);
+      bubbleTimers.add(timer2);
     };
     const interact = async (action) => {
       transient = action === "feed" ? "eat" : "play";
@@ -272,12 +282,13 @@
       await refresh();
     };
     let refreshing = false;
+    let failStreak = 0;
     const refresh = async () => {
       if (refreshing) return;
       refreshing = true;
       try {
         const res = await fetch(STATE_PATH);
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`state ${res.status}`);
         const body = await res.json();
         pet = body.pet;
         activity = body.activity ?? { name: "idle", until: 0 };
@@ -288,8 +299,11 @@
           transientUntil = Date.now() + TRANSIENT_MS;
         }
         wasSleeping = sleeping;
+        failStreak = 0;
         renderStatus();
       } catch {
+        failStreak += 1;
+        if (failStreak >= 3) metaNote.textContent = "\u{1F4E1} \u79BB\u7EBF\u2026";
       } finally {
         refreshing = false;
       }
@@ -388,8 +402,13 @@
       host.style.top = `${y}px`;
     };
     window.addEventListener("resize", onResize);
+    let dialogOpen = false;
     const syncInert = () => {
-      host.toggleAttribute("data-dsh-pet-inert", document.querySelector('[role="dialog"]') !== null);
+      const open = document.querySelector('[role="dialog"]') !== null;
+      if (open !== dialogOpen) {
+        dialogOpen = open;
+        host.toggleAttribute("data-dsh-pet-inert", open);
+      }
     };
     const dialogObserver = new MutationObserver(syncInert);
     dialogObserver.observe(document.body, { childList: true, subtree: true });
@@ -397,6 +416,8 @@
     return () => {
       clearInterval(timer);
       clearInterval(animTimer);
+      for (const t of bubbleTimers) clearTimeout(t);
+      bubbleTimers.clear();
       dialogObserver.disconnect();
       document.removeEventListener("pointerdown", onDocPointerDown);
       document.removeEventListener("keydown", onKeyDown);
