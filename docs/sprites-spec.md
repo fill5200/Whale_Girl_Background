@@ -61,15 +61,15 @@
 ```json
 {
   "states": {
-    "idle":         { "sheet": "idle.png",         "frames": 3, "fps": 3,  "loop": true,  "motion": "bob" },
-    "working":      { "sheet": "working.png",      "frames": 3, "fps": 4,  "loop": true,  "motion": "wiggle" },
-    "celebrate":    { "sheet": "celebrate.png",    "frames": 3, "fps": 8,  "loop": false, "motion": "squash" },
-    "error":        { "sheet": "error.png",        "frames": 2, "fps": 5,  "loop": false, "motion": "shake" },
-    "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "loop": false, "motion": "sigh" },
-    "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 6,  "loop": false, "motion": "hop" },
+    "idle":         { "sheet": "idle.png",         "frames": 3, "fps": 3,  "loop": true },
+    "working":      { "sheet": "working.png",      "frames": 3, "fps": 4,  "loop": true },
+    "celebrate":    { "sheet": "celebrate.png",    "frames": 3, "fps": 8,  "loop": false },
+    "error":        { "sheet": "error.png",        "frames": 2, "fps": 5,  "loop": false },
+    "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "loop": false },
+    "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 6,  "loop": false },
     "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "loop": false },
     "play":         { "sheet": "play.png",         "frames": 3, "fps": 8,  "loop": false },
-    "drag":         { "sheet": "drag.png",         "frames": 2, "fps": 6,  "loop": true,  "motion": "tilt" },
+    "drag":         { "sheet": "drag.png",         "frames": 2, "fps": 6,  "loop": true },
     "walk":         { "sheet": "walk.png",         "frames": 4, "fps": 6,  "loop": true },
     "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "loop": true,  "motion": "float" },
     "wake":         { "sheet": "wake.png",         "frames": 2, "fps": 5,  "loop": false },
@@ -77,6 +77,8 @@
   }
 }
 ```
+
+> 规则（verify-assets 门禁强制）：**`motion` 只允许配 `frames: 1`**——多帧状态由帧播放器动画，运动配方与帧播放器互斥（单帧状态才用 CSS 运动补充）。
 
 ## 资历与称号（积累型）
 

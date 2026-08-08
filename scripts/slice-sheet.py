@@ -52,13 +52,17 @@ def detect_bg(img):
     return np.median(border, axis=0).astype(int).tolist()
 
 
-def chroma_key(img, bg, lo, hi):
-    """色键：距背景色距离 < lo 的像素置透明，> hi 全不透明，中间软过渡。"""
+def chroma_key(img, bg_colors, lo, hi):
+    """色键：距任一背景色距离 < lo 的像素置透明，> hi 全不透明，中间软过渡。
+    bg_colors 为颜色列表（| 分隔的多色背景，如纯洋红缝隙 + 浅粉格底）。"""
     import numpy as np
     from PIL import ImageFilter
 
     arr = np.asarray(img.convert('RGB'), dtype=np.int16)
-    dist = np.linalg.norm(arr - np.asarray(bg, dtype=np.int16), axis=2)
+    dist = np.min(
+        [np.linalg.norm(arr - np.asarray(bg, dtype=np.int16), axis=2) for bg in bg_colors],
+        axis=0,
+    )
     alpha = np.clip((dist - lo) / max(1, hi - lo) * 255, 0, 255).astype(np.uint8)
     out = img.convert('RGBA')
     out.putalpha(Image.fromarray(alpha, 'L').filter(ImageFilter.MedianFilter(3)))
@@ -131,13 +135,48 @@ def detect_grid(img, max_cells=8):
     return row_bounds, col_bounds
 
 
+def build_state_sheet(img, row_bounds, col_bounds, row, cols, size):
+    """把一行（同一状态的帧）按 union-bbox 对齐后横排拼接成 sheet。
+    对齐保证各帧同尺同锚（不各自归一化导致动画抖动）；空帧跳过。"""
+    frames = []
+    for c in cols:
+        (yt, yb), (xl, xr) = row_bounds[row], col_bounds[c]
+        cell = img.crop((xl, yt, xr, yb))
+        bb = content_bbox(cell)
+        if bb is None:
+            continue
+        frames.append((cell, bb))
+    if not frames:
+        return None, 0
+    x0 = min(bb[0] for _, bb in frames)
+    y0 = min(bb[1] for _, bb in frames)
+    x1 = max(bb[2] for _, bb in frames)
+    y1 = max(bb[3] for _, bb in frames)
+    side = max(x1 - x0, y1 - y0)
+    if side <= 0:
+        return None, 0
+    norm = []
+    for cell, _ in frames:
+        f = cell.crop((x0, y0, x0 + side, y0 + side))
+        if f.size[0] != size:
+            f = f.resize((size, size), Image.LANCZOS)
+        norm.append(f)
+    sheet = Image.new('RGBA', (size * len(norm), size), (0, 0, 0, 0))
+    for i, f in enumerate(norm):
+        sheet.paste(f, (i * size, 0), f)
+    return sheet, len(norm)
+
+
 def main():
     ap = argparse.ArgumentParser(description='切分 AI 贴纸合集大图')
     ap.add_argument('input')
     ap.add_argument('--grid', help='声明网格，如 4x3')
     ap.add_argument('--auto', action='store_true', help='自动检测网格')
     ap.add_argument('--layout', help='行优先状态名列表（数量须等于格子数），如 idle,working,...')
-    ap.add_argument('--key', metavar='BG', help='抠图：gray=亮灰掩膜（AI 假透明棋盘格）；auto=取边框色；或 R,G,B')
+    ap.add_argument('--sheet', help='sheet 模式：网格如 3x3（行为状态、列为帧）')
+    ap.add_argument('--states', help='sheet 模式：每行状态名（逗号，数量=行数）')
+    ap.add_argument('--frames', help='sheet 模式：每行帧数（逗号，数量=行数）')
+    ap.add_argument('--key', metavar='BG', help='抠图：gray=亮灰掩膜；auto=取边框色；或 R,G,B（多色用 | 分隔）')
     ap.add_argument('--repair', action='store_true', help='键后硬化 alpha（救回被半透明的浅色皮肤）')
     ap.add_argument('--key-lo', type=int, default=6, help='色键阈值下界（距背景色距离，默认 6）')
     ap.add_argument('--key-hi', type=int, default=28, help='色键阈值上界（默认 28）')
@@ -145,8 +184,8 @@ def main():
     ap.add_argument('--size', type=int, default=256)
     args = ap.parse_args()
 
-    if not (args.grid or args.auto):
-        ap.error('必须提供 --grid ROWSxCOLS 或 --auto')
+    if not (args.grid or args.auto or args.sheet):
+        ap.error('必须提供 --grid ROWSxCOLS / --auto / --sheet ROWSxCOLS 之一')
     img = Image.open(args.input).convert('RGBA')
 
     if args.key:
@@ -154,9 +193,9 @@ def main():
             img = gray_key(img)
             print('keyed: gray-mask', file=sys.stderr)
         else:
-            bg = detect_bg(img) if args.key == 'auto' else [int(v) for v in args.key.split(',')]
-            img = chroma_key(img, bg, args.key_lo, args.key_hi)
-            print(f'keyed: bg={bg} lo={args.key_lo} hi={args.key_hi}', file=sys.stderr)
+            bgs = [detect_bg(img)] if args.key == 'auto' else [[int(v) for v in c.split(',')] for c in args.key.split('|')]
+            img = chroma_key(img, bgs, args.key_lo, args.key_hi)
+            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi}', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
@@ -168,20 +207,34 @@ def main():
             sys.exit(1)
         row_bounds, col_bounds = grid
     else:
-        rows_s, cols_s = args.grid.lower().split('x')
+        rows_s, cols_s = (args.sheet or args.grid).lower().split('x')
         rows, cols = int(rows_s), int(cols_s)
         w, h = img.size
         row_bounds = [(round(h * r / rows), round(h * (r + 1) / rows)) for r in range(rows)]
         col_bounds = [(round(w * c / cols), round(w * (c + 1) / cols)) for c in range(cols)]
 
-    if args.layout:
-        names = [s.strip() for s in args.layout.split(',')]
-        if len(names) != len(row_bounds) * len(col_bounds):
-            print(f'--layout 数量 {len(names)} 与格子数 {len(row_bounds)}x{len(col_bounds)} 不符', file=sys.stderr)
-            sys.exit(1)
-
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+
+    # sheet 模式：行为状态、列为帧，union-bbox 对齐拼横排 sheet（多状态图 → 每状态一张）。
+    if args.sheet:
+        if not (args.states and args.frames):
+            ap.error('--sheet 需要 --states 与 --frames')
+        states = [s.strip() for s in args.states.split(',')]
+        frame_counts = [int(v) for v in args.frames.split(',')]
+        if len(states) != len(row_bounds) or len(frame_counts) != len(row_bounds):
+            ap.error('--states/--frames 数量须等于网格行数')
+        report = {'input': str(args.input), 'size': list(img.size), 'grid': [len(row_bounds), len(col_bounds)], 'sheets': []}
+        for r, state in enumerate(states):
+            sheet_img, n = build_state_sheet(img, row_bounds, col_bounds, r, range(frame_counts[r]), args.size)
+            if sheet_img is None:
+                report['sheets'].append({'state': state, 'file': None, 'frames': 0, 'skipped': 'empty'})
+                continue
+            fname = f'{state}.png'
+            sheet_img.save(out / fname)
+            report['sheets'].append({'state': state, 'file': fname, 'frames': n})
+        print(json.dumps(report, ensure_ascii=False))
+        return
     report = {'input': str(args.input), 'size': list(img.size), 'grid': [len(row_bounds), len(col_bounds)], 'slices': []}
     for r, (yt, yb) in enumerate(row_bounds):
         for c, (xl, xr) in enumerate(col_bounds):
