@@ -1,12 +1,14 @@
 // 门禁：assets manifest 引用一致性。
 // 拒绝不变量：assets/manifest.json 里每个 state 的 sheet 引用的文件必须真实存在、
 // 扩展名在 MIME 白名单内（与 src/assets.mjs 一致）、frames/fps/loop 字段合法、
-// motion 配方（若声明）在白名单内且 frames 必须为 1（帧播放器与运动配方互斥），
-// 且 PNG 多帧 sheet 必须满足宽度 = frames × 高度（横排帧图契约——单姿势图配 frames>1
-// 会把姿势劈成两半）。只读、确定性。
+// motion 配方（若声明）在白名单内且 frames 必须为 1（帧播放器与运动配方互斥）、
+// PNG 多帧 sheet 必须满足宽度 = frames × 高度（横排帧图契约——单姿势图配 frames>1
+// 会把姿势劈成两半）、且状态名必须在 client EMOJI 兜底表内（新增状态无 sheet 时能兜底）。
+// 只读、确定性。
 import { readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { EMOJI } from '../../client/logic.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../..')
 
@@ -37,6 +39,9 @@ export function check(root = ROOT) {
     return { ok: false, errors: ['assets/manifest.json 缺 states 对象'] }
   }
   for (const [name, cfg] of Object.entries(manifest.states)) {
+    if (!(name in EMOJI)) {
+      errors.push(`manifest.states.${name}: 状态不在 client EMOJI 兜底表（新增状态须同步 client/logic.mjs）`)
+    }
     if (cfg === null || typeof cfg !== 'object' || typeof cfg.sheet !== 'string' || cfg.sheet === '') {
       errors.push(`manifest.states.${name}: 缺 sheet 字段`)
       continue

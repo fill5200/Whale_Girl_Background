@@ -206,7 +206,7 @@
       animState = name;
       frame = 0;
       lastFrameAt = 0;
-      for (const cls of stage.classList) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
+      for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
       const motion = manifest.states[name]?.motion;
       if (motion) stage.classList.add(`pet-motion-${motion}`);
       const cfg = manifest.states[name];

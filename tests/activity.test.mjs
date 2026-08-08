@@ -58,3 +58,20 @@ test('known 收缩到当前任务集合（残留终态任务时不线性增长�
   assert.deepEqual([...known.keys()], ['t1'])
 })
 
+test('killed 中性：running→killed 的消失兜底不触发庆祝', () => {
+  // poll N：t1 running（wasWorking=true）→ poll N+1：t1 消失（用户取消后列表清空）
+  const known = new Map([['t1', 'running']])
+  // 先经过 killed 状态（本轮 sawKill 置位）
+  deriveActivity({ tasks: [{ id: 't1', status: 'killed' }], nowMs: 1000, known, wasWorking: true })
+  // 下一轮任务消失：兜底不得因上一轮 killed 发庆祝
+  const r = deriveActivity({ tasks: [], nowMs: 2000, known, wasWorking: false })
+  assert.equal(r.burst, null)
+})
+
+test('killed 中性：单轮内 running→killed 不发 burst', () => {
+  const known = new Map([['t1', 'running']])
+  const r = deriveActivity({ tasks: [{ id: 't1', status: 'killed' }], nowMs: 1000, known, wasWorking: true })
+  assert.equal(r.burst, null)
+  assert.equal(r.completed.length, 0)
+})
+

@@ -104,3 +104,11 @@ test('接受：真两帧横排 sheet（512×256 配 frames:2）', () => {
   const { ok, errors } = check(root)
   assert.equal(ok, true, errors.join('\n'))
 })
+
+test('拒绝：manifest 状态不在 client EMOJI 兜底表', () => {
+  const bad = { states: { teleport: { sheet: 'idle.png', frames: 1, fps: 4, loop: true } } }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/idle.png': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /状态不在 client EMOJI 兜底表/)
+})

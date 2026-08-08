@@ -33,6 +33,9 @@ function analyze(html) {
   const stageHasSprite = /<div class="pet-stage[^"]*"[^>]*>\s*<div class="pet-sprite[^>]*background-image/.test(html)
   const stageHasEmoji = /<div class="pet-stage[^"]*"[^>]*>([^<\s])/.test(html)
   if (!stageHasSprite && !stageHasEmoji) errors.push('宠物舞台为空（sprite 未渲染且无 emoji 兜底）')
+  // motion 配方生效（idle 兜底态必为 pet-motion-bob）与账本渲染（任务计数）——回归防线。
+  if (!/pet-motion-[a-z]+/.test(html)) errors.push('未找到 pet-motion-* 运动类（motion 配方未生效）')
+  if (!/<span class="pet-stats">\d+ 任务/.test(html)) errors.push('账本统计未渲染（任务计数缺失）')
   return { errors, stageHasSprite }
 }
 

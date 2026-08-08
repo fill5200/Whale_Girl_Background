@@ -210,7 +210,8 @@ export function apply() {
     frame = 0
     lastFrameAt = 0
     // 运动配方：manifest.motion → 舞台类（emoji 与 sprite 路径都生效；无 motion 时清类）。
-    for (const cls of stage.classList) if (cls.startsWith('pet-motion-')) stage.classList.remove(cls)
+    // 快照迭代再删：活 DOMTokenList 边遍历边删可能跳项（当前单类无碍，加固免踩）。
+    for (const cls of [...stage.classList]) if (cls.startsWith('pet-motion-')) stage.classList.remove(cls)
     const motion = manifest.states[name]?.motion
     if (motion) stage.classList.add(`pet-motion-${motion}`)
     const cfg = manifest.states[name]

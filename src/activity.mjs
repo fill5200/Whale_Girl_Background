@@ -27,6 +27,7 @@ export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = f
   let burst = null
   const completed = []
   const failed = []
+  let sawKill = false
   for (const t of tasks) {
     const prev = known.get(t.id)
     if (prev === 'running' && t.status === 'completed') {
@@ -35,12 +36,14 @@ export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = f
     } else if (prev === 'running' && t.status === 'failed') {
       failed.push(t.id)
       burst = betterBurst(burst, { name: 'error', until: nowMs + BURST_MS })
+    } else if (prev === 'running' && t.status === 'killed') {
+      sawKill = true
     }
-    // killed（用户取消）中性：不进 completed/failed、不触发 burst（账本由 onTaskDone 同样中性处理）。
     known.set(t.id, t.status)
   }
   // 任务从列表消失也视为完成（列表可能只保留活跃任务）。
-  if (wasWorking && !working) {
+  // killed 中性：本轮观察到 running→killed 时不触发兜底庆祝（用户取消不是成就）。
+  if (wasWorking && !working && !sawKill) {
     burst = betterBurst(burst, { name: 'celebrate', until: nowMs + BURST_MS })
   }
   // known 收缩到当前任务 id 集合：unowned 终态任务常驻列表时也不会线性增长
