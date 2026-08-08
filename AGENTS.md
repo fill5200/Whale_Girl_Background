@@ -42,7 +42,7 @@ node scripts/build-client.mjs --check   # 校验 client.js 新鲜度（只读）
 | client/ 源码或构建配置 | `node scripts/build-client.mjs --check`，改完跑 `node scripts/build-client.mjs` |
 | 文档、决策记录 | `node scripts/gates/run.mjs` |
 | assets/ sheet 或 manifest | `node scripts/gates/verify-assets.mjs`（引用文件必须存在） |
-| dsh.plugin.json / index.mjs（插件接线） | `node scripts/gates/run.mjs` + 验证站 `dsh registry install/enable` |
+| dsh.plugin.json / index.mjs（插件接线，含工具 schema） | `node scripts/gates/run.mjs` + 验证站 install/enable + **web 重启**（value-schema DSL 只在挂载时编译，enable 不够，见 [decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md](decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md)） |
 | 门禁本身 | 对应门禁的自证测试（`node --test 'scripts/gates/*.test.mjs'`） |
 
 ## 约定

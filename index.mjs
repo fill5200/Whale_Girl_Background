@@ -1,15 +1,18 @@
-// dsh-pet Node half：宠物状态机宿主 + assets 静态服务 + 活动状态推导。
+// dsh-pet Node half：宠物状态机宿主 + assets 静态服务 + 活动状态推导 + 状态持久化。
 // 契约：contributes.tools 与下方注册的工具逐名一致（verify-contributes 门禁守护）；
 // 路由路径与 client bundle 一致（见 client/index.mjs 的 STATE_PATH/INTERACT_PATH/ASSETS_URL）；
 // activity 是派生字段，不写入 pet-state（状态机保持纯函数）。
 // 安全：/interact 校验跨源（CSRF）；body 上限 1KB；assets 路径净化拒绝 `\` 段（Windows 穿越）。
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+// 持久化：状态存 <dshHome>/data/dsh-pet/state.json（.tmp + rename 原子写，1s 防抖，
+// 仅在 feed/play 时落盘——衰减可由 updatedAt 在重载时重算，无需随轮询写盘）。
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
+import { join, dirname, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { INITIAL_STATE, tick, feed, play } from './src/pet-state.mjs'
 import { deriveActivity, mergeBurst, BURST_MS } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
 import { applyAction, isCrossOrigin } from './src/interact.mjs'
+import { normalizeState, serializeState } from './src/persistence.mjs'
 
 export const name = 'dsh-pet'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
@@ -19,6 +22,31 @@ export const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
 
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
+
+/** 状态文件：<dshHome>/data/dsh-pet/state.json（不放插件目录——uninstall 会删）。 */
+const DSH_HOME = process.env.DSH_HOME ?? resolve(import.meta.dirname, '../../..')
+const STATE_FILE = join(DSH_HOME, 'data', 'dsh-pet', 'state.json')
+
+/** 读取并归一化已保存状态；缺失/损坏返回 null。 */
+function loadState() {
+  try {
+    return normalizeState(JSON.parse(readFileSync(STATE_FILE, 'utf8')))
+  } catch {
+    return null
+  }
+}
+
+/** 原子写：同目录 .tmp + rename；失败不阻塞插件（状态仅本次运行有效）。 */
+function saveState(next) {
+  try {
+    mkdirSync(dirname(STATE_FILE), { recursive: true })
+    const tmp = `${STATE_FILE}.tmp`
+    writeFileSync(tmp, serializeState(next))
+    renameSync(tmp, STATE_FILE)
+  } catch {
+    // 持久化失败不阻塞插件：状态仅本次运行内有效。
+  }
+}
 
 /** 状态的一行摘要（工具输出与路由都复用）。 */
 function describe(state) {
@@ -61,7 +89,13 @@ async function readBody(req, limit = BODY_LIMIT) {
 }
 
 export function apply(ctx) {
-  let state = { ...INITIAL_STATE, updatedAt: Date.now() }
+  let state = { ...INITIAL_STATE, updatedAt: Date.now(), ...(loadState() ?? {}) }
+  // 落盘防抖：仅 feed/play 触发；衰减由 updatedAt 在重载时重算，不随轮询写盘。
+  let saveTimer = null
+  const scheduleSave = () => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => saveState(state), 1000)
+  }
   // 活动推导记账（跨轮询保持；与状态机分离，见 src/activity.mjs 契约）。
   const known = new Map()
   let wasWorking = false
@@ -93,6 +127,7 @@ export function apply(ctx) {
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
         execute: async () => {
           state = feed(snapshot(), Date.now())
+          scheduleSave()
           return describe(state)
         },
       })),
@@ -103,6 +138,7 @@ export function apply(ctx) {
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
         execute: async () => {
           state = play(snapshot(), Date.now())
+          scheduleSave()
           return describe(state)
         },
       })),
@@ -111,15 +147,16 @@ export function apply(ctx) {
         description: '查看桌面宠物当前状态（饱食度/心情/等级/经验），喂食或玩耍前先查状态。',
         parameters: {},
         output: {
+          // 注意：value-schema DSL 不支持 required 数组；object schema 必须显式声明 additionalProperties。
           schema: {
             type: 'object',
+            additionalProperties: false,
             properties: {
               hunger: { type: 'number', description: '0=不饿，100=饿极' },
               mood: { type: 'number', description: '0=低落，100=开心' },
-              level: { type: 'integer' },
-              xp: { type: 'integer' },
+              level: { type: 'integer', description: '等级（经验派生）' },
+              xp: { type: 'integer', description: '累计经验' },
             },
-            required: ['hunger', 'mood', 'level', 'xp'],
           },
           render: (_args, value) => [{ type: 'text', text: describe(value) }],
         },
@@ -172,7 +209,10 @@ export function apply(ctx) {
               return
             }
             const result = applyAction(snapshot(), body.action, Date.now())
-            if (result.status === 200) state = result.body.pet
+            if (result.status === 200) {
+              state = result.body.pet
+              scheduleSave()
+            }
             json(res, result.status, result.body, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
@@ -215,6 +255,8 @@ export function apply(ctx) {
       }),
     ]
     return () => {
+      clearTimeout(saveTimer)
+      saveState(state) // 末次落盘：disable/卸载前保留最终状态
       for (const dispose of disposers) dispose()
     }
   }, 'dsh-pet: tools + state/interact routes + assets')
