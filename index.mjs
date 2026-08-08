@@ -155,9 +155,10 @@ export function apply(ctx) {
   ctx.effect(() => {
     const disposers = [
       ctx.on('agent/request-error', () => {
+        // 请求错误（LLM API 抖动，重试后可能成功）只触发 error/disappointed 情绪，
+        // 不记入 stats.failures / 回忆——「任务失败」计数只认任务状态翻转（deriveActivity），
+        // 避免一次坏任务多次请求错误刷出「越挫越勇」称号、回忆里出现虚假的「任务失败」。
         const now = Date.now()
-        state = recordFailure(state, now).state
-        scheduleSave()
         errorUntil = now + ERROR_MS
         disappointedUntil = now + DISAPPOINTED_MS
       }),
