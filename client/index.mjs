@@ -142,11 +142,13 @@ export function apply() {
 
   const showSprite = (name, cfg) => {
     const size = sheetSize.get(cfg.sheet)
-    if (!size) {
-      showEmoji(name)
+    if (!size || size.w <= 0 || size.h <= 0) {
+      showEmoji(name) // 未声明尺寸的 SVG（naturalWidth=0）→ 兜底，避免除零白屏
       return
     }
-    stage.textContent = ''
+    // replaceChildren(sprite)：清掉 emoji 文本等其它子节点，并确保 sprite 在 DOM 里
+    // （textContent='' 会把 sprite 也摘掉，样式作用在脱离 DOM 的节点上——空舞台 bug）。
+    stage.replaceChildren(sprite)
     const frameW = size.w / cfg.frames
     const scale = Math.min(SPRITE_MAX / frameW, SPRITE_MAX / size.h, 1)
     sprite.className = 'pet-sprite ready'
@@ -295,7 +297,9 @@ export function apply() {
       if (activity.name !== 'idle' || activity.until > Date.now()) lastActiveAt = Date.now()
       sleeping = activity.name === 'idle' && Date.now() - lastActiveAt > SLEEP_AFTER_MS
       // 睡醒过渡：sleep → 非 sleep 时播一次 wake（受 TRANSIENT_MS 超时兜底）。
-      if (wasSleeping && !sleeping && transient === null) {
+      // wake 不抢占 burst/working：睡醒撞上庆祝/错误/欢迎/工作直接播对应状态，伸懒腰让位。
+      if (wasSleeping && !sleeping && transient === null
+        && !['welcome', 'celebrate', 'error', 'disappointed', 'working'].includes(activity.name)) {
         transient = 'wake'
         transientUntil = Date.now() + TRANSIENT_MS
       }
@@ -326,8 +330,11 @@ export function apply() {
   try {
     const raw = JSON.parse(localStorage.getItem(POS_KEY) ?? 'null')
     if (raw && Number.isFinite(raw.x) && Number.isFinite(raw.y)) {
-      host.style.left = `${raw.x}px`
-      host.style.top = `${raw.y}px`
+      // 恢复时立即 clamp：窗口变小后直接恢复旧坐标会永久离屏（resize 事件不触发）。
+      const x = Math.max(0, Math.min(raw.x, window.innerWidth - host.offsetWidth))
+      const y = Math.max(0, Math.min(raw.y, window.innerHeight - host.offsetHeight))
+      host.style.left = `${x}px`
+      host.style.top = `${y}px`
       host.style.right = 'auto'
       host.style.bottom = 'auto'
     }
@@ -367,6 +374,11 @@ export function apply() {
     if (!moved && !e.target.closest('button')) toggleMenu()
   })
   host.addEventListener('pointercancel', () => {
+    dragging = false
+    moved = false
+  })
+  // 捕获被系统强制释放（元素移除/其它元素抢捕获）时复位，防拖拽状态卡死。
+  host.addEventListener('lostpointercapture', () => {
     dragging = false
     moved = false
   })

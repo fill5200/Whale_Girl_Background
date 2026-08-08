@@ -30,6 +30,13 @@ test('xpForLevel 三角数列与 levelFor 互逆', () => {
   assert.equal(levelFor(150), 3)
 })
 
+test('levelFor 闭式解：巨量 xp 瞬时返回且与 xpForLevel 往返一致（原线性循环会挂起宿主）', () => {
+  const l = levelFor(1e14) // 封顶 XP_SAFE_MAX 内
+  assert.ok(xpForLevel(l) <= 1e14 && 1e14 < xpForLevel(l + 1))
+  assert.ok(Number.isFinite(levelFor(Number.MAX_VALUE))) // 溢出被内部上限吸收
+  assert.ok(levelFor(-5) >= 1) // 负值钳制
+})
+
 test('recordTaskCompleted：+XP、记统计、写回忆、不可变', () => {
   const base = { ...INITIAL_STATE, updatedAt: 0 }
   const { state } = recordTaskCompleted(base, '任务甲', NOW)

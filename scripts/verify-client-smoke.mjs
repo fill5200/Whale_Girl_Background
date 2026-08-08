@@ -31,10 +31,16 @@ if (res.status !== 0) {
 }
 const html = res.stdout
 const errors = []
-if (html.includes('Failed to load plugins')) errors.push('页面出现 "Failed to load plugins"（client apply 失败）')
+// 双错误串：浏览器 harness 失败 + 服务端 plugin tree 失败。
+if (html.includes('Failed to load plugins') || html.includes('plugin tree failed to load')) {
+  errors.push('页面出现 harness/插件树加载失败（client apply 失败）')
+}
 if (!html.includes('data-dsh-pet')) errors.push('未找到 [data-dsh-pet]（client half 未 apply）')
-const stageHasSprite = html.includes('pet-sprite ready')
-const stageHasEmoji = /<div class="pet-stage"[^>]*>[^<]/.test(html)
+// pet-status/pet-lv 存在证明 apply 走完了 refresh 渲染管道（不止挂载了 DOM）。
+if (!html.includes('pet-status') || !html.includes('pet-lv')) errors.push('状态条未渲染（apply 可能中途抛错）')
+// 舞台必须有可见内容：sprite 元素（replaceChildren 修复后）或非空 emoji 文本。
+const stageHasSprite = /<div class="pet-stage"[^>]*>\s*<div class="pet-sprite/.test(html)
+const stageHasEmoji = /<div class="pet-stage"[^>]*>([^<\s])/.test(html)
 if (!stageHasSprite && !stageHasEmoji) errors.push('宠物舞台为空（sprite 未渲染且无 emoji 兜底）')
 if (errors.length > 0) {
   for (const e of errors) console.error(`[verify-client-smoke] ${e}`)

@@ -6,6 +6,9 @@ import { INITIAL_STATE, levelFor, MEMORY_MAX, TITLES } from './pet-state.mjs'
 
 const KNOWN_TITLES = new Set(TITLES.map((t) => t.id))
 
+/** 手改/损坏文件的安全 xp 上限（1e12 远超现实积累；配合 levelFor 闭式解防挂起）。 */
+export const XP_CAP = 1e12
+
 function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : NaN
 }
@@ -20,17 +23,20 @@ export function normalizeState(saved) {
   if (typeof saved !== 'object' || saved === null) return null
   const xpRaw = num(saved.xp)
   if (!Number.isFinite(xpRaw)) return null
-  const xp = Math.max(0, xpRaw)
+  // 手改/损坏文件的安全上限（1e12 远超现实积累）与取整（pet_status schema 声明 integer）。
+  const xp = Math.max(0, Math.floor(Math.min(xpRaw, XP_CAP)))
+  // stats 走 INITIAL_STATE 合并：未来新增字段时旧文件不静默丢失。
   const stats = {
+    ...INITIAL_STATE.stats,
     tasksDone: int(saved.stats?.tasksDone),
     failures: int(saved.stats?.failures),
     sessions: int(saved.stats?.sessions),
     activeMs: num(saved.stats?.activeMs) > 0 ? saved.stats.activeMs : 0,
     firstSeenAt: num(saved.stats?.firstSeenAt) || null,
   }
-  const titles = Array.isArray(saved.titles)
+  const titles = [...new Set(Array.isArray(saved.titles)
     ? saved.titles.filter((t) => typeof t === 'string' && KNOWN_TITLES.has(t))
-    : []
+    : [])]
   const memory = Array.isArray(saved.memory)
     ? saved.memory.filter((m) => typeof m === 'string').slice(-MEMORY_MAX)
     : []

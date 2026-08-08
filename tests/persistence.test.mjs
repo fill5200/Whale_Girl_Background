@@ -35,6 +35,21 @@ test('normalizeState: 未知称号 id 被过滤', () => {
   assert.deepEqual(s.titles, ['first-task'])
 })
 
+test('normalizeState: 巨量 xp 截断到上限 + 浮点取整（integer schema / 防挂起）', () => {
+  const s = normalizeState({ xp: 1e15, updatedAt: 0 })
+  assert.equal(s.xp, 1e12)
+  assert.ok(Number.isInteger(s.xp))
+  const f = normalizeState({ xp: 10.5, updatedAt: 0 })
+  assert.equal(f.xp, 10)
+})
+
+test('normalizeState: 重复称号去重 + stats 与 INITIAL_STATE 合并', () => {
+  const s = normalizeState({ xp: 10, titles: ['first-task', 'first-task'], updatedAt: 0 })
+  assert.deepEqual(s.titles, ['first-task'])
+  assert.equal(s.stats.activeMs, 0) // 缺字段补齐而非 undefined
+  assert.equal(s.stats.firstSeenAt, null)
+})
+
 test('normalizeState: 缺失/非对象/非法数值返回 null', () => {
   assert.equal(normalizeState(null), null)
   assert.equal(normalizeState('x'), null)

@@ -131,6 +131,7 @@ export function apply(ctx) {
     }
     lastActiveCheck = now
     // burst 级联：welcome > error > disappointed > celebrate > working > idle。
+    // welcome 不打断进行中的 error/disappointed 尾段（失败失落不该被新会话欢迎盖掉）。
     let name = derived.working ? 'working' : 'idle'
     let until = 0
     if (derived.burst !== null && derived.burst.until > now) {
@@ -145,7 +146,7 @@ export function apply(ctx) {
       name = 'error'
       until = errorUntil
     }
-    if (welcomeUntil > now) {
+    if (welcomeUntil > now && errorUntil <= now && disappointedUntil <= now) {
       name = 'welcome'
       until = welcomeUntil
     }
@@ -203,7 +204,12 @@ export function apply(ctx) {
               memory: { type: 'string', description: '最近共同事件（换行分隔）' },
             },
           },
-          render: (_args, value) => [{ type: 'text', text: describe(value) }],
+          // render 消费 execute 的扁平返回（schema 扁平化的同一面）——不能用 describe(state)，
+          // 后者期望 state 形状（state.titles.map/stats），对扁平对象抛 TypeError。
+          render: (_args, value) => [{
+            type: 'text',
+            text: `资历 Lv.${value.level}（${value.xp} XP）· 完成 ${value.tasksDone} 个任务 · ${value.titles ? `称号「${value.titles}」` : '尚无称号'}`,
+          }],
         },
         execute: async () => ({
           level: state.level,

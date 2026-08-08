@@ -24,11 +24,13 @@ export function xpForLevel(level) {
   return (50 * level * (level - 1)) / 2
 }
 
-/** 由累计 xp 求等级。 */
+/** levelFor 内部安全上限（4*xp/25 不得溢出成 Infinity；现实值远低于此，见 persistence XP_CAP）。 */
+const XP_SAFE_MAX = 1e15
+
+/** 由累计 xp 求等级（三角数列反函数的闭式解 O(1)；原线性 while 在巨量 xp 下可挂起宿主）。 */
 export function levelFor(xp) {
-  let level = 1
-  while (xp >= xpForLevel(level + 1)) level += 1
-  return level
+  const xpSafe = Math.max(0, Math.min(xp, XP_SAFE_MAX))
+  return Math.floor((1 + Math.sqrt(1 + (4 * xpSafe) / 25)) / 2)
 }
 
 /** 称号定义（封闭集合；加称号要同时改本表与 docs/sprites-spec.md 的资历说明）。 */

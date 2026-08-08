@@ -1,7 +1,7 @@
 // src/activity.mjs 单测（node:test）。归属：活动推导逻辑改动跑本文件。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { deriveActivity, mergeBurst, BURST_MS } from '../src/activity.mjs'
+import { deriveActivity, BURST_MS } from '../src/activity.mjs'
 
 test('无任务 → idle（working=false，无 burst）', () => {
   const r = deriveActivity({ tasks: [], nowMs: 1000 })
@@ -52,10 +52,9 @@ test('任务列表为空时清空 known（防长会话泄漏）', () => {
   assert.equal(known.size, 0)
 })
 
-test('mergeBurst：取 until 更晚者；空值传播', () => {
-  const a = { name: 'celebrate', until: 100 }
-  const b = { name: 'error', until: 200 }
-  assert.deepEqual(mergeBurst(a, b), b)
-  assert.deepEqual(mergeBurst(null, a), a)
-  assert.deepEqual(mergeBurst(a, null), a)
+test('known 收缩到当前任务集合（残留终态任务时不线性增长）', () => {
+  const known = new Map([['gone', 'completed'], ['t1', 'running']])
+  deriveActivity({ tasks: [{ id: 't1', status: 'running' }], nowMs: 1, known, wasWorking: true })
+  assert.deepEqual([...known.keys()], ['t1'])
 })
+

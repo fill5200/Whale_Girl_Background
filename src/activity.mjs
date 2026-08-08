@@ -42,12 +42,11 @@ export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = f
   if (wasWorking && !working) {
     burst = betterBurst(burst, { name: 'celebrate', until: nowMs + BURST_MS })
   }
+  // known 收缩到当前任务 id 集合：unowned 终态任务常驻列表时也不会线性增长
+  // （仅 tasks 为空才 clear 挡不住"列表残留一条终态任务"的窗口）。
+  if (tasks.length > 0) {
+    const ids = new Set(tasks.map((t) => t.id))
+    for (const key of known.keys()) if (!ids.has(key)) known.delete(key)
+  }
   return { working, burst, completed, failed, known, wasWorking: working }
-}
-
-/** 合并两个 burst：取 until 更晚者（事件驱动 burst 优先于任务派生 burst 的同名覆盖）。 */
-export function mergeBurst(a, b) {
-  if (a === null) return b
-  if (b === null) return a
-  return b.until >= a.until ? b : a
 }

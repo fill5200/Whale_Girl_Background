@@ -144,11 +144,11 @@
     };
     const showSprite = (name, cfg) => {
       const size = sheetSize.get(cfg.sheet);
-      if (!size) {
+      if (!size || size.w <= 0 || size.h <= 0) {
         showEmoji(name);
         return;
       }
-      stage.textContent = "";
+      stage.replaceChildren(sprite);
       const frameW = size.w / cfg.frames;
       const scale = Math.min(SPRITE_MAX / frameW, SPRITE_MAX / size.h, 1);
       sprite.className = "pet-sprite ready";
@@ -278,7 +278,7 @@
         activity = body.activity ?? { name: "idle", until: 0 };
         if (activity.name !== "idle" || activity.until > Date.now()) lastActiveAt = Date.now();
         sleeping = activity.name === "idle" && Date.now() - lastActiveAt > SLEEP_AFTER_MS;
-        if (wasSleeping && !sleeping && transient === null) {
+        if (wasSleeping && !sleeping && transient === null && !["welcome", "celebrate", "error", "disappointed", "working"].includes(activity.name)) {
           transient = "wake";
           transientUntil = Date.now() + TRANSIENT_MS;
         }
@@ -303,8 +303,10 @@
     try {
       const raw = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
       if (raw && Number.isFinite(raw.x) && Number.isFinite(raw.y)) {
-        host.style.left = `${raw.x}px`;
-        host.style.top = `${raw.y}px`;
+        const x = Math.max(0, Math.min(raw.x, window.innerWidth - host.offsetWidth));
+        const y = Math.max(0, Math.min(raw.y, window.innerHeight - host.offsetHeight));
+        host.style.left = `${x}px`;
+        host.style.top = `${y}px`;
         host.style.right = "auto";
         host.style.bottom = "auto";
       }
@@ -340,6 +342,10 @@
       if (!moved && !e.target.closest("button")) toggleMenu();
     });
     host.addEventListener("pointercancel", () => {
+      dragging = false;
+      moved = false;
+    });
+    host.addEventListener("lostpointercapture", () => {
       dragging = false;
       moved = false;
     });
