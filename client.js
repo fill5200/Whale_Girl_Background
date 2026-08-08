@@ -111,6 +111,7 @@
       const next = open ?? !menu.classList.contains("open");
       menu.classList.toggle("open", next);
       host.setAttribute("aria-expanded", String(next));
+      if (next) lastActiveAt = Date.now();
       return next;
     };
     let pet = null;
@@ -262,6 +263,7 @@
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ action })
         });
+        if (!res.ok) return;
         const body = await res.json().catch(() => null);
         if (body?.reply) showReply(body.reply);
         spawnHearts();
@@ -269,7 +271,10 @@
       }
       await refresh();
     };
+    let refreshing = false;
     const refresh = async () => {
+      if (refreshing) return;
+      refreshing = true;
       try {
         const res = await fetch(STATE_PATH);
         if (!res.ok) return;
@@ -285,6 +290,8 @@
         wasSleeping = sleeping;
         renderStatus();
       } catch {
+      } finally {
+        refreshing = false;
       }
     };
     let startX = 0;

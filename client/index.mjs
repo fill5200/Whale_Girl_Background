@@ -103,6 +103,7 @@ export function apply() {
     const next = open ?? !menu.classList.contains('open')
     menu.classList.toggle('open', next)
     host.setAttribute('aria-expanded', String(next))
+    if (next) lastActiveAt = Date.now() // 键盘/点击打开菜单也算活跃（防睡着）
     return next
   }
 
@@ -278,6 +279,7 @@ export function apply() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action }),
       })
+      if (!res.ok) return // 403/413/500 不当作互动成功（不撒心）
       const body = await res.json().catch(() => null)
       if (body?.reply) showReply(body.reply)
       spawnHearts()
@@ -287,7 +289,11 @@ export function apply() {
     await refresh()
   }
 
+  // 互斥：并发 refresh（visibilitychange 与定时器）乱序回写会制造假 wake 边沿。
+  let refreshing = false
   const refresh = async () => {
+    if (refreshing) return
+    refreshing = true
     try {
       const res = await fetch(STATE_PATH)
       if (!res.ok) return
@@ -307,6 +313,8 @@ export function apply() {
       renderStatus()
     } catch {
       // 瞬态网络错误：保留上次状态
+    } finally {
+      refreshing = false
     }
   }
 
