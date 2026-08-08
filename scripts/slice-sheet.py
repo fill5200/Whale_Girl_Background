@@ -114,7 +114,8 @@ def despill(img, bg_colors):
     dmin = np.min(dists, axis=0)
     r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
     sp = np.clip(np.minimum(r, b) - g, 0, 255)  # 洋红溢色量
-    mask = (dmin < 120) & (sp > 8) & (a > 0.05)
+    # 半径 200：深色角色 + 洋红的小比例混合其距背景距离仍大（120 漏网，实测边缘仍洋红）
+    mask = (dmin < 200) & (sp > 8) & (a > 0.05)
     rgb = np.stack([
         np.where(mask, r - sp * 0.35, r),
         np.where(mask, g + sp * 0.7, g),
@@ -124,6 +125,20 @@ def despill(img, bg_colors):
     data = np.asarray(out, dtype=np.uint8).copy()
     data[:, :, :3] = np.clip(rgb, 0, 255).astype(np.uint8)
     return Image.fromarray(data)
+
+
+def defringe(img, erode=1):
+    """边缘侵蚀 + 羽化：剥掉含背景混合的最外层 1-2px（洋红环确定性移除），再高斯羽化恢复柔和边缘。
+    代价：轮廓损失约 1px（贴纸可接受）；比依赖混合比例的抑制更可靠。"""
+    from PIL import ImageFilter
+
+    a = img.getchannel('A')
+    for _ in range(erode):
+        a = a.filter(ImageFilter.MinFilter(3))
+    a = a.filter(ImageFilter.GaussianBlur(0.6))
+    out = img.copy()
+    out.putalpha(a)
+    return out
 
 
 def profile_bounds(mask, axis, n):
@@ -197,9 +212,10 @@ def detect_grid(img, max_cells=8):
     return row_bounds, col_bounds
 
 
-def build_state_sheet(img, row_bounds, col_bounds, row, cols, size):
+def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, padding=14):
     """把一行（同一状态的帧）按 union-bbox 对齐后横排拼接成 sheet。
-    对齐保证各帧同尺同锚（不各自归一化导致动画抖动）；空帧跳过。"""
+    对齐保证各帧同尺同锚（不各自归一化导致动画抖动）；空帧跳过。
+    padding：union-bbox 四周留白（防角色顶/脚贴到帧边，视觉像被裁）。"""
     frames = []
     for c in cols:
         (yt, yb), (xl, xr) = row_bounds[row], col_bounds[c]
@@ -210,19 +226,22 @@ def build_state_sheet(img, row_bounds, col_bounds, row, cols, size):
         frames.append((cell, bb))
     if not frames:
         return None, 0
-    x0 = min(bb[0] for _, bb in frames)
-    y0 = min(bb[1] for _, bb in frames)
-    x1 = max(bb[2] for _, bb in frames)
-    y1 = max(bb[3] for _, bb in frames)
+    x0 = max(0, min(bb[0] for _, bb in frames) - padding)
+    y0 = max(0, min(bb[1] for _, bb in frames) - padding)
+    x1 = min(cell.width, max(bb[2] for _, bb in frames) + padding)
+    y1 = min(cell.height, max(bb[3] for _, bb in frames) + padding)
     side = max(x1 - x0, y1 - y0)
     if side <= 0:
         return None, 0
     norm = []
     for cell, _ in frames:
         f = cell.crop((x0, y0, x0 + side, y0 + side))
-        if f.size[0] != size:
-            f = f.resize((size, size), Image.LANCZOS)
-        norm.append(f)
+        # 最终帧 = 画布留白：内容缩放至 92% 居中（角色无论多高都有 ~4% 边距，防"像被裁"）
+        canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        fsize = round(size * 0.92)
+        f = f.resize((fsize, fsize), Image.LANCZOS)
+        canvas.paste(f, ((size - fsize) // 2, (size - fsize) // 2), f)
+        norm.append(canvas)
     sheet = Image.new('RGBA', (size * len(norm), size), (0, 0, 0, 0))
     for i, f in enumerate(norm):
         sheet.paste(f, (i * size, 0), f)
@@ -263,7 +282,8 @@ def main():
             bgs = [detect_bg(img)] if args.key == 'auto' else [[int(v) for v in c.split(',')] for c in args.key.split('|')]
             img = chroma_key(img, bgs, args.key_lo, args.key_hi)
             img = despill(img, bgs)  # 去边缘溢色（洋红描边）
-            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi} +despill', file=sys.stderr)
+            img = defringe(img, erode=1)  # 侵蚀 1px 剥掉混合环 + 羽化
+            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi} +despill +defringe', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
@@ -293,7 +313,8 @@ def main():
                 col_bounds = [(round(w * c / cols), round(w * (c + 1) / cols)) for c in range(cols)]
                 print('content bounds failed, fallback equal division', file=sys.stderr)
             # 安全内缩：剥掉相邻角色的残余（截脚），union-bbox 会重新收回到真实内容。
-            inset = 12
+            # 4px 保守值：内缩过大会裁掉角色头顶（用户反馈"多裁"）；留白交给 build_state_sheet 的 padding。
+            inset = 4
             row_bounds = [(a + inset, b - inset) for (a, b) in row_bounds if b - a > 2 * inset]
             col_bounds = [(a + inset, b - inset) for (a, b) in col_bounds if b - a > 2 * inset]
         else:
