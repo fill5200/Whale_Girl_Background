@@ -46,6 +46,12 @@ test('记账推进：known 更新为最新状态', () => {
   assert.equal(known.get('t1'), 'completed')
 })
 
+test('任务列表为空时清空 known（防长会话泄漏）', () => {
+  const known = new Map([['t1', 'completed'], ['t2', 'failed']])
+  deriveActivity({ tasks: [], nowMs: 1, known, wasWorking: false })
+  assert.equal(known.size, 0)
+})
+
 test('mergeBurst：取 until 更晚者；空值传播', () => {
   const a = { name: 'celebrate', until: 100 }
   const b = { name: 'error', until: 200 }

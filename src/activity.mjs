@@ -19,6 +19,9 @@ function betterBurst(a, b) {
  * @param {{ tasks: Array<{id: string, status: string}>, nowMs: number, known?: Map<string,string>, wasWorking?: boolean }} input
  */
 export function deriveActivity({ tasks, nowMs, known = new Map(), wasWorking = false }) {
+  // 任务列表为空时清空记账：无任务可跟踪，且 wasWorking 必为 false，无翻转可丢
+  // （防长会话下 known 随历史任务 id 无限增长——内存泄漏）。
+  if (tasks.length === 0) known.clear()
   const running = tasks.filter((t) => t.status === 'running' || t.status === 'stopping')
   const working = running.length > 0
   let burst = null
