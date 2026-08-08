@@ -413,8 +413,8 @@ def build_sheet_from_comps(band, comps, state_centers, my_center, size, row_y0, 
         return None, 0
     s = (size * scale) / hmax
     norm = []
-    for i, (a, bb, _) in enumerate(my_frames):
-        x0, y0, x1, y1 = bb
+    for i, (a, cbb, _) in enumerate(my_frames):
+        x0, y0, x1, y1 = cbb
         for dbb in attach[i]:
             x0 = min(x0, dbb[0])
             y0 = min(y0, dbb[1])
@@ -425,10 +425,20 @@ def build_sheet_from_comps(band, comps, state_centers, my_center, size, row_y0, 
         fh = max(1, round(f.height * s))
         if f.size != (fw, fh):
             f = f.resize((fw, fh), Image.LANCZOS)
-        norm.append(f)
+        norm.append((f, cbb, (x0, y0)))
     sheet = Image.new('RGBA', (size * len(norm), size), (0, 0, 0, 0))
-    for i, f in enumerate(norm):
-        sheet.paste(f, (i * size + (size - f.width) // 2, size - f.height), f)
+    for i, (f, cbb, (x0, y0)) in enumerate(norm):
+        # 锚点配准（角色本体不动，装饰件围绕浮动——杜绝装饰件引起的左右晃动）：
+        # x = 角色中心对齐画布中心 128；y = 角色脚底对齐画布底部。
+        char_cx = round(((cbb[0] + cbb[2]) / 2 - x0) * s)
+        char_bot = round((cbb[3] - y0) * s)
+        px = 128 - char_cx
+        py = size - char_bot
+        px = min(px, size - f.width)
+        py = min(py, size - f.height)
+        px = max(px, 0)
+        py = max(py, 0)
+        sheet.paste(f, (i * size + px, py), f)
     return sheet, len(norm)
 
 
