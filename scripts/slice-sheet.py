@@ -142,6 +142,28 @@ def bg_floodfill(img, bg_colors, tol):
     return out
 
 
+def exterior_magenta_cleanup(img, sp_thresh=40, erode_r=5):
+    """轮廓相对分类（用户要点：角色的颜色只在内部，外部底色可辨）：
+    腐蚀 alpha 得角色核心（core）；**核心外**（轮廓边缘带/外圈）的粉调像素（sp>阈值）
+    = 背景污染 → 删；核心内的粉/紫 = 角色设计色 → 保留。
+    比纯颜色规则（sp>120 删）安全：不误删内部设计色，且把低饱和的外部残留也清掉。"""
+    import numpy as np
+    from PIL import Image as _Image
+    from PIL import ImageFilter as _IF
+
+    arr = np.asarray(img.convert('RGBA'), dtype=np.int16)
+    a = arr[:, :, 3]
+    r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+    sp = np.minimum(r, b) - g
+    solid = _Image.fromarray((a > 100).astype(np.uint8) * 255, 'L')
+    core = np.asarray(solid.filter(_IF.MinFilter(2 * erode_r + 1))) > 0  # 腐蚀 ~erode_r px
+    kill = (sp > sp_thresh) & (a > 0) & (~core)
+    new_a = np.where(kill, 0, a).astype(np.uint8)
+    out = img.convert('RGBA')
+    out.putalpha(_Image.fromarray(new_a, 'L'))
+    return out
+
+
 def closed_islands_cleanup(img, bg_colors):
     """封闭岛清理 + 极洋红微斑清除：
     1) 洪泛只删与图边连通的背景；被角色轮廓包围的**极饱和洋红**岛（sp>120，如 G=32 暗洋红）
@@ -348,8 +370,9 @@ def main():
             bgs = list({tuple(b) for b in bgs} | {tuple(detect_bg(img))})
             img = bg_floodfill(img, bgs, tol=45)  # 边界洪泛去背景（连通性分割，保住与底色同色的角色部位）
             img = closed_islands_cleanup(img, bgs)  # 封闭洋红岛：极饱和洋红残留直接删（角色哑光粉脸安全）
+            img = exterior_magenta_cleanup(img)  # 轮廓相对分类：核心外粉调=背景删，内部设计色保留
             img = defringe(img, erode=2)  # 侵蚀 2px 剥掉边缘混合环 + 羽化（替代加法抑制——补 G 会产出绿边）
-            print(f'keyed: bg={bgs} floodfill+islands+defringe2', file=sys.stderr)
+            print(f'keyed: bg={bgs} floodfill+islands+exterior+defringe2', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
