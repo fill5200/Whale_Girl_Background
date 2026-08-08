@@ -319,15 +319,18 @@ def detect_grid(img, max_cells=8):
     return row_bounds, col_bounds
 
 
-def frame_extent(cell, margin=14):
-    """轮廓分组取帧范围：4-连通标注全部连通域。
-    最大连通域 = 角色本体；**吸收与角色 bbox 相邻/相交的小块**（装饰如五角星、
-    爱心——独立小连通域，若只取最大域会被裁掉）；邻格角色质心远离 → 排除。
-    返回 (union_bbox, 角色bbox)。"""
+def row_band_comps(img, row_bounds, row, expand=90, min_area=40):
+    """行带连通域分析：取整行（全宽、垂直放宽），4-连通标注全部连通域。
+    返回 (band_img, comps)；comps = [(area, bbox, centroid)] 按面积降序。
+    格子不再裁剪——行内所有内容都在带里，帧由连通域定义（角色/装饰件），
+    彻底消除"内容超出格子被切"（welcome 手臂 / celebrate 星星跨界）。"""
     from collections import deque
 
-    alpha = np.asarray(cell.getchannel('A'))
-    mask = alpha > 40
+    (yt, yb) = row_bounds[row]
+    cy0 = max(0, yt - expand)
+    cy1 = min(img.height, yb + expand)
+    band = img.crop((0, cy0, img.width, cy1))
+    mask = np.asarray(band.getchannel('A')) > 40
     h, w = mask.shape
     visited = np.zeros_like(mask)
     comps = []
@@ -351,65 +354,67 @@ def frame_extent(cell, margin=14):
                     if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not visited[ny, nx]:
                         visited[ny, nx] = True
                         q.append((ny, nx))
-            comps.append((area, (minx, miny, maxx, maxy)))
-    if not comps:
-        return None, None
+            if area >= min_area:
+                comps.append((area, (minx, miny, maxx, maxy), ((minx + maxx) / 2, (miny + maxy) / 2)))
     comps.sort(key=lambda c: -c[0])
-    char_bb = comps[0][1]
-    cx0, cy0, cx1, cy1 = char_bb
-    # 吸收：质心在角色 bbox 外扩 margin 内的连通域（装饰件）
-    keep = [char_bb]
-    for area, bb in comps[1:]:
-        mx, my = (bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2
-        if cx0 - margin <= mx <= cx1 + margin and cy0 - margin <= my <= cy1 + margin:
-            keep.append(bb)
-    ux0 = min(b[0] for b in keep)
-    uy0 = min(b[1] for b in keep)
-    ux1 = max(b[2] for b in keep)
-    uy1 = max(b[3] for b in keep)
-    return (ux0, uy0, ux1, uy1), char_bb
+    return band, comps
 
 
-def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88, expand=80):
-    """把一行（同一状态的帧）做成帧 sheet（轮廓法逐对象配准）：
-    先抠图（调用方完成）→ **格子四向放宽 expand px**（格子边界不再切角色）→
-    每帧取**轮廓分组范围**（最大连通域=角色 + 吸收相邻装饰件；排除邻格角色）→
-    统一缩放因子 → 底中对齐。"""
-    frames = []
-    for c in cols:
-        (yt, yb), (xl, xr) = row_bounds[row], col_bounds[c]
-        cx0 = max(0, xl - expand)
-        cx1 = min(img.width, xr + expand)
-        cy0 = max(0, yt - expand)
-        cy1 = min(img.height, yb + expand)
-        cell = img.crop((cx0, cy0, cx1, cy1))
-        bb, char_bb = frame_extent(cell)
-        if bb is None:
-            continue
-        frames.append((cell, bb, char_bb))
-    if not frames:
+def build_sheet_from_comps(band, comps, state_centers, my_center, size, row_y0, row_y1, max_frames=0, scale=0.88, deco_margin=90):
+    """由行带连通域构建一个状态的帧 sheet：
+    - 角色 = 大面积连通域（> 最大面积 20%）；按质心 x 距**本状态中心**最近归属
+      （行内多状态如 sleep+wake 同排时正确分流）；本状态角色按 x 排序 = 各帧。
+    - 装饰件（小连通域：星星/爱心）附着质心最近的帧角色（deco_margin 内）→ 并入该帧范围。
+    - 统一缩放因子基于各帧角色高度；帧 = 角色+装饰件范围，底中对齐。"""
+    if not comps:
         return None, 0
-    # 统一缩放因子：基于各帧**角色**（非含装饰的范围）的最大高度，避免星星撑高
-    hmax = max(bb[3] - bb[1] for _, _, bb in frames)
+    max_area = comps[0][0]
+    chars = [(a, bb, ct) for (a, bb, ct) in comps if a > max_area * 0.2]
+    if not chars:
+        return None, 0
+    # 角色质心 y 必须在行内（band 坐标 row_y0..row_y1）——垂直放宽只为保住头顶，
+    # 邻行角色的内容（feet 等）不得成为本行帧（否则帧数翻倍）。
+    my_frames = []
+    for a, bb, (cx, cy) in chars:
+        if not (row_y0 <= cy <= row_y1):
+            continue
+        nearest = min(range(len(state_centers)), key=lambda i: abs(state_centers[i] - cx))
+        if nearest == my_center:
+            my_frames.append((a, bb, (cx, cy)))
+    my_frames.sort(key=lambda f: f[2][0])
+    if max_frames > 0:
+        my_frames = my_frames[:max_frames]  # 尊重声明的帧数（模型可能多画）
+    if not my_frames:
+        return None, 0
+    attach = [[] for _ in my_frames]
+    for a, bb, (cx, cy) in comps:
+        if a > max_area * 0.2:
+            continue
+        dists = [(abs(f[2][0] - cx) + abs(f[2][1] - cy), i) for i, f in enumerate(my_frames)]
+        d, i = min(dists)
+        if d < deco_margin:
+            attach[i].append(bb)
+    hmax = max(bb[3] - bb[1] for _, bb, _ in my_frames)
     if hmax <= 0:
         return None, 0
     s = (size * scale) / hmax
     norm = []
-    for cell, bb, _ in frames:
+    for i, (a, bb, _) in enumerate(my_frames):
         x0, y0, x1, y1 = bb
-        if x1 <= x0 or y1 <= y0:
-            continue
-        f = cell.crop((x0, y0, x1, y1))
+        for dbb in attach[i]:
+            x0 = min(x0, dbb[0])
+            y0 = min(y0, dbb[1])
+            x1 = max(x1, dbb[2])
+            y1 = max(y1, dbb[3])
+        f = band.crop((x0, y0, x1, y1))
         fw = max(1, round(f.width * s))
         fh = max(1, round(f.height * s))
         if f.size != (fw, fh):
             f = f.resize((fw, fh), Image.LANCZOS)
         norm.append(f)
-    if not norm:
-        return None, 0
     sheet = Image.new('RGBA', (size * len(norm), size), (0, 0, 0, 0))
     for i, f in enumerate(norm):
-        sheet.paste(f, (i * size + (size - f.width) // 2, size - f.height), f)  # x 居中、底对齐
+        sheet.paste(f, (i * size + (size - f.width) // 2, size - f.height), f)
     return sheet, len(norm)
 
 
@@ -492,41 +497,50 @@ def main():
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
-    # sheet 模式：行为状态、列为帧，union-bbox 对齐拼横排 sheet（多状态图 → 每状态一张）。
+    # sheet 模式：行带连通域分段（多状态图 → 每状态一张；帧由连通域定义，格子不裁剪）。
     if args.sheet:
-        report = {'input': str(args.input), 'size': list(img.size), 'grid': [len(row_bounds), len(col_bounds)], 'sheets': []}
+        regions = []
         if args.regions:
-            # regions 模式：state@row:colStart-colEnd（一行可有多个状态）
             for region in args.regions.split(','):
                 state, pos = region.split('@')
                 row_s, colrange = pos.split(':')
                 c0, c1 = (int(v) for v in colrange.split('-'))
-                sheet_img, n = build_state_sheet(img, row_bounds, col_bounds, int(row_s), range(c0, c1 + 1), args.size)
+                regions.append((state, int(row_s), c0, c1))
+        else:
+            if not (args.states and args.frames):
+                ap.error('--sheet 需要 --states+--frames 或 --regions')
+            states = [s.strip() for s in args.states.split(',')]
+            frame_counts = [int(v) for v in args.frames.split(',')]
+            if len(states) != len(row_bounds) or len(frame_counts) != len(row_bounds):
+                ap.error('--states/--frames 数量须等于网格行数')
+            regions = [(state, r, 0, fc - 1) for r, (state, fc) in enumerate(zip(states, frame_counts))]
+
+        report = {'input': str(args.input), 'size': list(img.size), 'grid': [len(row_bounds), len(col_bounds)], 'sheets': []}
+        # 按行分组，每行做一次连通域分析
+        by_row = {}
+        for state, row_s, c0, c1 in regions:
+            by_row.setdefault(row_s, []).append((state, c0, c1))
+        for row_s, row_states in by_row.items():
+            row_states = [(st, c0, c1) for (st, c0, c1) in row_states if st != 'x']  # 跳过占位
+            if not row_states:
+                continue
+            band, comps = row_band_comps(img, row_bounds, row_s)
+            band_off = max(0, row_bounds[row_s][0] - 90)
+            row_y0 = row_bounds[row_s][0] - band_off
+            row_y1 = row_bounds[row_s][1] - band_off
+            state_centers = [(col_bounds[c0][0] + col_bounds[c1][1]) / 2 for _, c0, c1 in row_states]
+            for idx, (state, c0, c1) in enumerate(row_states):
+                declared = c1 - c0 + 1
+                sheet_img, n = build_sheet_from_comps(band, comps, state_centers, idx, args.size, row_y0, row_y1, max_frames=declared)
                 if sheet_img is None:
                     report['sheets'].append({'state': state, 'file': None, 'frames': 0, 'skipped': 'empty'})
                     continue
                 fname = f'{state}.png'
                 sheet_img.save(out / fname)
                 report['sheets'].append({'state': state, 'file': fname, 'frames': n})
-            print(json.dumps(report, ensure_ascii=False))
-            return
-        if not (args.states and args.frames):
-            ap.error('--sheet 需要 --states+--frames 或 --regions')
-        states = [s.strip() for s in args.states.split(',')]
-        frame_counts = [int(v) for v in args.frames.split(',')]
-        if len(states) != len(row_bounds) or len(frame_counts) != len(row_bounds):
-            ap.error('--states/--frames 数量须等于网格行数')
-        report = {'input': str(args.input), 'size': list(img.size), 'grid': [len(row_bounds), len(col_bounds)], 'sheets': []}
-        for r, state in enumerate(states):
-            sheet_img, n = build_state_sheet(img, row_bounds, col_bounds, r, range(frame_counts[r]), args.size)
-            if sheet_img is None:
-                report['sheets'].append({'state': state, 'file': None, 'frames': 0, 'skipped': 'empty'})
-                continue
-            fname = f'{state}.png'
-            sheet_img.save(out / fname)
-            report['sheets'].append({'state': state, 'file': fname, 'frames': n})
         print(json.dumps(report, ensure_ascii=False))
         return
+
     report = {'input': str(args.input), 'size': list(img.size), 'grid': [len(row_bounds), len(col_bounds)], 'slices': []}
     for r, (yt, yb) in enumerate(row_bounds):
         for c, (xl, xr) in enumerate(col_bounds):
