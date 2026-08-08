@@ -104,9 +104,13 @@ export function recordSession(state, nowMs) {
   )
 }
 
-/** 活跃时长积累（工作态时由宿主按轮询间隔累加）。 */
+/** 单次活跃累加上限：机器睡眠后首轮 poll 不把整段睡眠计入（防一夜刷出「常驻伙伴」）。 */
+export const ACTIVE_CAP_MS = 5 * 60_000
+
+/** 活跃时长积累（工作态时由宿主按轮询间隔累加；单次增量封顶 ACTIVE_CAP_MS）。 */
 export function recordActive(state, elapsedMs, nowMs) {
-  return commit(state, { activeMs: state.stats.activeMs + Math.max(0, elapsedMs) }, nowMs, null)
+  const capped = Math.min(Math.max(0, elapsedMs), ACTIVE_CAP_MS)
+  return commit(state, { activeMs: state.stats.activeMs + capped }, nowMs, null)
 }
 
 /** 资历一行摘要（工具输出与路由都复用）。 */

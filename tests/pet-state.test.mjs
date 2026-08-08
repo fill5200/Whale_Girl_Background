@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   INITIAL_STATE, MEMORY_MAX, TASK_XP, SESSION_XP, xpForLevel, levelFor,
-  recordTaskCompleted, recordFailure, recordSession, recordActive, describe, titleName,
+  recordTaskCompleted, recordFailure, recordSession, recordActive, ACTIVE_CAP_MS, describe, titleName,
 } from '../src/pet-state.mjs'
 
 const NOW = 1_700_000_000_000
@@ -98,9 +98,16 @@ test('recordSession：+XP、记首见时间', () => {
 
 test('recordActive：活跃时长积累且称号「常驻伙伴」在 6h 解锁', () => {
   let s = { ...INITIAL_STATE, updatedAt: 0 }
-  s = recordActive(s, 6 * 3_600_000, NOW).state
+  // 6h 由 5min 封顶增量多次累加（单次封顶后无「睡眠一夜刷称号」路径）。
+  for (let i = 0; i < 72; i++) s = recordActive(s, 5 * 60_000, NOW + i).state
   assert.equal(s.stats.activeMs, 6 * 3_600_000)
   assert.ok(s.titles.includes('regular'))
+})
+
+test('recordActive：单次增量封顶 ACTIVE_CAP_MS（睡眠后首轮不一次计满）', () => {
+  const s = recordActive({ ...INITIAL_STATE, updatedAt: 0 }, 6 * 3_600_000, NOW).state
+  assert.equal(s.stats.activeMs, ACTIVE_CAP_MS)
+  assert.ok(!s.titles.includes('regular')) // 单次睡眠不计满 6h
 })
 
 test('回忆环形上限 MEMORY_MAX', () => {
