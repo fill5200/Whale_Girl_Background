@@ -142,6 +142,26 @@ def bg_floodfill(img, bg_colors, tol):
     return out
 
 
+def closed_islands_cleanup(img, bg_colors):
+    """封闭岛清理：洪泛只删与图边连通的背景；被角色轮廓包围的**极饱和洋红**岛
+    （sp=min(R,B)-G > 120，如 (224,32,224) 的 G=32 暗洋红）不连通而残留——
+    这里按颜色直接删。角色哑光粉/紫内饰 sp≈30~70 且距背景色远，不受影响。"""
+    import numpy as np
+    from PIL import Image as _Image
+
+    arr = np.asarray(img.convert('RGB'), dtype=np.int16)
+    a = np.asarray(img.convert('RGBA').getchannel('A'), dtype=np.int16)
+    r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+    sp = np.minimum(r, b) - g
+    dists = [np.linalg.norm(arr - np.asarray(bg, dtype=np.int16), axis=2) for bg in bg_colors]
+    dmin = np.min(np.stack(dists), axis=0)
+    kill = (sp > 120) & (dmin < 45) & (a > 0)
+    new_a = np.where(kill, 0, a).astype(np.uint8)
+    out = img.convert('RGBA')
+    out.putalpha(_Image.fromarray(new_a, 'L'))
+    return out
+
+
 def despill(img, bg_colors):
     """去溢色（色键残边）：**只处理空间边缘带**（距透明像素 ≤3px）内的粉调像素——
     背景混合只可能出现在轮廓处；角色内饰色（粉脸/衣服）绝不碰（全域抑制会把粉脸灰化，实测）。"""
@@ -321,11 +341,13 @@ def main():
             img = gray_key(img)
             print('keyed: gray-mask', file=sys.stderr)
         else:
+            # 背景色 = 声明色 ∪ 图像边框实际取色（模型常把"纯洋红"画偏，如 G=32 的暗洋红）
             bgs = [detect_bg(img)] if args.key == 'auto' else [[int(v) for v in c.split(',')] for c in args.key.split('|')]
-            img = bg_floodfill(img, bgs, tol=35)  # 边界洪泛去背景（连通性分割，保住与底色同色的角色部位）
-            img = despill(img, bgs)  # 边缘带去溢色（内饰色不碰）
-            img = defringe(img, erode=1)  # 侵蚀 1px + 羽化
-            print(f'keyed: bg={bgs} floodfill+despill+defringe', file=sys.stderr)
+            bgs = list({tuple(b) for b in bgs} | {tuple(detect_bg(img))})
+            img = bg_floodfill(img, bgs, tol=45)  # 边界洪泛去背景（连通性分割，保住与底色同色的角色部位）
+            img = closed_islands_cleanup(img, bgs)  # 封闭洋红岛：极饱和洋红残留直接删（角色哑光粉脸安全）
+            img = defringe(img, erode=2)  # 侵蚀 2px 剥掉边缘混合环 + 羽化（替代加法抑制——补 G 会产出绿边）
+            print(f'keyed: bg={bgs} floodfill+islands+defringe2', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
