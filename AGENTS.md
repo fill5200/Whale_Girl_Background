@@ -41,8 +41,8 @@ node scripts/build-client.mjs --check   # 校验 client.js 新鲜度（只读）
 | src/ 状态机行为 | `node --test 'tests/pet-state.test.mjs'` |
 | client/ 源码或构建配置 | `node scripts/build-client.mjs --check`，改完跑 `node scripts/build-client.mjs`；验证站 web 运行中跑 `node scripts/verify-client-smoke.mjs <web-url>`（浏览器冒烟：apply 成功 + 宠物渲染，curl 覆盖不到的 client 面） |
 | 文档、决策记录 | `node scripts/gates/run.mjs` |
-| assets/ sheet 或 manifest | `node scripts/gates/verify-assets.mjs`（引用文件必须存在） |
-| dsh.plugin.json / index.mjs（插件接线，含工具 schema） | `node scripts/gates/run.mjs` + 验证站 install/enable + **web 重启**（value-schema DSL 只在挂载时编译，enable 不够，见 [decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md](decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md)） |
+| assets/ sheet 或 manifest | `node scripts/gates/verify-assets.mjs` + 重装 + **刷新页面即可，无需重启 web**（assets 路由按请求读磁盘） |
+| index.mjs / src/（Node half，含工具 schema） | `node scripts/gates/run.mjs` + 重装 + **web 重启**（value-schema DSL 只在挂载时编译，enable 不够，见 [decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md](decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md)）；重启后日志须无 `plugin tree failed to load` |
 | 门禁本身 | 对应门禁的自证测试（`node --test 'scripts/gates/*.test.mjs'`） |
 
 ## 约定
