@@ -50,9 +50,10 @@
     },
     "drag": {
       "sheet": "drag.png",
-      "frames": 2,
+      "frames": 1,
       "fps": 5,
-      "loop": true
+      "loop": true,
+      "motion": "shake"
     },
     "walk": {
       "sheet": "walk.png",
