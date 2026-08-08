@@ -9,7 +9,8 @@
   "contributes": {
     "tools": [
       "pet_feed",
-      "pet_play"
+      "pet_play",
+      "pet_status"
     ],
     "skills": []
   },

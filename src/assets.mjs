@@ -1,5 +1,5 @@
 // assets 静态服务守卫：路径净化 + MIME 映射（纯函数，零宿主依赖，可单测）。
-// 契约：从请求 pathname 提取相对 assets 目录的安全子路径；含 `..`/`.`/空段/绝对路径即拒绝。
+// 契约：从请求 pathname 提取相对 assets 目录的安全子路径；含 `..`/`.`/空段/`\`（Windows 分隔符）/绝对路径即拒绝。
 
 export const ASSETS_PATH = '/plugins/vlln/dsh-pet/assets'
 
@@ -14,7 +14,7 @@ export function sanitizeAssetPath(pathname, prefix = ASSETS_PATH) {
   if (rel === '' || rel.includes('\0')) return null
   const segments = rel.split('/')
   for (const s of segments) {
-    if (s === '' || s === '.' || s === '..') return null
+    if (s === '' || s === '.' || s === '..' || s.includes('\\')) return null
   }
   return rel
 }

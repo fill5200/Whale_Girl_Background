@@ -1,19 +1,24 @@
 // dsh-pet Node half：宠物状态机宿主 + assets 静态服务 + 活动状态推导。
-// 契约：contributes.tools 与下方注册的工具逐名一致；路由路径与 client bundle 一致
-// （见 client/index.mjs 的 STATE_PATH/INTERACT_PATH/ASSETS_URL）；activity 是派生字段，
-// 不写入 pet-state（状态机保持纯函数）。
+// 契约：contributes.tools 与下方注册的工具逐名一致（verify-contributes 门禁守护）；
+// 路由路径与 client bundle 一致（见 client/index.mjs 的 STATE_PATH/INTERACT_PATH/ASSETS_URL）；
+// activity 是派生字段，不写入 pet-state（状态机保持纯函数）。
+// 安全：/interact 校验跨源（CSRF）；body 上限 1KB；assets 路径净化拒绝 `\` 段（Windows 穿越）。
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { INITIAL_STATE, tick, feed, play } from './src/pet-state.mjs'
 import { deriveActivity, mergeBurst, BURST_MS } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
+import { applyAction, isCrossOrigin } from './src/interact.mjs'
 
 export const name = 'dsh-pet'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
 
 export const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 export const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
+
+/** /interact 请求体大小上限（动作只需几字节）。 */
+export const BODY_LIMIT = 1024
 
 /** 状态的一行摘要（工具输出与路由都复用）。 */
 function describe(state) {
@@ -40,14 +45,18 @@ function collectTasks(ctx) {
   return out
 }
 
-function json(res, status, body) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
+function json(res, status, body, extra = {}) {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...extra })
   res.end(JSON.stringify(body))
 }
 
-async function readBody(req) {
+/** 读取请求体（超 BODY_LIMIT 返回 null，由调用方回 413）。 */
+async function readBody(req, limit = BODY_LIMIT) {
   let data = ''
-  for await (const chunk of req) data += chunk
+  for await (const chunk of req) {
+    data += chunk
+    if (data.length > limit) return null
+  }
   return data
 }
 
@@ -97,12 +106,36 @@ export function apply(ctx) {
           return describe(state)
         },
       })),
+      ctx.tools.register(defineTool({
+        name: 'pet_status',
+        description: '查看桌面宠物当前状态（饱食度/心情/等级/经验），喂食或玩耍前先查状态。',
+        parameters: {},
+        output: {
+          schema: {
+            type: 'object',
+            properties: {
+              hunger: { type: 'number', description: '0=不饿，100=饿极' },
+              mood: { type: 'number', description: '0=低落，100=开心' },
+              level: { type: 'integer' },
+              xp: { type: 'integer' },
+            },
+            required: ['hunger', 'mood', 'level', 'xp'],
+          },
+          render: (_args, value) => [{ type: 'text', text: describe(value) }],
+        },
+        execute: async () => snapshot(),
+      })),
       ctx.httpServer.register({
         kind: 'exact',
         path: STATE_PATH,
-        handler: async (_req, res) => {
+        handler: async (req, res) => {
           try {
-            json(res, 200, { pet: snapshot(), activity: activity() })
+            if (req.method !== 'GET') {
+              json(res, 405, { error: 'method not allowed; use GET' }, { allow: 'GET' })
+              return
+            }
+            // 轮询端点：禁缓存，防止启发式缓存读到冻结状态。
+            json(res, 200, { pet: snapshot(), activity: activity() }, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
           }
@@ -114,19 +147,33 @@ export function apply(ctx) {
         handler: async (req, res) => {
           try {
             if (req.method !== 'POST') {
-              json(res, 405, { error: 'method not allowed; use POST' })
+              json(res, 405, { error: 'method not allowed; use POST' }, { allow: 'POST' })
               return
             }
-            const body = JSON.parse((await readBody(req)) || '{}')
-            const action = body.action
-            const now = Date.now()
-            if (action === 'feed') state = feed(snapshot(), now)
-            else if (action === 'play') state = play(snapshot(), now)
-            else {
-              json(res, 400, { error: `unknown action "${action}"; expected "feed" or "play"` })
+            // CSRF 面：跨源请求拒绝（恶意网页不能喂宠物/刷经验）。
+            if (isCrossOrigin(req.headers, req.headers.host)) {
+              json(res, 403, { error: 'cross-origin request rejected' })
               return
             }
-            json(res, 200, { pet: state })
+            const raw = await readBody(req)
+            if (raw === null) {
+              json(res, 413, { error: 'request body too large' })
+              return
+            }
+            let body
+            try {
+              body = JSON.parse(raw || '{}')
+            } catch {
+              json(res, 400, { error: 'invalid JSON body' })
+              return
+            }
+            if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+              json(res, 400, { error: 'body must be a JSON object' })
+              return
+            }
+            const result = applyAction(snapshot(), body.action, Date.now())
+            if (result.status === 200) state = result.body.pet
+            json(res, result.status, result.body, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
           }
@@ -141,7 +188,14 @@ export function apply(ctx) {
             res.end()
             return
           }
-          const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://dsh.internal').pathname)
+          let pathname
+          try {
+            pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://dsh.internal').pathname)
+          } catch {
+            res.writeHead(400)
+            res.end()
+            return
+          }
           const rel = sanitizeAssetPath(pathname)
           if (rel === null) {
             res.writeHead(403)
@@ -150,7 +204,8 @@ export function apply(ctx) {
           }
           try {
             const data = readFileSync(join(import.meta.dirname, 'assets', rel))
-            res.writeHead(200, { 'content-type': contentTypeFor(rel) })
+            // no-cache：替换同名 sheet 后浏览器须重新校验，避免旧图。
+            res.writeHead(200, { 'content-type': contentTypeFor(rel), 'cache-control': 'no-cache' })
             res.end(data)
           } catch {
             res.writeHead(404)

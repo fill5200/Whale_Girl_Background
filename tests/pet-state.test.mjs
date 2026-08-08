@@ -19,11 +19,28 @@ test('tick 按流逝推进衰减且不可变', () => {
   assert.equal(base.updatedAt, 0)
 })
 
-test('tick 的负流逝钳制为 0', () => {
+test('tick 的负流逝钳制为 0，且 updatedAt 锚点不倒退', () => {
   const base = { ...INITIAL_STATE, updatedAt: 1000 }
   const next = tick(base, 500)
   assert.equal(next.hunger, 0)
-  assert.equal(next.updatedAt, 500)
+  assert.equal(next.updatedAt, 1000) // 时钟回拨：锚点保持，恢复后不二次计数
+})
+
+test('feed/play 内部吸收流逝衰减（传 stale 状态也安全）', () => {
+  const stale = { ...INITIAL_STATE, updatedAt: 0 }
+  const fed = feed(stale, 2 * HOUR)
+  assert.equal(fed.hunger, 0) // tick +16 → feed -35 → clamp 0
+  assert.equal(fed.mood, 61) // tick -4 → feed +5 → 61
+  const played = play(stale, 2 * HOUR)
+  assert.equal(played.mood, 81) // tick -4 → play +25 → 81
+})
+
+test('feed 与宿主先 tick 的组合幂等', () => {
+  const base = { ...INITIAL_STATE, updatedAt: 0 }
+  const pre = tick(base, 1000)
+  const a = feed(pre, 1000) // 宿主先 tick，feed 内部再 tick（elapsed 0，恒等）
+  const b = feed(base, 1000) // 直接喂
+  assert.deepEqual(a, b)
 })
 
 test('feed 降饥饿、升心情、加经验，且不越过边界', () => {
@@ -36,7 +53,7 @@ test('feed 降饥饿、升心情、加经验，且不越过边界', () => {
 })
 
 test('play 升心情、饥饿略增（运动消耗）、加经验', () => {
-  const base = { ...INITIAL_STATE, mood: 80, updatedAt: 0 }
+  const base = { ...INITIAL_STATE, mood: 80, updatedAt: 1000 }
   const next = play(base, 1000)
   assert.equal(next.mood, 100)
   assert.equal(next.hunger, 8)
