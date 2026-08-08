@@ -238,6 +238,7 @@ def main():
     ap.add_argument('--sheet', help='sheet 模式：网格如 3x3（行为状态、列为帧）')
     ap.add_argument('--states', help='sheet 模式：每行状态名（逗号，数量=行数）')
     ap.add_argument('--frames', help='sheet 模式：每行帧数（逗号，数量=行数）')
+    ap.add_argument('--regions', help='sheet 模式（更灵活）：state@row:colStart-colEnd,state@row:..., 如 walk@0:0-3,sleep@1:0-1')
     ap.add_argument('--key', metavar='BG', help='抠图：gray=亮灰掩膜；auto=取边框色；或 R,G,B（多色用 | 分隔）')
     ap.add_argument('--repair', action='store_true', help='键后硬化 alpha（救回被半透明的浅色皮肤）')
     ap.add_argument('--key-lo', type=int, default=6, help='色键阈值下界（距背景色距离，默认 6）')
@@ -304,8 +305,24 @@ def main():
 
     # sheet 模式：行为状态、列为帧，union-bbox 对齐拼横排 sheet（多状态图 → 每状态一张）。
     if args.sheet:
+        report = {'input': str(args.input), 'size': list(img.size), 'grid': [len(row_bounds), len(col_bounds)], 'sheets': []}
+        if args.regions:
+            # regions 模式：state@row:colStart-colEnd（一行可有多个状态）
+            for region in args.regions.split(','):
+                state, pos = region.split('@')
+                row_s, colrange = pos.split(':')
+                c0, c1 = (int(v) for v in colrange.split('-'))
+                sheet_img, n = build_state_sheet(img, row_bounds, col_bounds, int(row_s), range(c0, c1 + 1), args.size)
+                if sheet_img is None:
+                    report['sheets'].append({'state': state, 'file': None, 'frames': 0, 'skipped': 'empty'})
+                    continue
+                fname = f'{state}.png'
+                sheet_img.save(out / fname)
+                report['sheets'].append({'state': state, 'file': fname, 'frames': n})
+            print(json.dumps(report, ensure_ascii=False))
+            return
         if not (args.states and args.frames):
-            ap.error('--sheet 需要 --states 与 --frames')
+            ap.error('--sheet 需要 --states+--frames 或 --regions')
         states = [s.strip() for s in args.states.split(',')]
         frame_counts = [int(v) for v in args.frames.split(',')]
         if len(states) != len(row_bounds) or len(frame_counts) != len(row_bounds):
