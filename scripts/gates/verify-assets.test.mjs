@@ -14,7 +14,7 @@ function makeTree(files) {
   for (const [rel, content] of Object.entries(files)) {
     const p = join(root, rel)
     mkdirSync(dirname(p), { recursive: true })
-    writeFileSync(p, typeof content === 'string' ? content : JSON.stringify(content))
+    writeFileSync(p, content instanceof Buffer ? content : typeof content === 'string' ? content : JSON.stringify(content))
   }
   return root
 }
@@ -77,4 +77,30 @@ test('拒绝：motion 配 frames>1（与帧播放器互斥）', () => {
   const { ok, errors } = check(root)
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /motion 配方要求 frames === 1/)
+})
+
+/** 构造最小 PNG 头（宽高可指定；门禁只读 IHDR 尺寸）。 */
+function fakePng(w, h) {
+  const buf = Buffer.alloc(24)
+  buf.writeUInt32BE(0x89504e47, 0)
+  buf.writeUInt32BE(13, 8)
+  buf.write('IHDR', 12)
+  buf.writeUInt32BE(w, 16)
+  buf.writeUInt32BE(h, 20)
+  return buf
+}
+
+test('拒绝：单姿势 256×256 配 frames:2（宽度 ≠ 2×高度，姿势会被劈开）', () => {
+  const bad = { states: { eat: { sheet: 'eat.png', frames: 2, fps: 10, loop: false } } }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/eat.png': fakePng(256, 256) })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /frames 2 要求 PNG 宽度 = 2 × 高度/)
+})
+
+test('接受：真两帧横排 sheet（512×256 配 frames:2）', () => {
+  const good = { states: { eat: { sheet: 'eat.png', frames: 2, fps: 10, loop: false } } }
+  const root = makeTree({ 'assets/manifest.json': good, 'assets/eat.png': fakePng(512, 256) })
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
 })
