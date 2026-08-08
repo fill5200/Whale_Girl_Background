@@ -24,7 +24,7 @@ const SPRITE_MAX = 150
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
-[data-dsh-pet] .pet-stage { width: 96px; height: 96px; display: grid; place-items: center;
+[data-dsh-pet] .pet-stage { width: 150px; height: 150px; display: grid; place-items: center;
   font-size: 56px; line-height: 1; text-align: center; animation: dsh-pet-bob 2s ease-in-out infinite;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; }
