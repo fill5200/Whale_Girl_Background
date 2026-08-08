@@ -30,7 +30,7 @@ const WALK_SPEED_PX_S = 45
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
-[data-dsh-pet] .pet-stage { width: 150px; height: 150px; display: grid; place-items: center;
+[data-dsh-pet] .pet-stage { position: relative; width: 150px; height: 150px; display: grid; place-items: center;
   font-size: 56px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
@@ -297,13 +297,15 @@ export function apply() {
   }
 
   // ---- 互动 ----
+  // 互动爱心爆发：围绕角色本体（stage 中心区域）散开上浮，不贴角。
+  // stage 是 position:relative 锚点；偏移取角色所在的中上部区域，避免缩进左上角。
   const spawnHearts = () => {
     for (let i = 0; i < 4; i++) {
       const heart = document.createElement('div')
       heart.className = 'pet-heart'
       heart.textContent = '💗'
-      heart.style.left = `${8 + Math.random() * 48}px`
-      heart.style.top = `${8 + Math.random() * 24}px`
+      heart.style.left = `${20 + Math.random() * 110}px`
+      heart.style.top = `${30 + Math.random() * 80}px`
       stage.appendChild(heart)
       heart.addEventListener('animationend', () => heart.remove())
     }

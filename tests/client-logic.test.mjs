@@ -50,7 +50,7 @@ test('确定性：显式 now 时相同输入相同输出', () => {
 
 test('TRANSIENT_MS/JOY_MS 与 EMOJI 完整性（每个可达状态都有兜底表情）', () => {
   assert.equal(TRANSIENT_MS, 1500)
-  assert.equal(JOY_MS, 2000)
+  assert.equal(JOY_MS, 1600)
   for (const s of ['idle', 'working', 'celebrate', 'error', 'disappointed', 'joy', 'eat', 'play', 'drag', 'walk', 'sleep', 'wake', 'welcome']) {
     assert.ok(EMOJI[s] !== undefined, `EMOJI 缺 ${s}`)
   }

@@ -1,7 +1,7 @@
 (() => {
   // client/logic.mjs
   var TRANSIENT_MS = 1500;
-  var JOY_MS = 2e3;
+  var JOY_MS = 1600;
   var EMOJI = {
     idle: "\u{1F423}",
     working: "\u{1F914}",
@@ -47,7 +47,7 @@
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
-[data-dsh-pet] .pet-stage { width: 150px; height: 150px; display: grid; place-items: center;
+[data-dsh-pet] .pet-stage { position: relative; width: 150px; height: 150px; display: grid; place-items: center;
   font-size: 56px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
@@ -285,8 +285,8 @@
         const heart = document.createElement("div");
         heart.className = "pet-heart";
         heart.textContent = "\u{1F497}";
-        heart.style.left = `${8 + Math.random() * 48}px`;
-        heart.style.top = `${8 + Math.random() * 24}px`;
+        heart.style.left = `${20 + Math.random() * 110}px`;
+        heart.style.top = `${30 + Math.random() * 80}px`;
         stage.appendChild(heart);
         heart.addEventListener("animationend", () => heart.remove());
       }

@@ -64,13 +64,13 @@
 {
   "states": {
     "idle":         { "sheet": "idle.png",         "frames": 3, "fps": 2,  "loop": true },
-    "working":      { "sheet": "working.png",      "frames": 3, "fps": 4,  "loop": true },
+    "working":      { "sheet": "working.png",      "frames": 3, "fps": 3,  "loop": true },
     "celebrate":    { "sheet": "celebrate.png",    "frames": 3, "fps": 4,  "loop": true },
     "error":        { "sheet": "error.png",        "frames": 2, "fps": 8,  "loop": false, "motion": "shake" },
     "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "loop": true },
     "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 5,  "loop": true },
     "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "loop": true },
-    "play":         { "sheet": "play.png",         "frames": 3, "fps": 5,  "loop": true },
+    "play":         { "sheet": "play.png",         "frames": 3, "fps": 4,  "loop": true },
     "drag":         { "sheet": "drag.png",         "frames": 1, "fps": 5,  "loop": true,  "motion": "tilt" },
     "walk":         { "sheet": "walk.png",         "frames": 3, "fps": 6,  "loop": true },
     "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "loop": true },

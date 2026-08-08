@@ -6,7 +6,7 @@
 // transient 由宿主计时（TRANSIENT_MS 超时兜底），本模块只做选择；burst 由 activity.until 窗口决定。
 
 export const TRANSIENT_MS = 1500
-export const JOY_MS = 2000
+export const JOY_MS = 1600
 
 export const EMOJI = {
   idle: '🐣', working: '🤔', celebrate: '🎉', error: '😱', disappointed: '😞',

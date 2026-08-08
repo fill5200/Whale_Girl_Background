@@ -9,7 +9,7 @@
     "working": {
       "sheet": "working.png",
       "frames": 3,
-      "fps": 4,
+      "fps": 3,
       "loop": true
     },
     "celebrate": {
@@ -46,7 +46,7 @@
     "play": {
       "sheet": "play.png",
       "frames": 3,
-      "fps": 5,
+      "fps": 4,
       "loop": true
     },
     "drag": {
