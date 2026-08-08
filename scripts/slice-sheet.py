@@ -387,13 +387,27 @@ def build_sheet_from_comps(band, comps, state_centers, my_center, size, row_y0, 
     if not my_frames:
         return None, 0
     attach = [[] for _ in my_frames]
-    for a, bb, (cx, cy) in comps:
-        if a > max_area * 0.2:
+    decos = [(a, bb, (cx, cy)) for a, bb, (cx, cy) in comps if a <= max_area * 0.2]
+    for a, bb, (cx, cy) in decos:
+        # 1) 与某帧角色 bbox 相交（部分重叠的星星——只取角色 bbox 会切一半）→ 整体并入该帧
+        hit = None
+        for i, (_, cbb, _) in enumerate(my_frames):
+            ix = min(bb[2], cbb[2]) - max(bb[0], cbb[0])
+            iy = min(bb[3], cbb[3]) - max(bb[1], cbb[1])
+            if ix > 1 and iy > 1:
+                hit = i
+                break
+        if hit is not None:
+            attach[hit].append(bb)
             continue
-        dists = [(abs(f[2][0] - cx) + abs(f[2][1] - cy), i) for i, f in enumerate(my_frames)]
-        d, i = min(dists)
-        if d < deco_margin:
-            attach[i].append(bb)
+        # 2) 否则质心距离最近且 < deco_margin → 并入
+        best_i, best_d = None, float('inf')
+        for i, (_, cbb, _) in enumerate(my_frames):
+            d = abs((cbb[0] + cbb[2]) / 2 - cx) + abs((cbb[1] + cbb[3]) / 2 - cy)
+            if d < best_d:
+                best_d, best_i = d, i
+        if best_i is not None and best_d < deco_margin:
+            attach[best_i].append(bb)
     hmax = max(bb[3] - bb[1] for _, bb, _ in my_frames)
     if hmax <= 0:
         return None, 0
