@@ -1,0 +1,6 @@
+#!/bin/sh
+# 本地精选门禁组。窄而必过的 hook 才是真防线——慢 hook 会被 --no-verify 绕过，
+# 绕过一次就永久失效。全量覆盖交给 CI（scripts/gates/run.mjs --group ci）。
+set -e
+cd "$(git rev-parse --show-toplevel)"
+node scripts/gates/run.mjs
