@@ -10,10 +10,10 @@ Status: proposed
 
 采用**混合管线**：**关键姿势生图 + 过程动画**，作为**实验性探索**——先由用户生成关键姿势图验证一致性/管线，代码改动（client 运动层 + PIL 脚本）在验证通过后再实施：
 
-- **生图（用户/gpt-image-2）**：每状态 **1 张关键姿势单图**（12 张，透明贴纸 PNG，正方形画布居中），风格锁定参考 `originals/鲸鱼娘.png`；可一次生成一个系列。
+- **生图（用户/gpt-image-2）**：**1 张 2048×2048 大图含全部 12 个关键姿势子图**（网格排列、同一画布 → 角色一致性天然成立；透明贴纸 PNG、子图互不重叠、格间留白、角色居中占格 ~80%），风格锁定参考 `originals/鲸鱼娘.png`；可一次生成一个系列。
+- **切分（PIL 脚本，已实现 `scripts/slice-sheet.py`）**：按声明网格（`--grid 4x3`）或自动探测（`--auto`）切子图，每片裁透明边距 → 居中补边成正方形 → 统一 256×256；位置→状态映射由 `--layout` 声明（本机无视觉识别，按位置映射）。几何是机械活（脚本），语义（fps/loop/motion）留在 `assets/manifest.json`（verify-assets 门禁守护引用）。已用合成 2048² 画布自测：`--grid`/`--auto` 均正确切出 12 片命名子图。
 - **动画（client 代码，验证后实施）**：manifest 每状态新增可选 `motion` 字段（`frames: 1` 的单图状态走运动配方）：`bob`/`wiggle`/`squash`/`shake`/`sigh`/`hop`/`tilt`/`float`/`wave`；`eat`/`play` 可选 2 帧，其余单帧。多帧播放器保留（`frames > 1` 仍走帧循环），`frames: 1` 走单图 + 运动类。
-- **几何后处理（PIL 脚本，验证后实施）**：`scripts/normalize-sprites.py` 把 `assets/raw/` 的 AI 输出自动处理：裁透明边距 → 统一 256×256 居中 → 多帧拼横排 sheet → 输出 `assets/<状态>.png`；`--check` 模式逐字节比对守护新鲜度。几何是机械活（脚本），语义（fps/loop/motion）留在 `assets/manifest.json`（verify-assets 门禁守护引用）。
-- **实验判据**：先产出 idle/working/celebrate 3 张试点图，验证：①角色一致性（同画风/配色/线条）；②透明输出干净；③单图 + 过程动画的表现力足够（对比多帧方案）。
+- **实验判据**：先产出 1 张含 idle/working/celebrate 的试点大图，验证：①角色一致性（同画风/配色/线条）；②透明输出干净；③切分正确（`--grid`/`--auto` 都能定位）；④单图 + 过程动画的表现力足够（对比多帧方案）。
 
 ## Alternatives considered
 
@@ -27,11 +27,12 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 试点 3 张图（idle/working/celebrate）角色一致、透明干净、单图动画观感合格。
-- 用户确认后：client 运动层 + PIL 归一化脚本落地，全门禁 + 实况验证通过。
+- 试点 1 张含 idle/working/celebrate 的大图：角色一致、透明干净、切分正确（`--grid`/`--auto` 均定位到 3 个子图）。
+- 用户确认后：client 运动层落地，全门禁 + 实况验证通过。
 
 ## Risks
 
 - 单图 + 过程动画的表现力上限（复杂动作如"吃东西"可能仍需 2 帧）——由试点 eat 状态验证。
 - gpt-image-2 透明输出若不干净，需退路（实底 + PIL 抠图）。
+- 模型可能不严格按网格排布（子图错位/重叠/留白不均）——`--auto` 降级容错，最坏按 `--layout` 人工核对位置映射。
 - client 运动层与帧播放器并存增加渲染分支——保持 `frames > 1` 路径不动以控风险。

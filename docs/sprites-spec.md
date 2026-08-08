@@ -8,34 +8,20 @@
 
 ## 素材管线（混合方案：关键姿势 + 过程动画）
 
-**不要为每个状态生成多帧**。AI 帧间角色会漂移、无法对齐，动画会抖。正确做法：
+**不要为每个状态生成多帧**。AI 帧间角色会漂移、无法对齐，动画会抖。正确做法——**单张 2K 大图含全部关键姿势，由脚本切分**：
 
-1. **生图**：每状态 **1 张关键姿势单图**（透明贴纸 PNG，正方形画布，角色居中占 ~80%），风格锁定参考 [originals/鲸鱼娘.png](../originals/鲸鱼娘.png)。
-2. **归一化（PIL 脚本）**：把生图产物丢进 `assets/raw/`，跑 `python3 scripts/normalize-sprites.py` → 自动裁透明边距、统一到 256×256 居中、多帧拼横排 sheet → 输出 `assets/<状态>.png`。
-3. **投放**：在 `assets/manifest.json` 加条目（`frames: 1` + `motion` 配方；`eat`/`play` 可 2 帧）。`verify-assets` 门禁保证引用文件存在；`check-sprites` 门禁守护归一化产物新鲜度。
+1. **生图**：用 gpt-image-2 一次性生成 **1 张 2048×2048 大图**，内含 **12 个关键姿势子图**（每状态 1 个，透明贴纸、网格排列、同一画布 → 角色一致性天然成立）。生成契约见下节模板。
+2. **切分**：`python3 scripts/slice-sheet.py sheet.png --grid 4x3 --layout idle,working,... --out assets/raw/slices` → 按网格位置切出 12 张 256×256 归一化子图（裁透明边距、居中补边、统一尺寸；位置→状态映射由 `--layout` 声明，本机无视觉识别故按位置映射）。
+3. **投放**：子图进 `assets/`，在 `assets/manifest.json` 加条目（`frames: 1` + `motion` 配方；`eat`/`play` 可单独出 2 帧小图）。`verify-assets` 门禁保证引用文件存在。
 
-## 生图提示模板（gpt-image-2）
+## 生图提示模板（gpt-image-2，单张大图）
 
-**通用前缀**（每张都带）：
+> 生成一张 2048×2048 的贴纸合集大图：**4 列 × 3 行网格，共 12 个子图**。每个子图是《鲸鱼娘》表情包角色的一个姿势，画风、配色、线条比例完全一致（以参考图为准），输出透明背景 PNG（sticker 模式）。每个子图独立占一格、互不重叠、格子之间留明显空白；子图在各自格子内居中、占格子约 80%，全身取景统一。**行优先顺序**（不要加文字标注）：
+> - 第 1 行：idle（正面站立待机，表情平静）｜working（一手托腮思考，头顶小灯泡）｜celebrate（双手高举欢呼，周围小星星）｜error（惊吓瞪眼，呆毛炸起，一个感叹号）
+> - 第 2 行：disappointed（低头垂肩含泪）｜joy（眯眼咧嘴大笑，周围小爱心）｜eat（双手捧食物啃咬）｜play（抛接小球蹦跳）
+> - 第 3 行：drag（身体被斜向拉扯，惊讶慌张）｜sleep（蜷缩闭眼睡觉，头顶 Zzz）｜wake（伸懒腰揉眼睛打哈欠）｜welcome（举手挥手打招呼，周围小星星）
 
-> 为《鲸鱼娘》表情包角色生成一张贴纸插画，画风、配色、线条比例必须与参考图完全一致。输出透明背景 PNG（sticker 模式），只画角色本身，无文字、无边框、无地面阴影。正方形 1:1 画布，角色居中，占画面约 80%，取景与全身站姿参考图一致。
-
-**状态后缀**（替换最后一句）：
-
-| 状态 | 提示后缀（姿势/表情描述） |
-|---|---|
-| idle | 正面站立待机，双手自然下垂，表情平静，眼睛微睁 |
-| working | 一手托腮专注思考，头顶冒小灯泡，眼睛专注看向一侧 |
-| celebrate | 双手高举跳跃，嘴巴大张欢呼，眼睛弯成月牙，周围撒小星星 |
-| error | 惊吓弹起，头发/呆毛炸起，眼睛瞪圆，嘴巴张成 O 形，周围一个感叹号 |
-| disappointed | 低头垂肩，眼睛含泪但没哭出来，嘴角下撇，轻轻叹气状 |
-| joy | 眯眼咧嘴大笑，双手举起欢呼状，身体微倾，周围两个小爱心 |
-| eat | 双手捧食物大口啃咬，腮帮鼓起，眼睛满足地眯起，食物只画半个 |
-| play | 双手抛接小球或抱球，身体腾空，表情兴奋开心 |
-| drag | 身体被斜向拉扯，表情惊讶慌张，双手乱摆，眼睛瞪大 |
-| sleep | 蜷缩成一团闭眼睡觉，头顶飘一个 Zzz，身体放松 |
-| wake | 刚醒伸懒腰，一只手揉眼睛，嘴巴打哈欠，睡眼惺忪 |
-| welcome | 一只手举高挥动打招呼，眼睛弯弯，嘴巴微笑，周围两个小星星 |
+提示顺序与 `--layout` 参数一一对应；若模型打乱顺序，报告实际布局后改 `--layout` 即可（切分只认位置）。
 
 ## 状态总表（权威，12 状态）
 
@@ -96,7 +82,7 @@
 
 ## 投放与验证
 
-1. 生图产物丢 `assets/raw/<状态>.png`（多帧为 `<状态>-1.png`、`<状态>-2.png`）。
-2. `python3 scripts/normalize-sprites.py`（或 `--check` 校验新鲜度）→ 生成 `assets/<状态>.png`。
-3. `assets/manifest.json` 加条目（`verify-assets` 门禁保证引用存在，缺文件即红）。
+1. 生图产物（单张 2K 大图）放 `assets/raw/sheet.png`（或任意路径）。
+2. `python3 scripts/slice-sheet.py <sheet.png> --grid 4x3 --layout idle,working,celebrate,error,disappointed,joy,eat,play,drag,sleep,wake,welcome --out assets/raw/slices` → 12 张归一化子图；`--auto` 可自动探测网格（模型严格按网格排布时更稳）。
+3. 子图复制进 `assets/`，`assets/manifest.json` 加条目（`verify-assets` 门禁保证引用存在，缺文件即红）。
 4. 实况验证：`dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh registry enable vlln/dsh-pet`，重启 web 后刷新（日志须无 `plugin tree failed to load`）。
