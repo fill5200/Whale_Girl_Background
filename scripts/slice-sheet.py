@@ -319,17 +319,18 @@ def detect_grid(img, max_cells=8):
     return row_bounds, col_bounds
 
 
-def largest_blob_bbox(cell):
-    """轮廓法：cell 内 4-连通**最大连通域**的 bbox。
-    取代简单 alpha 包围盒——格子放宽后邻格角色的小块会误入，包围盒会包含它们；
-    最大连通域只取角色本体（邻块是独立小连通域，被排除）。"""
+def frame_extent(cell, margin=14):
+    """轮廓分组取帧范围：4-连通标注全部连通域。
+    最大连通域 = 角色本体；**吸收与角色 bbox 相邻/相交的小块**（装饰如五角星、
+    爱心——独立小连通域，若只取最大域会被裁掉）；邻格角色质心远离 → 排除。
+    返回 (union_bbox, 角色bbox)。"""
     from collections import deque
 
     alpha = np.asarray(cell.getchannel('A'))
     mask = alpha > 40
     h, w = mask.shape
     visited = np.zeros_like(mask)
-    best = None
+    comps = []
     for y0 in range(h):
         for x0 in range(w):
             if not mask[y0, x0] or visited[y0, x0]:
@@ -342,49 +343,60 @@ def largest_blob_bbox(cell):
             while q:
                 y, x = q.popleft()
                 area += 1
-                if x < minx:
-                    minx = x
-                if x > maxx:
-                    maxx = x
-                if y < miny:
-                    miny = y
-                if y > maxy:
-                    maxy = y
+                minx = min(minx, x)
+                maxx = max(maxx, x)
+                miny = min(miny, y)
+                maxy = max(maxy, y)
                 for ny, nx in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
                     if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not visited[ny, nx]:
                         visited[ny, nx] = True
                         q.append((ny, nx))
-            if best is None or area > best[0]:
-                best = (area, (minx, miny, maxx, maxy))
-    return best[1] if best else None
+            comps.append((area, (minx, miny, maxx, maxy)))
+    if not comps:
+        return None, None
+    comps.sort(key=lambda c: -c[0])
+    char_bb = comps[0][1]
+    cx0, cy0, cx1, cy1 = char_bb
+    # 吸收：质心在角色 bbox 外扩 margin 内的连通域（装饰件）
+    keep = [char_bb]
+    for area, bb in comps[1:]:
+        mx, my = (bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2
+        if cx0 - margin <= mx <= cx1 + margin and cy0 - margin <= my <= cy1 + margin:
+            keep.append(bb)
+    ux0 = min(b[0] for b in keep)
+    uy0 = min(b[1] for b in keep)
+    ux1 = max(b[2] for b in keep)
+    uy1 = max(b[3] for b in keep)
+    return (ux0, uy0, ux1, uy1), char_bb
 
 
-def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88, expand=45):
+def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88, expand=80):
     """把一行（同一状态的帧）做成帧 sheet（轮廓法逐对象配准）：
-    先抠图（调用方完成）→ **格子垂直放宽 expand px**（格子边界不再切角色头顶）→
-    每帧取**最大连通域** bbox（排除邻格误入的小块）→ 统一缩放因子 → 底中对齐。
-    这是用户指点的正确顺序：宽松取域 + 轮廓定位，避免过裁与邻图误入。"""
+    先抠图（调用方完成）→ **格子四向放宽 expand px**（格子边界不再切角色）→
+    每帧取**轮廓分组范围**（最大连通域=角色 + 吸收相邻装饰件；排除邻格角色）→
+    统一缩放因子 → 底中对齐。"""
     frames = []
     for c in cols:
         (yt, yb), (xl, xr) = row_bounds[row], col_bounds[c]
-        # 放宽：格子边界可能切进角色（头顶被裁/邻图误入的根因）；轮廓法会重新定位本体
         cx0 = max(0, xl - expand)
         cx1 = min(img.width, xr + expand)
         cy0 = max(0, yt - expand)
         cy1 = min(img.height, yb + expand)
         cell = img.crop((cx0, cy0, cx1, cy1))
-        bb = largest_blob_bbox(cell)
+        bb, char_bb = frame_extent(cell)
         if bb is None:
             continue
-        frames.append((cell, bb))
+        frames.append((cell, bb, char_bb))
     if not frames:
         return None, 0
-    hmax = max(bb[3] - bb[1] for _, bb in frames)
+    # 统一缩放因子：基于各帧**角色**（非含装饰的范围）的最大高度，避免星星撑高
+    hmax = max(bb[3] - bb[1] for _, _, bb in frames)
     if hmax <= 0:
         return None, 0
-    s = (size * scale) / hmax  # 统一缩放因子
+    s = (size * scale) / hmax
     norm = []
-    for cell, (x0, y0, x1, y1) in frames:
+    for cell, bb, _ in frames:
+        x0, y0, x1, y1 = bb
         if x1 <= x0 or y1 <= y0:
             continue
         f = cell.crop((x0, y0, x1, y1))
