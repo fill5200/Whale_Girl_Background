@@ -234,14 +234,15 @@ def despill(img, bg_colors):
 
 
 def defringe(img, erode=1):
-    """边缘侵蚀 + 羽化：剥掉含背景混合的最外层 1-2px（洋红环确定性移除），再高斯羽化恢复柔和边缘。
-    代价：轮廓损失约 1px（贴纸可接受）；比依赖混合比例的抑制更可靠。"""
+    """边缘侵蚀 + 羽化：剥掉含背景混合的最外层，再**强羽化**平滑像素锯齿。
+    硬 alpha（洪泛/清理全是 0/255）直接输出会呈现台阶状边缘（锯齿）；
+    GaussianBlur(1.5) 把边界变成 ~4px 的平滑渐变。代价：轮廓轻微软化（宠物可接受）。"""
     from PIL import ImageFilter
 
     a = img.getchannel('A')
     for _ in range(erode):
         a = a.filter(ImageFilter.MinFilter(3))
-    a = a.filter(ImageFilter.GaussianBlur(0.6))
+    a = a.filter(ImageFilter.GaussianBlur(1.5))
     out = img.copy()
     out.putalpha(a)
     return out
@@ -390,8 +391,8 @@ def main():
             img = bg_floodfill(img, bgs, tol=45)  # 边界洪泛去背景（连通性分割）
             img = closed_islands_cleanup(img, bgs)  # 封闭洋红岛（极饱和）
             img = magenta_free_cleanup(img)  # 全量洋红清除：角色纯蓝白，sp>25 即非角色
-            img = defringe(img, erode=2)  # 侵蚀 2px 剥掉边缘混合环 + 羽化
-            print(f'keyed: bg={bgs} floodfill+islands+magenta-free+defringe2', file=sys.stderr)
+            img = defringe(img, erode=1)  # 侵蚀 1px + 强羽化(1.5) 平滑锯齿
+            print(f'keyed: bg={bgs} floodfill+islands+magenta-free+feather', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
