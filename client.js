@@ -247,7 +247,7 @@
           frame = 0;
           lastFrameAt = 0;
         }
-        if (now - lastFrameAt >= 1e3 / cfg.fps) {
+        if (cfg.frames > 1 && now - lastFrameAt >= 1e3 / cfg.fps) {
           lastFrameAt = now;
           frame += 1;
           if (frame >= cfg.frames) {

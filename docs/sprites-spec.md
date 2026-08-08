@@ -14,9 +14,14 @@
 2. **切分**：`python3 scripts/slice-sheet.py sheet.png --grid 4x3 --layout idle,working,... --out assets/raw/slices` → 按网格位置切出 12 张 256×256 归一化子图（裁透明边距、居中补边、统一尺寸；位置→状态映射由 `--layout` 声明，本机无视觉识别故按位置映射）。
 3. **投放**：子图进 `assets/`，在 `assets/manifest.json` 加条目（`frames: 1` + `motion` 配方；`eat`/`play` 可单独出 2 帧小图）。`verify-assets` 门禁保证引用文件存在。
 
-## 生图提示模板（gpt-image-2，单张大图）
+## 生图提示模板（单张大图 + 纯色背景）
 
-> 生成一张 2048×2048 的贴纸合集大图：**4 列 × 3 行网格，共 12 个子图**。每个子图是《鲸鱼娘》表情包角色的一个姿势，画风、配色、线条比例完全一致（以参考图为准），输出透明背景 PNG（sticker 模式）。每个子图独立占一格、互不重叠、格子之间留明显空白；子图在各自格子内居中、占格子约 80%，全身取景统一。**行优先顺序**（不要加文字标注）：
+**背景要求（关键）**：必须用**纯色背景**（强烈建议洋红 `#FF00FF` 或绿色 `#00FF00`——角色身上没有的饱和色）。
+- ❌ 不要白/浅灰底：角色的皮肤/高光接近白色，色键会误删（实测"太苍白"）。
+- ❌ 不要"透明背景"提示：Gemini 只会画**假透明棋盘格**（灰/白两色），灰度角色同样抠不干净。
+- 纯色底 + 色键 `--key R,G,B` = 一键干净分割。
+
+> 生成一张 2048×2048 的贴纸合集大图：**4 列 × 3 行网格，共 12 个子图**。背景为**纯洋红色（#FF00FF）**，无任何渐变/纹理/杂色。每个子图是《鲸鱼娘》表情包角色的一个姿势，画风、配色、线条比例完全一致（以参考图为准），角色本身**不得含有洋红色**。每个子图独立占一格、互不重叠、格子之间留明显空白（洋红背景）；子图在各自格子内居中、占格子约 80%，全身取景统一。**行优先顺序**（不要加文字标注）：
 > - 第 1 行：idle（正面站立待机，表情平静）｜working（一手托腮思考，头顶小灯泡）｜celebrate（双手高举欢呼，周围小星星）｜error（惊吓瞪眼，呆毛炸起，一个感叹号）
 > - 第 2 行：disappointed（低头垂肩含泪）｜joy（眯眼咧嘴大笑，周围小爱心）｜eat（双手捧食物啃咬）｜play（抛接小球蹦跳）
 > - 第 3 行：drag（身体被斜向拉扯，惊讶慌张）｜sleep（蜷缩闭眼睡觉，头顶 Zzz）｜wake（伸懒腰揉眼睛打哈欠）｜welcome（举手挥手打招呼，周围小星星）
@@ -82,7 +87,8 @@
 
 ## 投放与验证
 
-1. 生图产物（单张 2K 大图）放 `assets/raw/sheet.png`（或任意路径）。
-2. `python3 scripts/slice-sheet.py <sheet.png> --grid 4x3 --layout idle,working,celebrate,error,disappointed,joy,eat,play,drag,sleep,wake,welcome --out assets/raw/slices` → 12 张归一化子图；`--auto` 可自动探测网格（模型严格按网格排布时更稳）。
+1. 生图产物（单张 2K 大图，纯色背景）放 `assets/raw/sheet.png`（或任意路径）。
+2. `python3 scripts/slice-sheet.py <sheet.png> --key 255,0,255 --grid 3x4 --layout idle,working,celebrate,error,disappointed,joy,eat,play,drag,sleep,wake,welcome --out assets/raw/slices`
+   - 纯色底用 `--key R,G,B`（如洋红 `255,0,255`、绿 `0,255,0`）；假透明棋盘格用 `--key gray [--repair]`（灰度角色皮肤会失真，不推荐）。
 3. 子图复制进 `assets/`，`assets/manifest.json` 加条目（`verify-assets` 门禁保证引用存在，缺文件即红）。
-4. 实况验证：`dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh registry enable vlln/dsh-pet`，重启 web 后刷新（日志须无 `plugin tree failed to load`）。
+4. 实况验证：`dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh registry enable vlln/dsh-pet`，重启 web 后刷新（日志须无 `plugin tree failed to load`）；改 client 后跑 `node scripts/verify-client-smoke.mjs <web-url>`。

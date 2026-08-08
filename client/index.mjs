@@ -259,7 +259,9 @@ export function apply() {
         frame = 0
         lastFrameAt = 0
       }
-      if (now - lastFrameAt >= 1000 / cfg.fps) {
+      // frames>1 才走帧循环；frames=1 的单图状态由 manifest.motion 的 CSS 动画驱动，不推进帧
+      // （否则会推进到 -width 位置闪空白）。
+      if (cfg.frames > 1 && now - lastFrameAt >= 1000 / cfg.fps) {
         lastFrameAt = now
         frame += 1
         if (frame >= cfg.frames) {

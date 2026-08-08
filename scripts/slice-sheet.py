@@ -43,8 +43,59 @@ def normalize_slice(img, size):
     return canvas, bbox
 
 
+def detect_bg(img):
+    """背景色估计：边框环像素中位色（贴纸大图背景通常为统一纯色/近白）。"""
+    import numpy as np
+
+    arr = np.asarray(img.convert('RGB'), dtype=np.int16)
+    border = np.concatenate([arr[0], arr[-1], arr[:, 0], arr[:, -1]])
+    return np.median(border, axis=0).astype(int).tolist()
+
+
+def chroma_key(img, bg, lo, hi):
+    """色键：距背景色距离 < lo 的像素置透明，> hi 全不透明，中间软过渡。"""
+    import numpy as np
+    from PIL import ImageFilter
+
+    arr = np.asarray(img.convert('RGB'), dtype=np.int16)
+    dist = np.linalg.norm(arr - np.asarray(bg, dtype=np.int16), axis=2)
+    alpha = np.clip((dist - lo) / max(1, hi - lo) * 255, 0, 255).astype(np.uint8)
+    out = img.convert('RGBA')
+    out.putalpha(Image.fromarray(alpha, 'L').filter(ImageFilter.MedianFilter(3)))
+    return out
+
+
+def gray_key(img):
+    """亮灰掩膜键：AI 模拟"透明棋盘格"的背景是周期性的灰/白两色（~16px 格，随位置漂移）。
+    规则：像素「色彩丰富（饱和度高）**或** 深色（亮度低）」视为内容，其余（亮且灰）透明。
+    软阈值会半透明化浅色皮肤（苍白）；--repair 把 alpha 硬化（半透明带→全不透明）救回皮肤，
+    代价是真背景边缘的半透明过渡也变硬（贴纸风格可接受）。"""
+    import numpy as np
+    from PIL import ImageFilter
+
+    arr = np.asarray(img.convert('RGB'), dtype=np.int16)
+    sat = arr.max(axis=2) - arr.min(axis=2)
+    lum = arr.mean(axis=2)
+    a_sat = np.clip((sat - 25) / 35 * 255, 0, 255)  # 饱和 ≥60 全不透明
+    a_lum = np.clip((lum - 215) / -40 * 255, 0, 255)  # 亮度 ≤175 全不透明
+    alpha = np.maximum(a_sat, a_lum).astype(np.uint8)
+    out = img.convert('RGBA')
+    out.putalpha(Image.fromarray(alpha, 'L').filter(ImageFilter.MedianFilter(3)))
+    return out
+
+
+def harden_alpha(img):
+    """alpha 硬化：≤16 置 0（背景），≥48 置 255（角色，救回被软阈值半透明的浅色皮肤），中间线性。"""
+    import numpy as np
+
+    a = np.asarray(img.getchannel('A'), dtype=np.float32)
+    a = np.clip((a - 16) / 32 * 255, 0, 255).astype(np.uint8)
+    out = img.copy()
+    out.putalpha(Image.fromarray(a, 'L'))
+    return out
+
+
 def detect_grid(img, max_cells=8):
-    """下采样 alpha 找空行/空列推断网格；返回 (row_bounds, col_bounds) 或 None。"""
     w, h = img.size
     small = img.resize((64, 64), Image.LANCZOS).getchannel('A')
     data = small.load()
@@ -86,6 +137,10 @@ def main():
     ap.add_argument('--grid', help='声明网格，如 4x3')
     ap.add_argument('--auto', action='store_true', help='自动检测网格')
     ap.add_argument('--layout', help='行优先状态名列表（数量须等于格子数），如 idle,working,...')
+    ap.add_argument('--key', metavar='BG', help='抠图：gray=亮灰掩膜（AI 假透明棋盘格）；auto=取边框色；或 R,G,B')
+    ap.add_argument('--repair', action='store_true', help='键后硬化 alpha（救回被半透明的浅色皮肤）')
+    ap.add_argument('--key-lo', type=int, default=6, help='色键阈值下界（距背景色距离，默认 6）')
+    ap.add_argument('--key-hi', type=int, default=28, help='色键阈值上界（默认 28）')
     ap.add_argument('--out', default='assets/raw/slices')
     ap.add_argument('--size', type=int, default=256)
     args = ap.parse_args()
@@ -93,6 +148,18 @@ def main():
     if not (args.grid or args.auto):
         ap.error('必须提供 --grid ROWSxCOLS 或 --auto')
     img = Image.open(args.input).convert('RGBA')
+
+    if args.key:
+        if args.key == 'gray':
+            img = gray_key(img)
+            print('keyed: gray-mask', file=sys.stderr)
+        else:
+            bg = detect_bg(img) if args.key == 'auto' else [int(v) for v in args.key.split(',')]
+            img = chroma_key(img, bg, args.key_lo, args.key_hi)
+            print(f'keyed: bg={bg} lo={args.key_lo} hi={args.key_hi}', file=sys.stderr)
+        if args.repair:
+            img = harden_alpha(img)
+            print('repair: alpha hardened', file=sys.stderr)
 
     if args.auto:
         grid = detect_grid(img)
