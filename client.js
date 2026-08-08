@@ -1,7 +1,7 @@
 (() => {
   // client/logic.mjs
   var TRANSIENT_MS = 1500;
-  var JOY_MS = 3e3;
+  var JOY_MS = 2e3;
   var EMOJI = {
     idle: "\u{1F423}",
     working: "\u{1F914}",

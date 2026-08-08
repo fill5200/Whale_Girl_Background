@@ -31,7 +31,7 @@
 | `eat` | 3 | 双手捧食物啃咬：咬下—咀嚼—咽下，腮帮鼓起 |
 | `play` | 3 | 抛接小球：抛出—腾空—接住，身体蹦跳 |
 | `drag` | 1 | 被斜向拉扯：单帧身体倾斜双手乱摆（拖拽态由 `tilt` 运动配方持续摇摆） |
-| `walk` | 4 | **侧面行走**：左到右依次为迈步循环（抬左腿—落脚—抬右腿—落脚），身体微微起伏 |
+| `walk` | 3 | **侧面行走**：左到右依次为迈步循环（抬左腿—落脚—抬右腿），身体微微起伏 |
 | `sleep` | 2 | 蜷缩闭眼睡觉：身体随呼吸起伏两态，头顶 Zzz |
 | `wake` | 2 | 伸懒腰：第 1 帧闭眼张嘴打哈欠、第 2 帧揉眼睛睁开 |
 | `welcome` | 2 | 举手挥手打招呼：两帧为挥手上下摆动，周围小星星 |
@@ -51,7 +51,7 @@
 | `eat` | 点击投喂（瞬发） | 3 | — | ✓ | 啃咬循环 |
 | `play` | 点击玩耍（瞬发） | 3 | — | ✓ | 抛接球循环 |
 | `drag` | 拖拽中 | 1 | `tilt` | ✓ | 被斜向拉扯 |
-| `walk` | 周期性游走 | 4 | — | ✓ | 侧面行走 |
+| `walk` | 周期性游走 | 3 | — | ✓ | 侧面行走 |
 | `sleep` | 空闲 ≥60s | 2 | — | ✓ | 蜷睡 |
 | `wake` | 睡醒过渡（瞬发） | 2 | — | ✗ | 伸懒腰 |
 | `welcome` | 新会话（burst） | 2 | — | ✓ | 挥手打招呼 |
@@ -70,9 +70,9 @@
     "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "loop": true },
     "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 5,  "loop": true },
     "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "loop": true },
-    "play":         { "sheet": "play.png",         "frames": 3, "fps": 8,  "loop": true },
+    "play":         { "sheet": "play.png",         "frames": 3, "fps": 5,  "loop": true },
     "drag":         { "sheet": "drag.png",         "frames": 1, "fps": 5,  "loop": true,  "motion": "tilt" },
-    "walk":         { "sheet": "walk.png",         "frames": 4, "fps": 6,  "loop": true },
+    "walk":         { "sheet": "walk.png",         "frames": 3, "fps": 6,  "loop": true },
     "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "loop": true },
     "wake":         { "sheet": "wake.png",         "frames": 2, "fps": 3,  "loop": false },
     "welcome":      { "sheet": "welcome.png",      "frames": 2, "fps": 3,  "loop": true }

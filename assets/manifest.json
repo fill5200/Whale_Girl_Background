@@ -46,7 +46,7 @@
     "play": {
       "sheet": "play.png",
       "frames": 3,
-      "fps": 8,
+      "fps": 5,
       "loop": true
     },
     "drag": {
@@ -58,7 +58,7 @@
     },
     "walk": {
       "sheet": "walk.png",
-      "frames": 4,
+      "frames": 3,
       "fps": 6,
       "loop": true
     },
