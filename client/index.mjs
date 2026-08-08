@@ -25,7 +25,7 @@ const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
 [data-dsh-pet] .pet-stage { width: 150px; height: 150px; display: grid; place-items: center;
-  font-size: 56px; line-height: 1; text-align: center; animation: dsh-pet-bob 2s ease-in-out infinite;
+  font-size: 56px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
@@ -44,14 +44,34 @@ const CSS = `
 [data-dsh-pet] .pet-menu button:hover { background: rgba(255,255,255,.28); }
 [data-dsh-pet] .pet-heart { position: absolute; font-size: 18px; pointer-events: none;
   animation: dsh-pet-float 1s ease-out forwards; }
-@keyframes dsh-pet-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+/* 状态运动配方（manifest.motion → 舞台 CSS 类；frames>1 走帧播放器，frames=1 走此动画）。
+   动画作用于舞台（无内联 transform），与 sprite 的内联 scale 不冲突。 */
+[data-dsh-pet] .pet-stage.pet-motion-bob { animation: dsh-pet-m-bob 2s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-wiggle { animation: dsh-pet-m-wiggle .5s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-squash { animation: dsh-pet-m-squash .6s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-shake { animation: dsh-pet-m-shake .25s linear infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-sigh { animation: dsh-pet-m-sigh 1.2s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-hop { animation: dsh-pet-m-hop .5s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-tilt { animation: dsh-pet-m-tilt 1s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-float { animation: dsh-pet-m-float 3s ease-in-out infinite; }
+[data-dsh-pet] .pet-stage.pet-motion-wave { animation: dsh-pet-m-wave .8s ease-in-out infinite; }
+@keyframes dsh-pet-m-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes dsh-pet-m-wiggle { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes dsh-pet-m-squash { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.15,.85); } }
+@keyframes dsh-pet-m-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes dsh-pet-m-sigh { 0%,100% { transform: translateY(0) scale(1,1); } 50% { transform: translateY(2px) scale(1,.97); } }
+@keyframes dsh-pet-m-hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes dsh-pet-m-tilt { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+@keyframes dsh-pet-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes dsh-pet-m-wave { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 [data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
 [data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) {
-  [data-dsh-pet] .pet-stage { animation: none; }
+  [data-dsh-pet] .pet-stage { animation: none !important; }
+  [data-dsh-pet] .pet-sprite { animation: none !important; }
   [data-dsh-pet] .pet-heart { animation: none; opacity: 0; }
   [data-dsh-pet] .pet-bubble { animation: none; }
 }
@@ -175,6 +195,10 @@ export function apply() {
     animState = name
     frame = 0
     lastFrameAt = 0
+    // 运动配方：manifest.motion → 舞台类（emoji 与 sprite 路径都生效；无 motion 时清类）。
+    for (const cls of stage.classList) if (cls.startsWith('pet-motion-')) stage.classList.remove(cls)
+    const motion = manifest.states[name]?.motion
+    if (motion) stage.classList.add(`pet-motion-${motion}`)
     const cfg = manifest.states[name]
     if (cfg && loaded.has(cfg.sheet)) {
       showSprite(name, cfg)

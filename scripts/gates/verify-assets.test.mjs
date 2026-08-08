@@ -55,3 +55,26 @@ test('拒绝：sheet 扩展名不在 MIME 白名单', () => {
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /扩展名不在白名单/)
 })
+
+test('接受：frames:1 + 白名单 motion 配方', () => {
+  const good = { states: { idle: { sheet: 'idle.png', frames: 1, fps: 4, loop: true, motion: 'bob' } } }
+  const root = makeTree({ 'assets/manifest.json': good, 'assets/idle.png': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
+})
+
+test('拒绝：motion 不在白名单', () => {
+  const bad = { states: { idle: { sheet: 'idle.png', frames: 1, fps: 4, loop: true, motion: 'teleport' } } }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/idle.png': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /motion "teleport" 不在白名单/)
+})
+
+test('拒绝：motion 配 frames>1（与帧播放器互斥）', () => {
+  const bad = { states: { idle: { sheet: 'idle.png', frames: 2, fps: 4, loop: true, motion: 'bob' } } }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/idle.png': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /motion 配方要求 frames === 1/)
+})

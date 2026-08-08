@@ -1,6 +1,7 @@
 // 门禁：assets manifest 引用一致性。
 // 拒绝不变量：assets/manifest.json 里每个 state 的 sheet 引用的文件必须真实存在、
-// 扩展名在 MIME 白名单内（与 src/assets.mjs 一致），且 frames/fps/loop 字段合法。只读、确定性。
+// 扩展名在 MIME 白名单内（与 src/assets.mjs 一致）、frames/fps/loop 字段合法，
+// 且 motion 配方（若声明）在白名单内且 frames 必须为 1（帧播放器与运动配方互斥）。只读、确定性。
 import { readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -9,6 +10,9 @@ const ROOT = resolve(import.meta.dirname, '../..')
 
 /** 与 src/assets.mjs 的 MIME 表一致的扩展名白名单。 */
 const ALLOWED_EXT = ['.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif', '.json']
+
+/** 与 client/index.mjs 的 pet-motion-* 类一致的运动配方白名单。 */
+export const MOTION_WHITELIST = ['bob', 'wiggle', 'squash', 'shake', 'sigh', 'hop', 'tilt', 'float', 'wave']
 
 /** 校验 assets manifest。返回 { ok, errors }。 */
 export function check(root = ROOT) {
@@ -42,6 +46,12 @@ export function check(root = ROOT) {
     if (!Number.isInteger(cfg.frames) || cfg.frames < 1) errors.push(`manifest.states.${name}: frames 必须是正整数`)
     if (typeof cfg.fps !== 'number' || cfg.fps <= 0) errors.push(`manifest.states.${name}: fps 必须是正数`)
     if (typeof cfg.loop !== 'boolean') errors.push(`manifest.states.${name}: loop 必须是布尔值`)
+    if (cfg.motion !== undefined) {
+      if (!MOTION_WHITELIST.includes(cfg.motion)) {
+        errors.push(`manifest.states.${name}: motion "${cfg.motion}" 不在白名单 ${MOTION_WHITELIST.join('/')}`)
+      }
+      if (cfg.frames !== 1) errors.push(`manifest.states.${name}: motion 配方要求 frames === 1（帧播放器与运动配方互斥）`)
+    }
   }
   return { ok: errors.length === 0, errors }
 }
