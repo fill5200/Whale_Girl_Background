@@ -16,13 +16,14 @@
       "sheet": "celebrate.png",
       "frames": 3,
       "fps": 8,
-      "loop": false
+      "loop": true
     },
     "error": {
       "sheet": "error.png",
-      "frames": 2,
+      "frames": 1,
       "fps": 5,
-      "loop": false
+      "loop": true,
+      "motion": "shake"
     },
     "disappointed": {
       "sheet": "disappointed.png",
@@ -34,7 +35,7 @@
       "sheet": "joy.png",
       "frames": 2,
       "fps": 6,
-      "loop": false
+      "loop": true
     },
     "eat": {
       "sheet": "eat.png",
@@ -77,7 +78,7 @@
       "sheet": "welcome.png",
       "frames": 2,
       "fps": 6,
-      "loop": false
+      "loop": true
     }
   }
 }
