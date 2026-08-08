@@ -102,9 +102,11 @@ def harden_alpha(img):
 
 
 def despill(img, bg_colors):
-    """去溢色（色键残边）：对距背景色近（<120）且洋红主导（R,B≫G）的像素做溢色抑制
-    （补 G、降 R/B），消除角色边缘洋红描边/光晕。
-    不做反解：低 alpha 像素反解 c=(c-(1-α)bg)/α 会把噪声放大成饱和色环（实测）。"""
+    """去溢色（色键残边）两段式：
+    1) 全域：距背景 <200 且粉调（sp>8）→ 中等抑制（去明显混合；角色深粉内饰 dmin≥200 不受影响）。
+    2) 边缘带补充：alpha 过渡区（20<a<245）内粉调像素，半径 255 全覆盖 + 强抑制
+       （深色角色 15~20% 混合的 dmin 可达 200~255，全域段漏网，只可能在边缘出现）。
+    只动边缘带，不动角色内饰色。"""
     import numpy as np
 
     arr = np.asarray(img.convert('RGBA'), dtype=np.float64)
@@ -113,13 +115,18 @@ def despill(img, bg_colors):
     dists = np.stack([np.linalg.norm(rgb - np.asarray(b, dtype=np.float64), axis=2) for b in bg_colors])
     dmin = np.min(dists, axis=0)
     r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
-    sp = np.clip(np.minimum(r, b) - g, 0, 255)  # 洋红溢色量
-    # 半径 200：深色角色 + 洋红的小比例混合其距背景距离仍大（120 漏网，实测边缘仍洋红）
-    mask = (dmin < 200) & (sp > 8) & (a > 0.05)
+    sp = np.clip(np.minimum(r, b) - g, 0, 255)  # 粉调量
+    # 空间边缘带：距透明像素（α<0.08）≤3px 的像素（含不透明混合残留），与自身 alpha 无关。
+    from PIL import Image as _Image
+    from PIL import ImageFilter as _IF
+    trans = _Image.fromarray(((a < 0.08) * 255).astype(np.uint8), 'L')
+    spatial_edge = np.asarray(trans.filter(_IF.MaxFilter(7))) > 0
+    m1 = (dmin < 200) & (sp > 8) & (a > 0.05)
+    m2 = spatial_edge & (dmin < 255) & (sp > 8)
     rgb = np.stack([
-        np.where(mask, r - sp * 0.35, r),
-        np.where(mask, g + sp * 0.7, g),
-        np.where(mask, b - sp * 0.35, b),
+        np.where(m1 | m2, r - np.where(m2, sp * 0.5, sp * 0.35), r),
+        np.where(m1 | m2, g + np.where(m2, sp * 1.0, sp * 0.7), g),
+        np.where(m1 | m2, b - np.where(m2, sp * 0.5, sp * 0.35), b),
     ], axis=2)
     out = img.convert('RGBA')
     data = np.asarray(out, dtype=np.uint8).copy()
@@ -236,9 +243,9 @@ def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, padding=14):
     norm = []
     for cell, _ in frames:
         f = cell.crop((x0, y0, x0 + side, y0 + side))
-        # 最终帧 = 画布留白：内容缩放至 92% 居中（角色无论多高都有 ~4% 边距，防"像被裁"）
+        # 最终帧 = 画布留白：内容缩放至 88% 居中（更慷慨的边距，显示不显局促）
         canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        fsize = round(size * 0.92)
+        fsize = round(size * 0.88)
         f = f.resize((fsize, fsize), Image.LANCZOS)
         canvas.paste(f, ((size - fsize) // 2, (size - fsize) // 2), f)
         norm.append(canvas)
@@ -282,8 +289,8 @@ def main():
             bgs = [detect_bg(img)] if args.key == 'auto' else [[int(v) for v in c.split(',')] for c in args.key.split('|')]
             img = chroma_key(img, bgs, args.key_lo, args.key_hi)
             img = despill(img, bgs)  # 去边缘溢色（洋红描边）
-            img = defringe(img, erode=1)  # 侵蚀 1px 剥掉混合环 + 羽化
-            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi} +despill +defringe', file=sys.stderr)
+            img = defringe(img, erode=2)  # 侵蚀 2px 剥掉混合环 + 羽化
+            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi} +despill +defringe2', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
