@@ -66,13 +66,13 @@ function collectTasks(ctx) {
     for (const snapshot of tasks.list(agent)) {
       if (seen.has(snapshot.id)) continue
       seen.add(snapshot.id)
-      out.push({ id: snapshot.id, status: snapshot.status })
+      out.push({ id: snapshot.id, status: snapshot.status, label: snapshot.label })
     }
   }
   for (const snapshot of tasks.list()) {
     if (seen.has(snapshot.id)) continue
     seen.add(snapshot.id)
-    out.push({ id: snapshot.id, status: snapshot.status })
+    out.push({ id: snapshot.id, status: snapshot.status, label: snapshot.label })
   }
   return out
 }
@@ -112,10 +112,13 @@ export function apply(ctx) {
   // 派生活动 + 事件记账（积累）：完成 +XP/称号/回忆；失败计数；工作态累加活跃时长。
   const activity = () => {
     const now = Date.now()
-    const derived = deriveActivity({ tasks: collectTasks(ctx), nowMs: now, known, wasWorking })
+    const tasks = collectTasks(ctx)
+    const derived = deriveActivity({ tasks, nowMs: now, known, wasWorking })
     wasWorking = derived.wasWorking
     for (const id of derived.completed) {
-      state = recordTaskCompleted(state, id, now).state
+      // 回忆用任务 label（非原始 id——UUID 截断无意义）；缺 label 用通用占位。
+      const label = tasks.find((t) => t.id === id)?.label
+      state = recordTaskCompleted(state, label ?? '未命名任务', now).state
       scheduleSave()
     }
     for (const id of derived.failed) {
@@ -222,7 +225,9 @@ export function apply(ctx) {
               return
             }
             // 轮询端点：禁缓存，防止启发式缓存读到冻结状态。
-            json(res, 200, { pet: state, activity: activity() }, { 'cache-control': 'no-store' })
+            // 先跑 activity()（有记账副作用），再读 state——响应里的 pet 才是记账后的值。
+            const act = activity()
+            json(res, 200, { pet: state, activity: act }, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
           }

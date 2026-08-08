@@ -41,6 +41,13 @@ test('recordTaskCompleted：+XP、记统计、写回忆、不可变', () => {
   assert.equal(state.updatedAt, NOW)
 })
 
+test('recordTaskCompleted：长标签截断（回忆用可读标签而非 UUID）', () => {
+  const long = 'a3f9c2d1e4b5a6b7c8d9e0f1a2b3c4d5e6f7a8b9'
+  const { state } = recordTaskCompleted({ ...INITIAL_STATE, updatedAt: 0 }, long, NOW)
+  assert.match(state.memory[0], /「a3f9c2d1e4b5a6…」/)
+  assert.ok(state.memory[0].length < 50)
+})
+
 test('任务完成解锁称号「初次协作」', () => {
   const { state, unlocked } = recordTaskCompleted({ ...INITIAL_STATE, updatedAt: 0 }, 'x', NOW)
   assert.deepEqual(unlocked, ['初次协作'])
