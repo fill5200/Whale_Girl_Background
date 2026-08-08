@@ -99,6 +99,40 @@ def harden_alpha(img):
     return out
 
 
+def despill(img, bg_colors):
+    """去溢色（色键残边）：
+    1) 半透明边缘像素按最近背景色反解真实颜色 c_true = (c - (1-α)·bg) / α；
+    2) 不透明混合残留（α≈255 但距背景 < 120 且洋红主导 R,B≫G）做溢色抑制：补 G、降 R/B。
+    角色被提示约束为不含洋红，故距背景近的洋红主导像素可安全视为残边。"""
+    import numpy as np
+
+    arr = np.asarray(img.convert('RGBA'), dtype=np.float64)
+    rgb = arr[:, :, :3]
+    a = arr[:, :, 3] / 255.0  # (h,w) 2D，避免与 3D 通道广播出巨数组
+    dists = np.stack([np.linalg.norm(rgb - np.asarray(b, dtype=np.float64), axis=2) for b in bg_colors])
+    nearest = np.argmin(dists, axis=0)
+    dmin = np.min(dists, axis=0)
+    bg = np.stack([np.asarray(b, dtype=np.float64) for b in bg_colors])[nearest]
+    # 1) 半透明反解
+    a_safe = np.maximum(a, 1e-3)
+    corrected = np.clip((rgb - (1 - a_safe)[:, :, None] * bg) / a_safe[:, :, None], 0, 255)
+    semi_mask = (a > 0.02) & (a < 0.98)
+    rgb = np.where(semi_mask[:, :, None], corrected, rgb)
+    # 2) 不透明溢色抑制
+    r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+    sp = np.clip(np.minimum(r, b) - g, 0, 255)  # 洋红溢色量
+    opaque_mask = (a >= 0.98) & (dmin < 120) & (sp > 8)
+    rgb = np.stack([
+        np.where(opaque_mask, r - sp * 0.35, r),
+        np.where(opaque_mask, g + sp * 0.7, g),
+        np.where(opaque_mask, b - sp * 0.35, b),
+    ], axis=2)
+    out = img.convert('RGBA')
+    data = np.asarray(out, dtype=np.uint8).copy()
+    data[:, :, :3] = np.clip(rgb, 0, 255).astype(np.uint8)
+    return Image.fromarray(data)
+
+
 def detect_grid(img, max_cells=8):
     w, h = img.size
     small = img.resize((64, 64), Image.LANCZOS).getchannel('A')
@@ -199,7 +233,8 @@ def main():
         else:
             bgs = [detect_bg(img)] if args.key == 'auto' else [[int(v) for v in c.split(',')] for c in args.key.split('|')]
             img = chroma_key(img, bgs, args.key_lo, args.key_hi)
-            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi}', file=sys.stderr)
+            img = despill(img, bgs)  # 去边缘溢色（洋红描边）
+            print(f'keyed: bg={bgs} lo={args.key_lo} hi={args.key_hi} +despill', file=sys.stderr)
         if args.repair:
             img = harden_alpha(img)
             print('repair: alpha hardened', file=sys.stderr)
