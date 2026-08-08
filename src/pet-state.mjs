@@ -18,6 +18,7 @@ export const INITIAL_STATE = Object.freeze({
 export const MEMORY_MAX = 8
 export const TASK_XP = 10
 export const SESSION_XP = 5
+export const RESUME_XP = 2
 
 /** 升到 level 所需累计 xp（三角数列：L2=50，L3=150，L4=300…）。 */
 export function xpForLevel(level) {
@@ -92,7 +93,7 @@ export function recordFailure(state, nowMs) {
   return commit(state, { failures: n }, nowMs, `任务失败（第 ${n} 次）——没关系，再来`)
 }
 
-/** 新会话：资历 +SESSION_XP，记录首见时间。 */
+/** 新会话（source=startup）：资历 +SESSION_XP，记录首见时间，计入会话数。 */
 export function recordSession(state, nowMs) {
   const n = state.stats.sessions + 1
   return commit(
@@ -102,6 +103,11 @@ export function recordSession(state, nowMs) {
     `新会话开启（第 ${n} 个）`,
     SESSION_XP,
   )
+}
+
+/** 续接/延续（source=resume/compact/clear）：+RESUME_XP，不计会话数、不记首见（不是新会话）。 */
+export function recordSessionResume(state, nowMs) {
+  return commit(state, {}, nowMs, '回到旧会话，继续陪伴', RESUME_XP)
 }
 
 /** 单次活跃累加上限：机器睡眠后首轮 poll 不把整段睡眠计入（防一夜刷出「常驻伙伴」）。 */

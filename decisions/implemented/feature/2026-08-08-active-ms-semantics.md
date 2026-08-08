@@ -1,15 +1,15 @@
 # Decision: activeMs（活跃时长）语义——观察窗口 vs 真实工作时长
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
 `recordActive` 只在「/state 轮询观察到 working 态」时累加 `now - lastActiveCheck`（index.mjs），产生两个失真方向：① GUI 关闭/禁用期间任务运行不计——「常驻伙伴」（activeMs≥6h）实际要求"页面打开 + 有任务运行"约 6h 的观察窗口；② 页面开着、任务跑过夜、机器睡眠 → 唤醒后首轮 poll 把整段睡眠时长一次计入（「常驻伙伴」可一夜刷出）。当前语义未写入任何决策记录。
 
-## Proposal
+## Decision
 
-- **语义定为「陪伴观察时长」**：宠物是陪伴角色，activeMs = 宠物在场（页面轮询）观察到的协作时长——写入决策记录，与「积累型/零负反馈」产品定位一致。
-- **加睡眠恢复护栏**：单次累加封顶一个轮询间隔的合理倍数（如 `MIN(now - lastActiveCheck, 5min)`），防机器睡眠后一次计入整段睡眠。
+- **语义 = 陪伴观察时长**（产品定夺，2026-08-08）：activeMs = 宠物在场（页面轮询）观察到的协作时长；GUI 关闭/禁用期间不计——「常驻伙伴」衡量陪伴观察而非任务耗时。与「积累型/零负反馈」定位一致。
+- **睡眠护栏已落地**（见 bug-fix/2026-08-08-active-ms-cap）：单次累加封顶 `ACTIVE_CAP_MS = 5min`。
 - 不做真实工作时长（见备选方案 B）。
 
 ## Alternatives considered
@@ -18,10 +18,11 @@ Status: proposed
 
 **C：现状不改。** 观察窗口语义未声明 + 睡眠计满的副作用并存——「常驻伙伴」可被一夜睡眠刷出，属于明确缺陷，需至少加护栏。
 
-## Acceptance criteria
 
-- 机器睡眠 >1h 后唤醒，首轮 poll 的 activeMs 单次增量 ≤ 5 分钟。
-- 决策记录明确「陪伴观察时长」语义；README/sprites-spec 的称号说明同步。
+## Consequences
+
+- 睡眠时段不再计入活跃；「常驻伙伴」反映真实陪伴观察时长。
+- 已知边界：后台标签被完全挂起期间的工作时长少计（观察窗口语义的可接受损失）；若产品后续要「关闭也陪伴」，升级为真实工作时长（备选方案 B）。
 
 ## Risks
 

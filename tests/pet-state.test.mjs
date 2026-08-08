@@ -2,8 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  INITIAL_STATE, MEMORY_MAX, TASK_XP, SESSION_XP, xpForLevel, levelFor,
-  recordTaskCompleted, recordFailure, recordSession, recordActive, ACTIVE_CAP_MS, describe, titleName,
+  INITIAL_STATE, MEMORY_MAX, TASK_XP, SESSION_XP, RESUME_XP, xpForLevel, levelFor,
+  recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive, ACTIVE_CAP_MS, describe, titleName,
 } from '../src/pet-state.mjs'
 
 const NOW = 1_700_000_000_000
@@ -94,6 +94,15 @@ test('recordSession：+XP、记首见时间', () => {
   assert.equal(state.stats.sessions, 1)
   assert.equal(state.stats.firstSeenAt, NOW)
   assert.equal(state.xp, SESSION_XP)
+})
+
+test('recordSessionResume：+RESUME_XP、不计会话数、不记首见（续接 ≠ 新会话）', () => {
+  const base = { ...INITIAL_STATE, updatedAt: 0, stats: { ...INITIAL_STATE.stats, sessions: 3, firstSeenAt: 100 } }
+  const { state } = recordSessionResume(base, NOW)
+  assert.equal(state.stats.sessions, 3) // 计数不变
+  assert.equal(state.stats.firstSeenAt, 100) // 首见不变
+  assert.equal(state.xp, RESUME_XP)
+  assert.match(state.memory[0], /回到旧会话/)
 })
 
 test('recordActive：活跃时长积累且称号「常驻伙伴」在 6h 解锁', () => {
