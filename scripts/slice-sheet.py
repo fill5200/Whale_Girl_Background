@@ -321,9 +321,10 @@ def detect_grid(img, max_cells=8):
 
 def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88):
     """把一行（同一状态的帧）做成帧 sheet（图形学式逐对象配准）：
-    每帧**独立**裁到自身内容 bbox（非 union——union 保留源帧漂移造成左右移动，
-    且含更低内容的帧会缩小整体导致头顶丢失）→ 统一高度缩放 → **底中对齐**锚点
-    （脚着地；左右漂移被 x 居中消除）。空帧跳过。"""
+    先抠图（调用方已完成）→ 每帧**独立**裁到自身内容 bbox → **统一缩放因子**
+    （scale = 目标高 / 全帧最大内容高；最高帧达目标高，其余按真实比例更矮——
+    逐帧归一化会把"抬手帧压扁/蹲伏帧拉伸"造成忽大忽小与过裁感）→
+    **底中对齐**（脚着地；x 居中消除左右漂移）。空帧跳过。"""
     frames = []
     for c in cols:
         (yt, yb), (xl, xr) = row_bounds[row], col_bounds[c]
@@ -335,14 +336,16 @@ def build_state_sheet(img, row_bounds, col_bounds, row, cols, size, scale=0.88):
     if not frames:
         return None, 0
     hmax = max(bb[3] - bb[1] for _, bb in frames)
-    target_h = round(size * scale)
+    if hmax <= 0:
+        return None, 0
+    s = (size * scale) / hmax  # 统一缩放因子
     norm = []
     for cell, (x0, y0, x1, y1) in frames:
         if x1 <= x0 or y1 <= y0:
             continue
         f = cell.crop((x0, y0, x1, y1))
-        fh = target_h
-        fw = max(1, round(f.width * fh / f.height))
+        fw = max(1, round(f.width * s))
+        fh = max(1, round(f.height * s))
         if f.size != (fw, fh):
             f = f.resize((fw, fh), Image.LANCZOS)
         norm.append(f)
