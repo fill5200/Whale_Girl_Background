@@ -291,7 +291,6 @@ export function apply(ctx = {}) {
   let lastActiveAt = Date.now()
   let idleSince = 0 // 进入 idle 的时刻（sleep 从此刻起算持续空闲）
   let sleeping = false
-  let wasSleeping = false // 睡醒过渡（wake 瞬发）触发依据
   let animState = null
   let frame = 0
   let frameDirection = 1
@@ -555,6 +554,17 @@ export function apply(ctx = {}) {
       resetTransient(now)
     }
     const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting })
+    // 睡醒边沿（视觉驱动）：上一帧显示 sleep、本帧离开 sleep（非拖拽打断）→ 播 wake。
+    // 不能用 sleeping 变量（Node half activity 判定）触发：会话活跃时 think/working 优先级
+    // 高于 sleep，视觉已离开 sleep 但 sleeping 仍是 true（activity 还 idle）——旧边沿永不翻转，
+    // wake 不可见。以实际显示的 animState 为准，视觉离开 sleep 的瞬间即过渡。
+    if (animState === 'sleep' && target !== 'sleep' && transient === null && !dragging) {
+      transient = 'wake'
+      transientUntil = now + WAKE_MS
+      // transient 变化后重算：wake 行优先级高于 think/working/sleep/walk（见 STATE_TABLE）。
+      setState(pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting }))
+      return
+    }
     setState(target)
     const cfg = stateOf(character, animState)
     if (cfg && loaded.has(sheetKey(cfg.sheet))) {
@@ -734,14 +744,8 @@ export function apply(ctx = {}) {
         const config = await fetchConfig()
         if (config !== null) applyClientConfig(config)
       }
-      // 睡醒过渡：sleep → 非 sleep 时播一次 wake（受 TRANSIENT_MS 超时兜底）。
-      // wake 不抢占 burst/working：睡醒撞上庆祝/错误/欢迎/工作直接播对应状态，伸懒腰让位。
-      if (wasSleeping && !sleeping && transient === null
-        && !['welcome', 'celebrate', 'error', 'disappointed', 'working'].includes(activity.name)) {
-        transient = 'wake'
-        transientUntil = Date.now() + WAKE_MS
-      }
-      wasSleeping = sleeping
+      // 睡醒过渡由 tick 视觉边沿触发（animState 离开 sleep 的瞬间播 wake）——见 tick 注释，
+      // 不在这里判定（旧逻辑基于 sleeping 变量，会话活跃时永不翻转，见决策记录）。
       failStreak = 0
       renderStatus()
     } catch {

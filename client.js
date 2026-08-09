@@ -373,7 +373,6 @@
     let lastActiveAt = Date.now();
     let idleSince = 0;
     let sleeping = false;
-    let wasSleeping = false;
     let animState = null;
     let frame = 0;
     let frameDirection = 1;
@@ -598,6 +597,12 @@
         resetTransient(now);
       }
       const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting });
+      if (animState === "sleep" && target !== "sleep" && transient === null && !dragging) {
+        transient = "wake";
+        transientUntil = now + WAKE_MS;
+        setState(pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting }));
+        return;
+      }
       setState(target);
       const cfg2 = stateOf(character, animState);
       if (cfg2 && loaded.has(sheetKey(cfg2.sheet))) {
@@ -750,11 +755,6 @@
           const config = await fetchConfig();
           if (config !== null) applyClientConfig(config);
         }
-        if (wasSleeping && !sleeping && transient === null && !["welcome", "celebrate", "error", "disappointed", "working"].includes(activity.name)) {
-          transient = "wake";
-          transientUntil = Date.now() + WAKE_MS;
-        }
-        wasSleeping = sleeping;
         failStreak = 0;
         renderStatus();
       } catch {
