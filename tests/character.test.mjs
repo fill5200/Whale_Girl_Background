@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   DEFAULT_ROLE_ID, ROLE_ID_RE, parseCharacters, listCharacters, defaultCharacter,
-  getCharacter, stateOf, isKnownState,
+  getCharacter, stateOf, isKnownState, emojiFor,
 } from '../client/character.mjs'
 
 const OLD_MANIFEST = {
@@ -69,4 +69,13 @@ test('ROLE_ID_RE：合法 id 通过，非法拒绝（URL 注入面）', () => {
   assert.ok(!ROLE_ID_RE.test('..'))
   assert.ok(!ROLE_ID_RE.test('a b'))
   assert.ok(!ROLE_ID_RE.test(''))
+})
+
+test('emojiFor：角色 emojiOverrides 优先，回退通用 EMOJI', () => {
+  const withOverride = { meta: { emojiOverrides: { idle: '🐱' } }, states: {} }
+  assert.equal(emojiFor(withOverride, 'idle'), '🐱')
+  assert.equal(emojiFor(withOverride, 'walk'), '🚶') // 未覆盖 → 通用表
+  assert.equal(emojiFor({ meta: {}, states: {} }, 'idle'), '🐣')
+  assert.equal(emojiFor(null, 'idle'), '🐣')
+  assert.equal(emojiFor({ meta: { emojiOverrides: { idle: 42 } }, states: {} }, 'idle'), '🐣') // 非字符串忽略
 })

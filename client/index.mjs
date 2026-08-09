@@ -10,8 +10,8 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { EMOJI, TRANSIENT_MS, WAKE_MS, JOY_MS, pickState, deriveSessionMood } from './logic.mjs'
-import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
+import { TRANSIENT_MS, WAKE_MS, JOY_MS, pickState, deriveSessionMood } from './logic.mjs'
+import { parseCharacters, getCharacter, stateOf, listCharacters, emojiFor } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
@@ -272,7 +272,7 @@ export function apply(ctx = {}) {
     sprite.classList.remove('ready')
     const emoji = document.createElement('span')
     emoji.className = 'pet-emoji'
-    emoji.textContent = EMOJI[name] ?? '🐣'
+    emoji.textContent = emojiFor(character, name) // 角色 emojiOverrides 优先，回退通用表
     stage.replaceChildren(emoji)
   }
 

@@ -71,3 +71,12 @@ export function stateOf(character, stateName) {
 export function isKnownState(stateName) {
   return stateName in EMOJI
 }
+
+/** 表情解析：角色 meta.emojiOverrides 优先（换角色后兜底表情贴画风），回退通用 EMOJI。 */
+export function emojiFor(character, stateName) {
+  const overrides = character?.meta?.emojiOverrides
+  if (overrides !== null && typeof overrides === 'object' && typeof overrides[stateName] === 'string') {
+    return overrides[stateName]
+  }
+  return EMOJI[stateName] ?? '🐣'
+}

@@ -100,6 +100,13 @@
   function stateOf(character, stateName) {
     return character?.states?.[stateName];
   }
+  function emojiFor(character, stateName) {
+    const overrides = character?.meta?.emojiOverrides;
+    if (overrides !== null && typeof overrides === "object" && typeof overrides[stateName] === "string") {
+      return overrides[stateName];
+    }
+    return EMOJI[stateName] ?? "\u{1F423}";
+  }
 
   // client/index.mjs
   var STATE_PATH = "/plugins/vlln/dsh-pet/state";
@@ -332,7 +339,7 @@
       sprite.classList.remove("ready");
       const emoji = document.createElement("span");
       emoji.className = "pet-emoji";
-      emoji.textContent = EMOJI[name] ?? "\u{1F423}";
+      emoji.textContent = emojiFor(character, name);
       stage.replaceChildren(emoji);
     };
     const sheetKey = (sheet) => `${characterId}:${sheet}`;
