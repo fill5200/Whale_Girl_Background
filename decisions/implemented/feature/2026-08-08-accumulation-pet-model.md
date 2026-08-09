@@ -11,10 +11,7 @@ Status: implemented
 宠物改为**积累型账本**（`src/pet-state.mjs`）：
 
 - **零负反馈**：无衰减、无惩罚、无需求。状态里没有 hunger/mood；宠物不因冷落而难受。失败只触发瞬发动画（`error` 惊吓 4s → `disappointed` 失落尾 6s，总负面 10s），不计数为惩罚、不扣资历。
-- **积累型**：一切向上积累——真实的共同经历 → 资历。
-  - **XP 来源**：任务完成 +10、新会话（startup）+5、续接/延续（resume/compact/clear）+2；等级 = xp 三角数列派生（L2=50，L3=150…），纯派生无手写。
-  - **称号**：里程碑解锁（初次协作/勤劳伙伴/百炼成钢/常驻伙伴/越挫越勇/广结善缘），封闭集合在 `src/pet-state.mjs`。
-  - **回忆**：最近 8 条共同事件环形日志（"完成任务「…」（第 N 个）""升到 Lv.N 🎉"），状态条展示。
+- **积累型**：一切向上积累——真实的共同经历 → 资历。**XP 来源/等级曲线/称号/回忆的完整契约见 [docs/growth-system.md](../../../docs/growth-system.md)（唯一权威），此处不重复。**
 - **情绪 = 事件即时反应**（瞬发、不持续）：`working`（任务运行）、`celebrate`（完成/升级/称号，事件+轮询双源同窗）、`error`→`disappointed`（失败）、`welcome`（新会话）、`joy`（投喂/玩耍后 1.6s）、`think`（任一会话运行/思考，sessions 订阅陪伴底座）、`wait`（任一会话等待批准，sessions 订阅陪伴底座）。
 - **动画状态 15 个**：idle/working/celebrate/error/disappointed/joy/eat/play/drag/walk/sleep/wake/welcome/think/wait（删 hungry/sad，happy→joy，新增 welcome/walk/think/wait；think/wait 当前 emoji 兜底无 sheet）。
 - **互动重定义**：投喂/玩耍是**纯乐趣**——状态不变，只回话（宠物"说话"气泡），无数值影响。
