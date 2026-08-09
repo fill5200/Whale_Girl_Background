@@ -73,6 +73,8 @@
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: 110px; height: 110px;
+  pointer-events: none; overflow: visible; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 [data-dsh-pet] .pet-status { min-width: 110px; margin-top: 6px; padding: 6px 8px;
@@ -166,7 +168,9 @@
     const playBtn = document.createElement("button");
     playBtn.textContent = "\u{1F3BE} \u73A9\u800D";
     menu.append(feedBtn, playBtn);
-    host.append(stage, status, menu);
+    const effects = document.createElement("div");
+    effects.className = "pet-effects";
+    host.append(effects, stage, status, menu);
     const toggleMenu = (open) => {
       const next = open ?? !menu.classList.contains("open");
       menu.classList.toggle("open", next);
@@ -339,7 +343,7 @@
         heart.textContent = "\u{1F497}";
         heart.style.left = `${20 + Math.random() * 110}px`;
         heart.style.top = `${30 + Math.random() * 80}px`;
-        stage.appendChild(heart);
+        effects.appendChild(heart);
         heart.addEventListener("animationend", () => heart.remove());
         setTimeout(() => heart.remove(), 2e3);
       }
@@ -357,7 +361,7 @@
       const bubble = document.createElement("div");
       bubble.className = "pet-bubble";
       bubble.textContent = text;
-      stage.appendChild(bubble);
+      effects.appendChild(bubble);
       activeBubble = bubble;
       const timer2 = setTimeout(() => {
         bubbleTimers.delete(timer2);

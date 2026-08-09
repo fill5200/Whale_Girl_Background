@@ -34,6 +34,8 @@ const CSS = `
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: 110px; height: 110px;
+  pointer-events: none; overflow: visible; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 [data-dsh-pet] .pet-status { min-width: 110px; margin-top: 6px; padding: 6px 8px;
@@ -133,7 +135,11 @@ export function apply(ctx = {}) {
   playBtn.textContent = '🎾 玩耍'
   menu.append(feedBtn, playBtn)
 
-  host.append(stage, status, menu)
+  // 特效层：爱心/气泡的独立容器（覆盖在舞台上方，不参与舞台内容切换——
+  // stage 的 replaceChildren/textContent 不会清掉正在播放的特效）。
+  const effects = document.createElement('div')
+  effects.className = 'pet-effects'
+  host.append(effects, stage, status, menu)
 
   // 菜单开关（同步 aria-expanded；open 缺省时切换）。
   const toggleMenu = (open) => {
@@ -338,7 +344,7 @@ export function apply(ctx = {}) {
       heart.textContent = '💗'
       heart.style.left = `${20 + Math.random() * 110}px`
       heart.style.top = `${30 + Math.random() * 80}px`
-      stage.appendChild(heart)
+      effects.appendChild(heart)
       heart.addEventListener('animationend', () => heart.remove())
       // 兜底超时移除：reduced-motion 下动画被禁用（animation: none），
       // animationend 永不触发 → 爱心永久残留 DOM（不可见但泄漏）。
@@ -362,7 +368,7 @@ export function apply(ctx = {}) {
     const bubble = document.createElement('div')
     bubble.className = 'pet-bubble'
     bubble.textContent = text
-    stage.appendChild(bubble)
+    effects.appendChild(bubble)
     activeBubble = bubble
     const timer = setTimeout(() => {
       bubbleTimers.delete(timer)
