@@ -358,6 +358,12 @@ export function apply(ctx = {}) {
       const nextId = pref !== null && pref in roles.characters ? pref : roles.defaultId
       characterId = nextId
       character = getCharacter(manifest, nextId) ?? { id: nextId, states: {} }
+      // 角色尺寸：meta.stageSize 作为 --pet-size 默认（仅用户未配置 size 时生效——
+      // 配置系统 size 是权威，lastConfigRevision===0 表示未拉取过配置）。
+      const stageSize = character.meta?.stageSize
+      if (typeof stageSize === 'number' && lastConfigRevision === 0) {
+        host.style.setProperty('--pet-size', `${stageSize}px`)
+      }
       await Promise.all(Object.entries(character.states).map(([n, cfg]) => preload(n, cfg)))
     } catch {
       // manifest 不可用 → 全 emoji 兜底
@@ -389,6 +395,11 @@ export function apply(ctx = {}) {
       sheetSize.clear()
       for (const k of nextLoaded) loaded.add(k)
       for (const [k, v] of nextSize) sheetSize.set(k, v)
+      // 角色尺寸：meta.stageSize 作为 --pet-size 默认（用户未配置 size 时生效）。
+      const stageSize = target.meta?.stageSize
+      if (typeof stageSize === 'number' && lastConfigRevision === 0) {
+        host.style.setProperty('--pet-size', `${stageSize}px`)
+      }
       try { localStorage.setItem('dsh-pet:character', id) } catch { /* 隐私模式忽略 */ }
       transient = null
       transientUntil = 0

@@ -409,6 +409,10 @@
         const nextId = pref !== null && pref in roles.characters ? pref : roles.defaultId;
         characterId = nextId;
         character = getCharacter(manifest, nextId) ?? { id: nextId, states: {} };
+        const stageSize = character.meta?.stageSize;
+        if (typeof stageSize === "number" && lastConfigRevision === 0) {
+          host.style.setProperty("--pet-size", `${stageSize}px`);
+        }
         await Promise.all(Object.entries(character.states).map(([n, cfg2]) => preload(n, cfg2)));
       } catch {
       }
@@ -435,6 +439,10 @@
         sheetSize.clear();
         for (const k of nextLoaded) loaded.add(k);
         for (const [k, v] of nextSize) sheetSize.set(k, v);
+        const stageSize = target.meta?.stageSize;
+        if (typeof stageSize === "number" && lastConfigRevision === 0) {
+          host.style.setProperty("--pet-size", `${stageSize}px`);
+        }
         try {
           localStorage.setItem("dsh-pet:character", id);
         } catch {
