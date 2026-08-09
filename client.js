@@ -337,13 +337,23 @@
       }
     };
     const bubbleTimers = /* @__PURE__ */ new Set();
+    let activeBubble = null;
+    const clearBubble = () => {
+      if (activeBubble !== null) {
+        activeBubble.remove();
+        activeBubble = null;
+      }
+    };
     const showReply = (text) => {
+      clearBubble();
       const bubble = document.createElement("div");
       bubble.className = "pet-bubble";
       bubble.textContent = text;
       stage.appendChild(bubble);
+      activeBubble = bubble;
       const timer2 = setTimeout(() => {
         bubbleTimers.delete(timer2);
+        if (activeBubble === bubble) activeBubble = null;
         bubble.remove();
       }, 2500);
       bubbleTimers.add(timer2);
@@ -602,6 +612,7 @@
       if (sessionsUnsub !== null) sessionsUnsub();
       for (const t of bubbleTimers) clearTimeout(t);
       bubbleTimers.clear();
+      clearBubble();
       dialogObserver.disconnect();
       document.removeEventListener("pointerdown", onDocPointerDown);
       document.removeEventListener("keydown", onKeyDown);

@@ -336,14 +336,26 @@ export function apply(ctx = {}) {
   }
 
   // 宠物回话气泡（互动后显示，2.5s 消失；超时记入清理表，dispose 时一并清）。
+  // 一次只显示一个气泡：新气泡替换旧的（互动回话与回合完成提示不堆叠覆盖——
+  // 多会话同时完成时快照循环里后者替换前者，避免同位置重叠）。
   const bubbleTimers = new Set()
+  let activeBubble = null
+  const clearBubble = () => {
+    if (activeBubble !== null) {
+      activeBubble.remove()
+      activeBubble = null
+    }
+  }
   const showReply = (text) => {
+    clearBubble()
     const bubble = document.createElement('div')
     bubble.className = 'pet-bubble'
     bubble.textContent = text
     stage.appendChild(bubble)
+    activeBubble = bubble
     const timer = setTimeout(() => {
       bubbleTimers.delete(timer)
+      if (activeBubble === bubble) activeBubble = null
       bubble.remove()
     }, 2500)
     bubbleTimers.add(timer)
@@ -644,6 +656,7 @@ export function apply(ctx = {}) {
     if (sessionsUnsub !== null) sessionsUnsub()
     for (const t of bubbleTimers) clearTimeout(t) // 气泡残留计时器一并清
     bubbleTimers.clear()
+    clearBubble() // 活动气泡引用清空（DOM 随 host.remove() 移除）
     dialogObserver.disconnect()
     document.removeEventListener('pointerdown', onDocPointerDown)
     document.removeEventListener('keydown', onKeyDown)
