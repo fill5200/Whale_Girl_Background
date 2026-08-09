@@ -40,7 +40,7 @@
 
 ## 状态总表（权威，15 状态）
 
-窗口时长不在此重复：burst/瞬发窗口的毫秒值只存 [index.mjs](../index.mjs)（本表触发列只写事件来源）。motion 配方与帧播放器默认互斥（`motion` 只配 `frames:1`）；`error` 是唯一多帧+运动叠加的定向例外（见下方规则）。`think`/`wait` 已有 sheet（1 帧 + `float`/`wiggle` 运动配方），表内为实际投放。
+窗口时长不在此重复：burst/瞬发窗口的毫秒值只存 [index.mjs](../index.mjs)；**完整触发条件/优先级/转换语义见 [state-machine.md](state-machine.md)（唯一权威）**，本表触发列只写事件来源。motion 配方与帧播放器默认互斥（`motion` 只配 `frames:1`）；`error` 是唯一多帧+运动叠加的定向例外（见下方规则）。`think`/`wait` 已有 sheet（1 帧 + `float`/`wiggle` 运动配方），表内为实际投放。
 
 | 状态 | 触发 | 帧数 | motion 配方 | loop | 画面 |
 |---|---|---|---|---|---|

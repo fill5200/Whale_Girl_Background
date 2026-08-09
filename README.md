@@ -43,7 +43,7 @@ dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh reg
 
 ## 素材（sprite sheet）契约
 
-宠物的图是**每状态一张横排帧图**（可含 2~4 个中间帧），由 `assets/manifest.json` 声明。**完整规格（15 状态、帧数、逐状态生图提示、manifest 模板）见 [docs/sprites-spec.md](docs/sprites-spec.md)**，要点：
+宠物的图是**每状态一张横排帧图**（可含 2~4 个中间帧），由 `assets/manifest.json` 声明。**完整规格（15 状态、帧数、逐状态生图提示、manifest 模板）见 [docs/sprites-spec.md](docs/sprites-spec.md)**；**状态机（状态清单/触发/优先级/扩展指引）见 [docs/state-machine.md](docs/state-machine.md)**，要点：
 
 - **生图要求**：**纯绿色 `#00FF00` 背景**（❌ 洋红/粉/紫底——与鲸鱼娘蓝紫粉配色在色域重叠，实测反复出残边；❌ 白/浅灰底；❌ 不要提示透明背景——生图模型会画假透明棋盘格，抠图死局）；每状态一张横排帧图，帧等宽同高；风格一致（参考 `originals/鲸鱼娘.png`，建议先出角色设定图锁定风格）。
 - **投放方式**：图放进 `assets/characters/<角色id>/`（多帧为横排单图），在 `assets/manifest.json` 对应角色的 `states` 加条目——`verify-assets` 门禁保证引用的文件存在、多帧 PNG 尺寸符合帧数、角色 id 合法（缺文件/尺寸不符/非法 id 即门禁红）。

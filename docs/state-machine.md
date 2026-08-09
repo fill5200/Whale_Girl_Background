@@ -1,0 +1,90 @@
+# 状态机（唯一权威）
+
+本文是 dsh-pet **动画状态机**的权威现状文档：状态清单、触发条件、优先级、转换语义、扩展指引。实现见 [client/logic.mjs](../client/logic.mjs)（`STATE_TABLE`，文法单源）与 [index.mjs](../index.mjs)（Node half 事件→窗口）。角色素材规格见 [sprites-spec.md](sprites-spec.md)，成长系统见 [growth-system.md](growth-system.md)。
+
+## 设计原则
+
+- **文法单源**：状态优先级由 `STATE_TABLE` 声明（行序即优先级，首个命中即返回），不散落 if 链。加状态/调优先级只改此表。
+- **分工**：Node half 输出**事实窗口**（`{ name, until }`，welcome/celebrate/error/disappointed 的 burst）；client 做**本地交互选择**（drag/transient/joy/session/working 交替）。
+- **零负反馈**：失败只触发情绪状态（error→disappointed），不惩罚、不持续。
+- **降级**：角色缺某状态 sheet → emoji 兜底（`emojiFor`），行为不变。
+
+## 状态清单与触发
+
+### 瞬发/覆盖态（优先级高，临时）
+
+| 状态 | 触发 | 来源 | 说明 |
+|---|---|---|---|
+| `drag` | 用户拖拽（pointermove 越过 6px） | client 本地 | 拖拽中最高优先 |
+| `idle`（缓冲） | 拖拽放下后 1.5s（`dragReleaseUntil`） | client 本地 | 放下缓冲，再进底层状态 |
+| `eat` / `play` | 点击喂食/玩耍 | client 本地（`transient`） | 瞬发 1.5s，超时复位 |
+| `wake` | 睡眠→醒来过渡 | client 本地 | 瞬发 3s，非循环 |
+| `wait` | 任一会话等待批准 | client（sessions 订阅） | 陪伴底座，覆盖 sleep/walk |
+
+### 事件 burst（Node 窗口，until 有效期内优先）
+
+| 状态 | 触发事件 | 窗口 | 说明 |
+|---|---|---|---|
+| `welcome` | `agent/session-start`（startup） | 6s（可配） | 新会话欢迎 |
+| `celebrate` | 任务完成/升级/称号 | 6s（可配） | 双源同窗（事件+轮询） |
+| `error` | 任务失败/`agent/request-error` | 4s（可配） | 惊吓，负面窗口 |
+| `disappointed` | 失败后尾段 | 6s（可配） | 失落，紧跟 error |
+
+### 持续态（底层派生，优先级低）
+
+| 状态 | 触发 | 说明 |
+|---|---|---|
+| `working` | 有任务在跑（Node `activity.working`） | 有 sessionThink 时与 think 交替（见下） |
+| `think` | 任一会话运行/思考（sessions 订阅） | 沉思陪伴 |
+| `joy` | 互动后短时 | 1.6s |
+| `sleep` | 空闲 ≥60s（可配） | 打盹 |
+| `walk` | 周期性游走（18-40s 间隔，可配） | 散步 |
+| `idle` | 兜底 | 待机（眨眼+呼吸） |
+
+### 工作陪伴交替（working ↔ think）
+
+会话思考中（`sessionThink`）**且有任务跑**（`activity.working`）时，按 **3s 周期**交替：
+- **0-2s**：`working`（托腮小灯泡——「在干活」主表现）
+- **2-3s**：`think`（沉思——「在想」）
+
+无 `sessionThink` 时纯 `working`（不交替）。常量：`WORKING_SLICE_MS=3000`、`WORKING_ACTIVE_MS=2000`（[client/logic.mjs](../client/logic.mjs)）。
+
+## 优先级（STATE_TABLE 行序，文法单源）
+
+```
+drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
+> eat/play > wake > wait > working(交替) > think > joy > sleep > walk > idle
+```
+
+## 状态转换语义
+
+- **瞬发/覆盖态结束后**：不硬编码回 idle——重新计算底层派生状态（`pickState` 每 tick 重算）。
+- **临时覆盖不抢戏**：事件 burst > 用户互动 > 陪伴态；失败情绪不被新会话欢迎盖掉（welcome 不打断 error/disappointed 尾段）。
+- **会话活跃保持清醒**：think/wait 覆盖 sleep/walk（陪伴底座）。
+
+## 扩展指引（给新角色/新状态）
+
+### 加一个新状态（行为级，平台变更）
+1. `client/logic.mjs` `STATE_TABLE` 加行（`{ state, when, resolve? }`），位置决定优先级
+2. `client/logic.mjs` `EMOJI` 加兜底表情
+3. `assets/manifest.json` 角色 `states` 加条目（可选 sheet；缺则 emoji 兜底）
+4. `docs/sprites-spec.md` 状态总表同步（verify-spec-states 门禁强制 spec ↔ EMOJI）
+5. 决策记录（行为文法变更）
+
+### 加角色（不新增状态）
+- 角色只用**现有状态**（`characters.<id>.states` 部分映射），缺的 emoji 兜底
+- 帧数/fps/motion 角色可选（表现层）；触发/优先级全角色共通（行为层）
+- 详见 [character-manifest 决策](../decisions/implemented/feature/2026-08-09-character-manifest.md)
+
+### 新角色的「核心状态集」建议（低成本下限）
+`idle / walk / working / celebrate / error / sleep / joy` 必做（有 sheet），其余（eat/play/drag/wake/welcome/think/wait）可选 emoji 兜底。
+
+## 触发源（Node half → client）
+
+| 宿主事件 | Node half 处理 | client 输入 |
+|---|---|---|
+| `tasks.onTaskDone` | 记账 + celebrate/failure 窗口 | `activity` |
+| `agent/session-start` | 会话 XP + welcome 窗口 | `activity` |
+| `agent/request-error` | error/disappointed 窗口 | `activity` |
+| sessions.list 快照 | — | `sessionThink` / `sessionWait` |
+| 用户 pointer/点击 | — | `dragging` / `transient` / `joyUntil` |
