@@ -12,7 +12,7 @@
 
 1. **生图**：3×3 网格图（纯色背景，见提示模板），参考 [originals/鲸鱼娘.png](../originals/鲸鱼娘.png) 锁风格。
 2. **切分/归一化**（`scripts/slice-sheet.py`，PIL）：`--sheet 3x3 --states 行状态名 --frames 每行帧数`（更细粒度用 `--regions state@row:colStart-colEnd`）→ 行带连通域分离 → 逐帧裁切 → 质心配准（±2px 钳制）→ 底中对齐 → 帧横排 sheet；纯色底色键 `--key R,G,B`（多色 `|` 分隔）或 `--auto` 取边框色。
-3. **投放**：sheet 进 `assets/`，`assets/manifest.json` 加条目（`frames: N` + 可选 `motion`；`verify-assets` 门禁保证引用存在）。
+3. **投放**：sheet 进 `assets/characters/<角色id>/`，`assets/manifest.json` 的角色 `states` 加条目（`frames: N` + 可选 `motion`；`verify-assets` 门禁保证引用存在与多角色遍历）。
 
 ## 生图提示模板（每状态一行，纯色背景）
 
@@ -62,31 +62,39 @@
 
 优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > `think` > `working` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 
-## manifest 模板（13 个有 sheet 状态，与部署实况一致）
+## manifest 模板（角色索引；whale-girl 13 个有 sheet 状态）
 
-`think`/`wait` 当前无 sheet（client 的 EMOJI 兜底表提供表情，见 [client/logic.mjs](../client/logic.mjs)）；补图后在此加入条目（`verify-assets` 要求 manifest 状态 ∈ EMOJI 表，反向不必）。
+`think`/`wait` 当前无 sheet（client 的 EMOJI 兜底表提供表情，见 [client/logic.mjs](../client/logic.mjs)）；补图后在此加入条目（`verify-assets` 要求 manifest 状态 ∈ EMOJI 表，反向不必）。角色索引格式：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）；`default` 指定默认角色；顶层 `states` 为旧格式兼容简写（单角色、sheet 平铺 `assets/`），`verify-assets` 两种格式都校验。
 
 ```json
 {
-  "states": {
-    "idle":         { "sheet": "idle.png",         "frames": 3, "fps": 2,  "loop": true },
-    "working":      { "sheet": "working.png",      "frames": 3, "fps": 3,  "loop": true },
-    "celebrate":    { "sheet": "celebrate.png",    "frames": 3, "fps": 4,  "loop": true },
-    "error":        { "sheet": "error.png",        "frames": 2, "fps": 8,  "loop": false, "motion": "shake" },
-    "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "loop": true },
-    "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 5,  "loop": true },
-    "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "loop": true },
-    "play":         { "sheet": "play.png",         "frames": 3, "fps": 4,  "loop": true },
-    "drag":         { "sheet": "drag.png",         "frames": 1, "fps": 5,  "loop": true,  "motion": "tilt" },
-    "walk":         { "sheet": "walk.png",         "frames": 3, "fps": 6,  "loop": true },
-    "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "loop": true },
-    "wake":         { "sheet": "wake.png",         "frames": 2, "fps": 3,  "loop": false },
-    "welcome":      { "sheet": "welcome.png",      "frames": 2, "fps": 3,  "loop": true }
-  }
+  "characters": {
+    "whale-girl": {
+      "name": "鲸鱼娘",
+      "credit": "ZipZipPipe",
+      "meta": { "stageSize": 110 },
+      "states": {
+        "idle":         { "sheet": "idle.png",         "frames": 3, "fps": 2,  "loop": true },
+        "working":      { "sheet": "working.png",      "frames": 3, "fps": 3,  "loop": true },
+        "celebrate":    { "sheet": "celebrate.png",    "frames": 3, "fps": 4,  "loop": true },
+        "error":        { "sheet": "error.png",        "frames": 2, "fps": 8,  "loop": false, "motion": "shake" },
+        "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "loop": true },
+        "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 5,  "loop": true },
+        "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "loop": true },
+        "play":         { "sheet": "play.png",         "frames": 3, "fps": 4,  "loop": true },
+        "drag":         { "sheet": "drag.png",         "frames": 1, "fps": 5,  "loop": true,  "motion": "tilt" },
+        "walk":         { "sheet": "walk.png",         "frames": 3, "fps": 6,  "loop": true },
+        "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "loop": true },
+        "wake":         { "sheet": "wake.png",         "frames": 2, "fps": 3,  "loop": false },
+        "welcome":      { "sheet": "welcome.png",      "frames": 2, "fps": 3,  "loop": true }
+      }
+    }
+  },
+  "default": "whale-girl"
 }
 ```
 
-> 规则（verify-assets 门禁强制）：**`motion` 只允许配 `frames: 1`**——多帧状态由帧播放器动画，运动配方与帧播放器互斥（单帧状态才用 CSS 运动补充）。**定向例外：仅 `error`（2 帧「正常→惊吓」+ `shake`）**——一次播完僵住后由 CSS 颤抖维持 burst 窗口内的持续表现（见决策记录动画编排修订）。
+> 规则（verify-assets 门禁强制）：**`motion` 只允许配 `frames: 1`**——多帧状态由帧播放器动画，运动配方与帧播放器互斥（单帧状态才用 CSS 运动补充）。**定向例外：仅 `error`（2 帧「正常→惊吓」+ `shake`）**——一次播完僵住后由 CSS 颤抖维持 burst 窗口内的持续表现（见决策记录动画编排修订）。**角色 id 只允许 `[a-z0-9-]`**（URL 路径安全，防注入）。
 
 ## 资历与称号（积累型）
 

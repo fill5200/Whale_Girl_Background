@@ -11,6 +11,7 @@
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
 import { EMOJI, TRANSIENT_MS, WAKE_MS, JOY_MS, pickState, deriveSessionMood } from './logic.mjs'
+import { parseCharacters, getCharacter, stateOf } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
@@ -220,8 +221,12 @@ export function apply(ctx = {}) {
   let pet = null
   let activity = { name: 'idle', until: 0 }
   let manifest = { states: {} }
-  const loaded = new Set() // 已加载成功的 sheet 名
-  const sheetSize = new Map() // sheet 名 → { w, h }（自然尺寸）
+  // 角色上下文：manifest 角色索引 → 当前角色（whale-girl 默认）。角色 id 决定
+  // sheet 的目录前缀（assets/characters/<id>/）；缓存 key 含角色 id 防串图。
+  let character = { id: 'whale-girl', states: {} }
+  let characterId = 'whale-girl'
+  const loaded = new Set() // 已加载成功的 `${id}:${sheet}` 键
+  const sheetSize = new Map() // 同上 → { w, h }（自然尺寸）
   let dragging = false
   let pressed = false
   let moved = false
@@ -269,8 +274,15 @@ export function apply(ctx = {}) {
     stage.replaceChildren(emoji)
   }
 
+  // sheet 缓存键：含角色 id 命名空间（防切角色显示旧图）。
+  const sheetKey = (sheet) => `${characterId}:${sheet}`
+  // sheet URL：角色目录前缀（assets/characters/<id>/）；角色 id 经 ROLE_ID_RE 校验
+  // （parseCharacters 已过滤非法 id），assets 路由另有路径净化兜底。
+  const sheetUrl = (sheet) => `${ASSETS_URL}/characters/${characterId}/${sheet}`
+
   const showSprite = (name, cfg) => {
-    const size = sheetSize.get(cfg.sheet)
+    const key = sheetKey(cfg.sheet)
+    const size = sheetSize.get(key)
     if (!size || size.w <= 0 || size.h <= 0) {
       showEmoji(name) // 未声明尺寸的 SVG（naturalWidth=0）→ 兜底，避免除零白屏
       return
@@ -280,7 +292,7 @@ export function apply(ctx = {}) {
     const frameW = size.w / cfg.frames
     const scale = Math.min(cfg.size / frameW, cfg.size / size.h, 1)
     sprite.className = 'pet-sprite ready'
-    sprite.style.backgroundImage = `url("${ASSETS_URL}/${cfg.sheet}")`
+    sprite.style.backgroundImage = `url("${sheetUrl(cfg.sheet)}")`
     sprite.style.backgroundSize = `${size.w}px ${size.h}px`
     sprite.style.width = `${frameW}px`
     sprite.style.height = `${size.h}px`
@@ -303,10 +315,10 @@ export function apply(ctx = {}) {
     // 运动配方：manifest.motion → 舞台类（emoji 与 sprite 路径都生效；无 motion 时清类）。
     // 快照迭代再删：活 DOMTokenList 边遍历边删可能跳项（当前单类无碍，加固免踩）。
     for (const cls of [...stage.classList]) if (cls.startsWith('pet-motion-')) stage.classList.remove(cls)
-    const motion = manifest.states[name]?.motion
+    const cfg = stateOf(character, name)
+    const motion = cfg?.motion
     if (motion) stage.classList.add(`pet-motion-${motion}`)
-    const cfg = manifest.states[name]
-    if (cfg && loaded.has(cfg.sheet)) {
+    if (cfg && loaded.has(sheetKey(cfg.sheet))) {
       showSprite(name, cfg)
       showingSprite = true
     } else {
@@ -322,12 +334,12 @@ export function apply(ctx = {}) {
   const preload = (name, cfg) => new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
-      sheetSize.set(cfg.sheet, { w: img.naturalWidth, h: img.naturalHeight })
-      loaded.add(cfg.sheet)
+      sheetSize.set(sheetKey(cfg.sheet), { w: img.naturalWidth, h: img.naturalHeight })
+      loaded.add(sheetKey(cfg.sheet))
       resolve()
     }
     img.onerror = resolve
-    img.src = `${ASSETS_URL}/${cfg.sheet}`
+    img.src = sheetUrl(cfg.sheet)
   })
 
   const loadAssets = async () => {
@@ -335,10 +347,16 @@ export function apply(ctx = {}) {
       const res = await fetch(MANIFEST_URL)
       if (!res.ok) return
       const next = await res.json()
-      // 结构守卫：states 必须是对象（坏 manifest 不赋值，保持上次有效值或空对象 → 全 emoji 兜底）。
-      if (next === null || typeof next !== 'object' || next.states === null || typeof next.states !== 'object' || Array.isArray(next.states)) return
+      // 结构守卫：manifest 必须是对象且可解析出角色（坏 manifest 不赋值 → 全 emoji 兜底）。
+      if (next === null || typeof next !== 'object') return
       manifest = next
-      await Promise.all(Object.entries(manifest.states).map(([n, cfg]) => preload(n, cfg)))
+      // 角色解析：默认角色 + 当前角色（localStorage 偏好，ROLE_ID_RE 已由 parseCharacters 过滤）。
+      const pref = (() => { try { return localStorage.getItem('dsh-pet:character') ?? null } catch { return null } })()
+      const roles = parseCharacters(manifest)
+      const nextId = pref !== null && pref in roles.characters ? pref : roles.defaultId
+      characterId = nextId
+      character = getCharacter(manifest, nextId) ?? { id: nextId, states: {} }
+      await Promise.all(Object.entries(character.states).map(([n, cfg]) => preload(n, cfg)))
     } catch {
       // manifest 不可用 → 全 emoji 兜底
     }
@@ -360,10 +378,9 @@ export function apply(ctx = {}) {
     }
     const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting })
     setState(target)
-    const states = manifest.states
-    const cfg = states === undefined || states === null ? undefined : states[animState]
-    if (cfg && loaded.has(cfg.sheet)) {
-      const size = sheetSize.get(cfg.sheet)
+    const cfg = stateOf(character, animState)
+    if (cfg && loaded.has(sheetKey(cfg.sheet))) {
+      const size = sheetSize.get(sheetKey(cfg.sheet))
       const frameW = size.w / cfg.frames
       if (!showingSprite) {
         // sprite 迟到加载完成：当前状态仍以 emoji 显示 → 换肤。
@@ -610,8 +627,8 @@ export function apply(ctx = {}) {
       const nextFlip = e.clientX < lastPointerX ? -1 : 1
       if (nextFlip !== flip) {
         flip = nextFlip
-        const dragCfg = manifest.states.drag
-        if (animState === 'drag' && dragCfg && loaded.has(dragCfg.sheet)) showSprite('drag', dragCfg)
+        const dragCfg = stateOf(character, 'drag')
+        if (animState === 'drag' && dragCfg && loaded.has(sheetKey(dragCfg.sheet))) showSprite('drag', dragCfg)
       }
     }
     lastPointerX = e.clientX
@@ -716,8 +733,8 @@ export function apply(ctx = {}) {
     flip = walkDir // sprite scaleX 翻转（showSprite 应用）
     // walk 可能已经是当前状态；此时 setState 会短路，必须主动刷新
     // sprite transform，否则新一轮游走仍沿用上一轮朝向。
-    const walkCfg = manifest.states.walk
-    if (animState === 'walk' && walkCfg && loaded.has(walkCfg.sheet)) showSprite('walk', walkCfg)
+    const walkCfg = stateOf(character, 'walk')
+    if (animState === 'walk' && walkCfg && loaded.has(sheetKey(walkCfg.sheet))) showSprite('walk', walkCfg)
     const duration = cfg.walk.minMs + Math.random() * (cfg.walk.maxMs - cfg.walk.minMs)
     const start = performance.now()
     const maxX = Math.max(0, window.innerWidth - host.offsetWidth)

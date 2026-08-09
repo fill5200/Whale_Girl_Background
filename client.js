@@ -52,6 +52,45 @@
     return { thinking, waiting, titles };
   }
 
+  // client/character.mjs
+  var DEFAULT_ROLE_ID = "whale-girl";
+  function parseCharacters(manifest) {
+    const raw = manifest?.characters;
+    if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+      const characters = {};
+      for (const [id, ch] of Object.entries(raw)) {
+        if (ch === null || typeof ch !== "object") continue;
+        characters[id] = {
+          id,
+          name: typeof ch.name === "string" ? ch.name : id,
+          credit: typeof ch.credit === "string" ? ch.credit : void 0,
+          meta: ch.meta !== null && typeof ch.meta === "object" ? ch.meta : {},
+          states: ch.states !== null && typeof ch.states === "object" ? ch.states : {}
+        };
+      }
+      const defaultId = typeof manifest.default === "string" && manifest.default in characters ? manifest.default : Object.keys(characters)[0] ?? DEFAULT_ROLE_ID;
+      return { characters, defaultId };
+    }
+    return {
+      characters: {
+        [DEFAULT_ROLE_ID]: {
+          id: DEFAULT_ROLE_ID,
+          name: DEFAULT_ROLE_ID,
+          credit: void 0,
+          meta: {},
+          states: manifest?.states !== null && typeof manifest?.states === "object" ? manifest.states : {}
+        }
+      },
+      defaultId: DEFAULT_ROLE_ID
+    };
+  }
+  function getCharacter(manifest, id) {
+    return parseCharacters(manifest).characters[id] ?? null;
+  }
+  function stateOf(character, stateName) {
+    return character?.states?.[stateName];
+  }
+
   // client/index.mjs
   var STATE_PATH = "/plugins/vlln/dsh-pet/state";
   var INTERACT_PATH = "/plugins/vlln/dsh-pet/interact";
@@ -243,6 +282,8 @@
     let pet = null;
     let activity = { name: "idle", until: 0 };
     let manifest = { states: {} };
+    let character = { id: "whale-girl", states: {} };
+    let characterId = "whale-girl";
     const loaded = /* @__PURE__ */ new Set();
     const sheetSize = /* @__PURE__ */ new Map();
     let dragging = false;
@@ -282,8 +323,11 @@
       emoji.textContent = EMOJI[name] ?? "\u{1F423}";
       stage.replaceChildren(emoji);
     };
+    const sheetKey = (sheet) => `${characterId}:${sheet}`;
+    const sheetUrl = (sheet) => `${ASSETS_URL}/characters/${characterId}/${sheet}`;
     const showSprite = (name, cfg2) => {
-      const size = sheetSize.get(cfg2.sheet);
+      const key = sheetKey(cfg2.sheet);
+      const size = sheetSize.get(key);
       if (!size || size.w <= 0 || size.h <= 0) {
         showEmoji(name);
         return;
@@ -292,7 +336,7 @@
       const frameW = size.w / cfg2.frames;
       const scale = Math.min(cfg2.size / frameW, cfg2.size / size.h, 1);
       sprite.className = "pet-sprite ready";
-      sprite.style.backgroundImage = `url("${ASSETS_URL}/${cfg2.sheet}")`;
+      sprite.style.backgroundImage = `url("${sheetUrl(cfg2.sheet)}")`;
       sprite.style.backgroundSize = `${size.w}px ${size.h}px`;
       sprite.style.width = `${frameW}px`;
       sprite.style.height = `${size.h}px`;
@@ -310,10 +354,10 @@
       idlePausedUntil = 0;
       lastFrameAt = 0;
       for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
-      const motion = manifest.states[name]?.motion;
+      const cfg2 = stateOf(character, name);
+      const motion = cfg2?.motion;
       if (motion) stage.classList.add(`pet-motion-${motion}`);
-      const cfg2 = manifest.states[name];
-      if (cfg2 && loaded.has(cfg2.sheet)) {
+      if (cfg2 && loaded.has(sheetKey(cfg2.sheet))) {
         showSprite(name, cfg2);
         showingSprite = true;
       } else {
@@ -328,21 +372,32 @@
     const preload = (name, cfg2) => new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        sheetSize.set(cfg2.sheet, { w: img.naturalWidth, h: img.naturalHeight });
-        loaded.add(cfg2.sheet);
+        sheetSize.set(sheetKey(cfg2.sheet), { w: img.naturalWidth, h: img.naturalHeight });
+        loaded.add(sheetKey(cfg2.sheet));
         resolve();
       };
       img.onerror = resolve;
-      img.src = `${ASSETS_URL}/${cfg2.sheet}`;
+      img.src = sheetUrl(cfg2.sheet);
     });
     const loadAssets = async () => {
       try {
         const res = await fetch(MANIFEST_URL);
         if (!res.ok) return;
         const next = await res.json();
-        if (next === null || typeof next !== "object" || next.states === null || typeof next.states !== "object" || Array.isArray(next.states)) return;
+        if (next === null || typeof next !== "object") return;
         manifest = next;
-        await Promise.all(Object.entries(manifest.states).map(([n, cfg2]) => preload(n, cfg2)));
+        const pref = (() => {
+          try {
+            return localStorage.getItem("dsh-pet:character") ?? null;
+          } catch {
+            return null;
+          }
+        })();
+        const roles = parseCharacters(manifest);
+        const nextId = pref !== null && pref in roles.characters ? pref : roles.defaultId;
+        characterId = nextId;
+        character = getCharacter(manifest, nextId) ?? { id: nextId, states: {} };
+        await Promise.all(Object.entries(character.states).map(([n, cfg2]) => preload(n, cfg2)));
       } catch {
       }
     };
@@ -359,10 +414,9 @@
       }
       const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting });
       setState(target);
-      const states = manifest.states;
-      const cfg2 = states === void 0 || states === null ? void 0 : states[animState];
-      if (cfg2 && loaded.has(cfg2.sheet)) {
-        const size = sheetSize.get(cfg2.sheet);
+      const cfg2 = stateOf(character, animState);
+      if (cfg2 && loaded.has(sheetKey(cfg2.sheet))) {
+        const size = sheetSize.get(sheetKey(cfg2.sheet));
         const frameW = size.w / cfg2.frames;
         if (!showingSprite) {
           showSprite(animState, cfg2);
@@ -570,8 +624,8 @@
         const nextFlip = e.clientX < lastPointerX ? -1 : 1;
         if (nextFlip !== flip) {
           flip = nextFlip;
-          const dragCfg = manifest.states.drag;
-          if (animState === "drag" && dragCfg && loaded.has(dragCfg.sheet)) showSprite("drag", dragCfg);
+          const dragCfg = stateOf(character, "drag");
+          if (animState === "drag" && dragCfg && loaded.has(sheetKey(dragCfg.sheet))) showSprite("drag", dragCfg);
         }
       }
       lastPointerX = e.clientX;
@@ -661,8 +715,8 @@
       walking = true;
       walkDir = Math.random() < 0.5 ? 1 : -1;
       flip = walkDir;
-      const walkCfg = manifest.states.walk;
-      if (animState === "walk" && walkCfg && loaded.has(walkCfg.sheet)) showSprite("walk", walkCfg);
+      const walkCfg = stateOf(character, "walk");
+      if (animState === "walk" && walkCfg && loaded.has(sheetKey(walkCfg.sheet))) showSprite("walk", walkCfg);
       const duration = cfg.walk.minMs + Math.random() * (cfg.walk.maxMs - cfg.walk.minMs);
       const start = performance.now();
       const maxX = Math.max(0, window.innerWidth - host.offsetWidth);

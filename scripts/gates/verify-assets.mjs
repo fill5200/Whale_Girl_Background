@@ -11,6 +11,7 @@ import { readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { EMOJI } from '../../client/logic.mjs'
+import { ROLE_ID_RE } from '../../client/character.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../..')
 
@@ -30,6 +31,55 @@ function pngSize(file) {
   return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) }
 }
 
+/** 校验一个角色的 states（sheet 文件在 assets/characters/<id>/ 下）。 */
+function checkStates(states, roleId, errors, root) {
+  const dir = roleId === null ? join(root, 'assets') : join(root, 'assets', 'characters', roleId)
+  const label = roleId === null ? 'states' : `characters.${roleId}.states`
+  for (const [name, cfg] of Object.entries(states)) {
+    if (!(name in EMOJI)) {
+      errors.push(`${label}.${name}: 状态不在 client EMOJI 兜底表（新增状态须同步 client/logic.mjs）`)
+    }
+    if (cfg === null || typeof cfg !== 'object' || typeof cfg.sheet !== 'string' || cfg.sheet === '') {
+      errors.push(`${label}.${name}: 缺 sheet 字段`)
+      continue
+    }
+    const file = join(dir, cfg.sheet)
+    try {
+      if (!statSync(file).isFile()) throw new Error('not a file')
+    } catch {
+      errors.push(`${label}.${name}: sheet "${cfg.sheet}" 文件不存在（期望 ${dir.replace(root, 'assets')}/${cfg.sheet}）`)
+    }
+    const dot = cfg.sheet.lastIndexOf('.')
+    const ext = dot === -1 ? '' : cfg.sheet.slice(dot).toLowerCase()
+    if (!ALLOWED_EXT.includes(ext)) {
+      errors.push(`${label}.${name}: sheet "${cfg.sheet}" 扩展名不在白名单 ${ALLOWED_EXT.join('/')}`)
+    }
+    if (!Number.isInteger(cfg.frames) || cfg.frames < 1) errors.push(`${label}.${name}: frames 必须是正整数`)
+    if (typeof cfg.fps !== 'number' || cfg.fps <= 0) errors.push(`${label}.${name}: fps 必须是正数`)
+    if (typeof cfg.loop !== 'boolean') errors.push(`${label}.${name}: loop 必须是布尔值`)
+    if (cfg.motion !== undefined) {
+      if (!MOTION_WHITELIST.includes(cfg.motion)) {
+        errors.push(`${label}.${name}: motion "${cfg.motion}" 不在白名单 ${MOTION_WHITELIST.join('/')}`)
+      }
+      if (cfg.frames !== 1 && !MOTION_MULTIFRAME_ALLOWED.has(name)) {
+        errors.push(`${label}.${name}: motion 配方要求 frames === 1（帧播放器与运动配方互斥；仅 ${[...MOTION_MULTIFRAME_ALLOWED].join('/')} 定向例外）`)
+      }
+    }
+    // PNG 多帧契约：宽度 = frames × 高度（横排、帧等宽同高）。
+    // 单姿势 256×256 图配 frames:2 → 256 ≠ 512 → 拒绝（帧播放器会把姿势劈成两半）。
+    if (cfg.frames > 1 && cfg.sheet.toLowerCase().endsWith('.png')) {
+      try {
+        const size = pngSize(file)
+        if (size !== null && size.w !== cfg.frames * size.h) {
+          errors.push(`${label}.${name}: frames ${cfg.frames} 要求 PNG 宽度 = ${cfg.frames} × 高度（当前 ${size.w}×${size.h}——单姿势图勿配 frames>1）`)
+        }
+      } catch {
+        // 文件不可读（statSync 已报错）：跳过尺寸校验
+      }
+    }
+  }
+}
+
 /** 校验 assets manifest。返回 { ok, errors }。 */
 export function check(root = ROOT) {
   const errors = []
@@ -40,51 +90,40 @@ export function check(root = ROOT) {
   } catch (error) {
     return { ok: false, errors: [`assets/manifest.json 无法解析：${error instanceof Error ? error.message : String(error)}`] }
   }
-  if (manifest.states === undefined || typeof manifest.states !== 'object' || Array.isArray(manifest.states)) {
-    return { ok: false, errors: ['assets/manifest.json 缺 states 对象'] }
+  if (manifest === null || typeof manifest !== 'object') {
+    return { ok: false, errors: ['assets/manifest.json 必须是对象'] }
   }
-  for (const [name, cfg] of Object.entries(manifest.states)) {
-    if (!(name in EMOJI)) {
-      errors.push(`manifest.states.${name}: 状态不在 client EMOJI 兜底表（新增状态须同步 client/logic.mjs）`)
+  // 角色索引优先（characters），旧格式 states 兼容（视为单角色，sheet 在平铺 assets/）。
+  const hasCharacters = manifest.characters !== undefined
+  if (hasCharacters) {
+    if (manifest.characters === null || typeof manifest.characters !== 'object' || Array.isArray(manifest.characters)) {
+      return { ok: false, errors: ['assets/manifest.json 的 characters 必须是对象'] }
     }
-    if (cfg === null || typeof cfg !== 'object' || typeof cfg.sheet !== 'string' || cfg.sheet === '') {
-      errors.push(`manifest.states.${name}: 缺 sheet 字段`)
-      continue
-    }
-    const file = join(root, 'assets', cfg.sheet)
-    try {
-      if (!statSync(file).isFile()) throw new Error('not a file')
-    } catch {
-      errors.push(`manifest.states.${name}: sheet "${cfg.sheet}" 文件不存在（期望 assets/${cfg.sheet}）`)
-    }
-    const dot = cfg.sheet.lastIndexOf('.')
-    const ext = dot === -1 ? '' : cfg.sheet.slice(dot).toLowerCase()
-    if (!ALLOWED_EXT.includes(ext)) {
-      errors.push(`manifest.states.${name}: sheet "${cfg.sheet}" 扩展名不在白名单 ${ALLOWED_EXT.join('/')}`)
-    }
-    if (!Number.isInteger(cfg.frames) || cfg.frames < 1) errors.push(`manifest.states.${name}: frames 必须是正整数`)
-    if (typeof cfg.fps !== 'number' || cfg.fps <= 0) errors.push(`manifest.states.${name}: fps 必须是正数`)
-    if (typeof cfg.loop !== 'boolean') errors.push(`manifest.states.${name}: loop 必须是布尔值`)
-    if (cfg.motion !== undefined) {
-      if (!MOTION_WHITELIST.includes(cfg.motion)) {
-        errors.push(`manifest.states.${name}: motion "${cfg.motion}" 不在白名单 ${MOTION_WHITELIST.join('/')}`)
+    for (const [roleId, ch] of Object.entries(manifest.characters)) {
+      if (!ROLE_ID_RE.test(roleId)) {
+        errors.push(`characters.${roleId}: 角色 id 只允许 [a-z0-9-]（URL 路径安全）`)
+        continue
       }
-      if (cfg.frames !== 1 && !MOTION_MULTIFRAME_ALLOWED.has(name)) {
-        errors.push(`manifest.states.${name}: motion 配方要求 frames === 1（帧播放器与运动配方互斥；仅 ${[...MOTION_MULTIFRAME_ALLOWED].join('/')} 定向例外）`)
+      if (ch === null || typeof ch !== 'object') {
+        errors.push(`characters.${roleId}: 角色定义必须是对象`)
+        continue
+      }
+      if (ch.states === null || typeof ch.states !== 'object' || Array.isArray(ch.states)) {
+        errors.push(`characters.${roleId}: 缺 states 对象`)
+        continue
+      }
+      checkStates(ch.states, roleId, errors, root)
+    }
+    if (manifest.default !== undefined) {
+      if (typeof manifest.default !== 'string' || !(manifest.default in manifest.characters)) {
+        errors.push(`default "${String(manifest.default)}" 必须指向 characters 中存在的角色`)
       }
     }
-    // PNG 多帧契约：宽度 = frames × 高度（横排、帧等宽同高）。
-    // 单姿势 256×256 图配 frames:2 → 256 ≠ 512 → 拒绝（帧播放器会把姿势劈成两半）。
-    if (cfg.frames > 1 && cfg.sheet.toLowerCase().endsWith('.png')) {
-      try {
-        const size = pngSize(file)
-        if (size !== null && size.w !== cfg.frames * size.h) {
-          errors.push(`manifest.states.${name}: frames ${cfg.frames} 要求 PNG 宽度 = ${cfg.frames} × 高度（当前 ${size.w}×${size.h}——单姿势图勿配 frames>1）`)
-        }
-      } catch {
-        // 文件不可读（statSync 已报错）：跳过尺寸校验
-      }
+  } else {
+    if (manifest.states === undefined || typeof manifest.states !== 'object' || Array.isArray(manifest.states)) {
+      return { ok: false, errors: ['assets/manifest.json 缺 states 对象（或 characters 角色索引）'] }
     }
+    checkStates(manifest.states, null, errors, root)
   }
   return { ok: errors.length === 0, errors }
 }

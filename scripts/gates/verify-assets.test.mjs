@@ -29,7 +29,7 @@ test('拒绝：manifest 引用不存在的 sheet（含状态名与路径）', ()
   const root = makeTree({ 'assets/manifest.json': GOOD })
   const { ok, errors } = check(root)
   assert.equal(ok, false)
-  assert.match(errors.join('\n'), /manifest\.states\.idle/)
+  assert.match(errors.join('\n'), /states\.idle/)
   assert.match(errors.join('\n'), /idle\.png/)
 })
 
@@ -126,4 +126,60 @@ test('拒绝：manifest 状态不在 client EMOJI 兜底表', () => {
   const { ok, errors } = check(root)
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /状态不在 client EMOJI 兜底表/)
+})
+
+test('接受：角色索引（characters + default）且 sheet 在角色目录', () => {
+  const good = {
+    characters: {
+      'whale-girl': { meta: { stageSize: 110 }, states: { idle: { sheet: 'idle.png', frames: 4, fps: 4, loop: true } } },
+      cat: { states: { walk: { sheet: 'walk.png', frames: 3, fps: 6, loop: true } } },
+    },
+    default: 'whale-girl',
+  }
+  const root = makeTree({
+    'assets/manifest.json': good,
+    'assets/characters/whale-girl/idle.png': fakePng(512, 128),
+    'assets/characters/cat/walk.png': fakePng(384, 128),
+  })
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
+})
+
+test('拒绝：角色 sheet 文件缺失（期望在 characters/<id>/ 下）', () => {
+  const bad = {
+    characters: { 'whale-girl': { states: { idle: { sheet: 'idle.png', frames: 4, fps: 4, loop: true } } } },
+    default: 'whale-girl',
+  }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/idle.png': 'x' }) // 平铺不算数
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /文件不存在.*characters\/whale-girl\/idle\.png/)
+})
+
+test('拒绝：角色 id 非法（URL 注入面）', () => {
+  const bad = {
+    characters: { 'a/b': { states: { idle: { sheet: 'idle.png', frames: 1, fps: 4, loop: true } } } },
+    default: 'a/b',
+  }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/characters/a/b/idle.png': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /角色 id 只允许/)
+})
+
+test('拒绝：default 指向不存在的角色', () => {
+  const bad = {
+    characters: { 'whale-girl': { states: { idle: { sheet: 'idle.png', frames: 1, fps: 4, loop: true } } } },
+    default: 'nope',
+  }
+  const root = makeTree({ 'assets/manifest.json': bad, 'assets/characters/whale-girl/idle.png': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /default .* 必须指向/)
+})
+
+test('接受：旧格式顶层 states（sheet 平铺 assets/）兼容', () => {
+  const root = makeTree({ 'assets/manifest.json': GOOD, 'assets/idle.png': 'x' })
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
 })
