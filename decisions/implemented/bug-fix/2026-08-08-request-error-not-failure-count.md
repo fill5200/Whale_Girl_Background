@@ -10,7 +10,7 @@ v2 里 `agent/request-error` 事件同时做两件事：触发 error/disappointe
 
 - `agent/request-error` 只设置 `errorUntil`/`disappointedUntil` 情绪窗口，**不再** `recordFailure`/`scheduleSave`。
 - 「任务失败」计数（`stats.failures` + 回忆）只认 `deriveActivity` 的任务状态翻转（running→failed）——语义与「失败的任务数」一致。
-- 请求错误仍触发 error(4s)→disappointed(12s) 情绪（宠物对 API 抖动有反应），只是不计资历。
+- 请求错误仍触发 error(4s)→disappointed(6s) 情绪（宠物对 API 抖动有反应，总负面 10s，与任务失败同窗），只是不计资历。
 
 ## Alternatives considered
 
