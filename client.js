@@ -287,18 +287,24 @@
     const metaNote = status.querySelector(".pet-note");
     const menu = document.createElement("div");
     menu.className = "pet-menu";
+    menu.style.cssText = "display:none; position:absolute; left:50%; top:calc(100% + 12px); transform:translateX(-50%); width:max-content; gap:6px; padding:6px; border-radius:8px; background:rgba(20,20,28,.72); z-index:4;";
+    const BTN_STYLE = "flex:1; border:0; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; background:rgba(255,255,255,.14); color:#fff; font-family:system-ui,sans-serif;";
     const feedBtn = document.createElement("button");
     feedBtn.textContent = "\u{1F357} \u5582\u98DF";
+    feedBtn.style.cssText = BTN_STYLE;
     const playBtn = document.createElement("button");
     playBtn.textContent = "\u{1F3BE} \u73A9\u800D";
+    playBtn.style.cssText = BTN_STYLE;
     const roleBtn = document.createElement("button");
     roleBtn.textContent = "\u{1F3AD} \u6362\u89D2\u8272";
+    roleBtn.style.cssText = BTN_STYLE;
     menu.append(feedBtn, playBtn, roleBtn);
     const effects = document.createElement("div");
     effects.className = "pet-effects";
     const hitarea = document.createElement("div");
     hitarea.className = "pet-hitarea";
-    host.append(effects, stage, hitarea, status, menu);
+    effects.appendChild(status);
+    host.append(effects, stage, hitarea, menu);
     const setStatusVisible = (visible) => {
       status.style.opacity = visible ? "1" : "0";
       status.style.visibility = visible ? "visible" : "hidden";

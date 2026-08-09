@@ -183,12 +183,18 @@ export function apply(ctx = {}) {
 
   const menu = document.createElement('div')
   menu.className = 'pet-menu'
+  // 菜单容器/按钮关键样式内联（同状态卡：宿主环境可能覆盖 CSS 注入，内联保证生效）。
+  menu.style.cssText = 'display:none; position:absolute; left:50%; top:calc(100% + 12px); transform:translateX(-50%); width:max-content; gap:6px; padding:6px; border-radius:8px; background:rgba(20,20,28,.72); z-index:4;'
+  const BTN_STYLE = 'flex:1; border:0; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; background:rgba(255,255,255,.14); color:#fff; font-family:system-ui,sans-serif;'
   const feedBtn = document.createElement('button')
   feedBtn.textContent = '🍗 喂食'
+  feedBtn.style.cssText = BTN_STYLE
   const playBtn = document.createElement('button')
   playBtn.textContent = '🎾 玩耍'
+  playBtn.style.cssText = BTN_STYLE
   const roleBtn = document.createElement('button')
   roleBtn.textContent = '🎭 换角色'
+  roleBtn.style.cssText = BTN_STYLE
   menu.append(feedBtn, playBtn, roleBtn)
 
   // 特效层：爱心/气泡的独立容器（覆盖在舞台上方，不参与舞台内容切换——
@@ -199,7 +205,10 @@ export function apply(ctx = {}) {
   // 拖拽/点击热区 = 角色实际轮廓，四周透明边缘不可点。
   const hitarea = document.createElement('div')
   hitarea.className = 'pet-hitarea'
-  host.append(effects, stage, hitarea, status, menu)
+  // 状态卡放入 effects 层：effects 与 stage 同尺寸同位置（host 内 0,0,110,110），
+  // 状态卡 top:calc(100%+18px) 相对 effects = 角色下方 18px，与角色视觉对齐（不遮挡）。
+  effects.appendChild(status)
+  host.append(effects, stage, hitarea, menu)
 
   // ---- 状态卡布局（视口感知：左右对齐，hover 显示时调用）----
   // status 绝对定位锚定宠物下方（始终不覆盖角色）；宠物贴左右缘 → 边缘对齐防横向溢出。
