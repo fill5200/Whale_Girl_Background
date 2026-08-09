@@ -91,6 +91,9 @@
       defaultId: DEFAULT_ROLE_ID
     };
   }
+  function listCharacters(manifest) {
+    return Object.keys(parseCharacters(manifest).characters);
+  }
   function getCharacter(manifest, id) {
     return parseCharacters(manifest).characters[id] ?? null;
   }
@@ -249,7 +252,9 @@
     feedBtn.textContent = "\u{1F357} \u5582\u98DF";
     const playBtn = document.createElement("button");
     playBtn.textContent = "\u{1F3BE} \u73A9\u800D";
-    menu.append(feedBtn, playBtn);
+    const roleBtn = document.createElement("button");
+    roleBtn.textContent = "\u{1F3AD} \u6362\u89D2\u8272";
+    menu.append(feedBtn, playBtn, roleBtn);
     const effects = document.createElement("div");
     effects.className = "pet-effects";
     host.append(effects, stage, status, menu);
@@ -405,6 +410,41 @@
         characterId = nextId;
         character = getCharacter(manifest, nextId) ?? { id: nextId, states: {} };
         await Promise.all(Object.entries(character.states).map(([n, cfg2]) => preload(n, cfg2)));
+      } catch {
+      }
+    };
+    const switchCharacter = async (id) => {
+      const target = getCharacter(manifest, id);
+      if (target === null || id === characterId) return;
+      try {
+        const nextLoaded = /* @__PURE__ */ new Set();
+        const nextSize = /* @__PURE__ */ new Map();
+        await Promise.all(Object.entries(target.states).map(([n, cfg2]) => new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            nextSize.set(`${id}:${cfg2.sheet}`, { w: img.naturalWidth, h: img.naturalHeight });
+            nextLoaded.add(`${id}:${cfg2.sheet}`);
+            resolve();
+          };
+          img.onerror = resolve;
+          img.src = `${ASSETS_URL}/characters/${id}/${cfg2.sheet}`;
+        })));
+        characterId = id;
+        character = target;
+        loaded.clear();
+        sheetSize.clear();
+        for (const k of nextLoaded) loaded.add(k);
+        for (const [k, v] of nextSize) sheetSize.set(k, v);
+        try {
+          localStorage.setItem("dsh-pet:character", id);
+        } catch {
+        }
+        transient = null;
+        transientUntil = 0;
+        joyUntil = 0;
+        animState = null;
+        frame = 0;
+        lastFrameAt = 0;
       } catch {
       }
     };
@@ -680,6 +720,14 @@
     document.addEventListener("keydown", onKeyDown);
     feedBtn.addEventListener("click", () => interact("feed"));
     playBtn.addEventListener("click", () => interact("play"));
+    roleBtn.addEventListener("click", () => {
+      const roles = listCharacters(manifest);
+      if (roles.length < 2) return;
+      const idx = roles.indexOf(characterId);
+      const next = roles[(idx + 1) % roles.length];
+      switchCharacter(next);
+      toggleMenu(false);
+    });
     const onPetSay = (e) => {
       if (e.detail && typeof e.detail.text === "string" && e.detail.text.length > 0) showReply(e.detail.text);
     };

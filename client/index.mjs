@@ -11,7 +11,7 @@
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
 import { EMOJI, TRANSIENT_MS, WAKE_MS, JOY_MS, pickState, deriveSessionMood } from './logic.mjs'
-import { parseCharacters, getCharacter, stateOf } from './character.mjs'
+import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
@@ -168,7 +168,9 @@ export function apply(ctx = {}) {
   feedBtn.textContent = '🍗 喂食'
   const playBtn = document.createElement('button')
   playBtn.textContent = '🎾 玩耍'
-  menu.append(feedBtn, playBtn)
+  const roleBtn = document.createElement('button')
+  roleBtn.textContent = '🎭 换角色'
+  menu.append(feedBtn, playBtn, roleBtn)
 
   // 特效层：爱心/气泡的独立容器（覆盖在舞台上方，不参与舞台内容切换——
   // stage 的 replaceChildren/textContent 不会清掉正在播放的特效）。
@@ -359,6 +361,43 @@ export function apply(ctx = {}) {
       await Promise.all(Object.entries(character.states).map(([n, cfg]) => preload(n, cfg)))
     } catch {
       // manifest 不可用 → 全 emoji 兜底
+    }
+  }
+
+  // 换角色：预加载目标角色全部 sheet → 原子替换（清旧缓存、换 id、复位状态）。
+  // 缺 sheet 状态走 emoji 兜底（现有降级机制）；失败时保留当前角色。
+  const switchCharacter = async (id) => {
+    const target = getCharacter(manifest, id)
+    if (target === null || id === characterId) return
+    try {
+      const nextLoaded = new Set()
+      const nextSize = new Map()
+      await Promise.all(Object.entries(target.states).map(([n, cfg]) => new Promise((resolve) => {
+        const img = new Image()
+        img.onload = () => {
+          nextSize.set(`${id}:${cfg.sheet}`, { w: img.naturalWidth, h: img.naturalHeight })
+          nextLoaded.add(`${id}:${cfg.sheet}`)
+          resolve()
+        }
+        img.onerror = resolve
+        img.src = `${ASSETS_URL}/characters/${id}/${cfg.sheet}`
+      })))
+      // 原子替换
+      characterId = id
+      character = target
+      loaded.clear()
+      sheetSize.clear()
+      for (const k of nextLoaded) loaded.add(k)
+      for (const [k, v] of nextSize) sheetSize.set(k, v)
+      try { localStorage.setItem('dsh-pet:character', id) } catch { /* 隐私模式忽略 */ }
+      transient = null
+      transientUntil = 0
+      joyUntil = 0
+      animState = null // 强制重选状态（下一帧 setState 生效）
+      frame = 0
+      lastFrameAt = 0
+    } catch {
+      // 预加载失败：保留当前角色
     }
   }
 
@@ -679,6 +718,15 @@ export function apply(ctx = {}) {
   document.addEventListener('keydown', onKeyDown)
   feedBtn.addEventListener('click', () => interact('feed'))
   playBtn.addEventListener('click', () => interact('play'))
+  roleBtn.addEventListener('click', () => {
+    // 循环切换：当前角色 → 清单中下一个（manifest 已加载时；单角色无操作）。
+    const roles = listCharacters(manifest)
+    if (roles.length < 2) return
+    const idx = roles.indexOf(characterId)
+    const next = roles[(idx + 1) % roles.length]
+    switchCharacter(next)
+    toggleMenu(false)
+  })
 
   // ---- 开放契约（CustomEvent，第三方插件自建缝驱动显示层）----
   // 文档化事件（detail 见 docs/architecture-evolution.md 开放性节）：
