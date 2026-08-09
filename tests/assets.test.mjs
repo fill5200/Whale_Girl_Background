@@ -19,6 +19,11 @@ test('前缀不匹配 / 空路径 / 点段拒绝', () => {
   assert.equal(sanitizeAssetPath('/plugins/vlln/dsh-pet/assets/./x.png'), null)
 })
 
+test('空字节与 Windows 反斜杠段拒绝（注入面）', () => {
+  assert.equal(sanitizeAssetPath('/plugins/vlln/dsh-pet/assets/idle.png\u0000.jpg'), null)
+  assert.equal(sanitizeAssetPath('/plugins/vlln/dsh-pet/assets/a\\b.png'), null)
+})
+
 test('MIME 映射与未知扩展兜底', () => {
   assert.equal(contentTypeFor('idle.png'), 'image/png')
   assert.equal(contentTypeFor('idle.svg'), 'image/svg+xml')
