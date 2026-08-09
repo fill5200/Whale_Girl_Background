@@ -19,23 +19,22 @@ import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs
 import { applyAction, isCrossOrigin } from './src/interact.mjs'
 import { normalizeState, serializeState } from './src/persistence.mjs'
 import { createSignals } from './src/signals.mjs'
+import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 
 export const name = 'dsh-pet'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
 
 export const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 export const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
+export const CONFIG_PATH = '/plugins/vlln/dsh-pet/config'
 
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
 
-/** 瞬发窗口：错误惊吓 4s → 失落尾 6s（总负面 10s，任务失败与请求错误统一）；欢迎 6s；庆祝 6s。 */
-const ERROR_MS = 4000
-const DISAPPOINTED_MS = 6000
-const WELCOME_MS = 6000
-// 庆祝窗口与 deriveActivity 的 BURST_MS 同长：事件路径（onTaskDone）与轮询路径
-// （翻转检测）产出同一视觉窗口，两源取 max 不叠加延长。
-const CELEBRATE_MS = 6000
+// 瞬发窗口时长现由配置（L1 体验层）提供：errorMs/disappointedMs/welcomeMs/celebrateMs，
+// 见 src/config.mjs 的 DEFAULTS。消费处统一读 configRef，不再用模块级常量（防双源漂移）。
+// 默认值：error 4s → disappointed 6s（总负面 10s，任务失败与请求错误统一）；欢迎 6s；庆祝 6s
+// （与 deriveActivity 的 BURST_MS 同长：事件路径与轮询路径取 max 不叠加延长）。
 
 /** 状态文件：<dshHome>/data/dsh-pet/state.json（不放插件目录——uninstall 会删）。 */
 const DSH_HOME = process.env.DSH_HOME ?? resolve(import.meta.dirname, '../../..')
@@ -99,6 +98,26 @@ async function readBody(req, limit = BODY_LIMIT) {
 
 export function apply(ctx) {
   let state = loadState() ?? { ...INITIAL_STATE, updatedAt: Date.now() }
+  // 配置（L1 体验层）：settings 服务条件接入——web 组合有 provider，CLI/headless
+  // 可能缺失；缺失时回退 DEFAULTS（插件照常跑，只是无用户配置面）。
+  // configRef 是消费端唯一读取面（Node half 的窗口时长等）；configRevision 随
+  // /state 下发，客户端以此门控「配置变化才重应用」。
+  let configRef = { ...DEFAULTS }
+  let configRevision = 0
+  const settings = typeof ctx.get === 'function' ? ctx.get('settings') : undefined
+  const applyConfig = (next) => {
+    configRef = next
+    configRevision += 1
+  }
+  if (settings !== undefined && typeof settings.register === 'function') {
+    try {
+      const scope = settings.register(NAMESPACE, buildSchema(), { applies: 'live', validate: validateConfig })
+      applyConfig(scope.get())
+      scope.watch((next) => applyConfig(next))
+    } catch {
+      // register 失败（如重复注册）→ 保持 DEFAULTS
+    }
+  }
   // 落盘防抖：事件记账时触发（任务完成/失败/会话/活跃时长）。
   let saveTimer = null
   const scheduleSave = () => {
@@ -125,7 +144,7 @@ export function apply(ctx) {
   const activity = () => {
     const now = Date.now()
     const tasks = collectTasks(ctx)
-    const derived = deriveActivity({ tasks, nowMs: now, known, wasWorking, errorMs: ERROR_MS })
+    const derived = deriveActivity({ tasks, nowMs: now, known, wasWorking, errorMs: configRef.errorMs })
     wasWorking = derived.wasWorking
     // 账本记账（+XP/失败计数/回忆）已迁入 ctx.tasks.onTaskDone 事件驱动——
     // 页面关闭/轮询缺席时任务终态不漏记；此处只保留展示（working/burst）与活跃时长。
@@ -138,7 +157,7 @@ export function apply(ctx) {
     // 窗口取 max：同一窗口内多次失败/错误只延长不缩短（越挫越勇不因并发被吞）。
     if (derived.burst?.name === 'error') {
       errorUntil = Math.max(errorUntil, derived.burst.until)
-      disappointedUntil = Math.max(disappointedUntil, derived.burst.until + DISAPPOINTED_MS)
+      disappointedUntil = Math.max(disappointedUntil, derived.burst.until + configRef.disappointedMs)
     }
     // burst 级联：welcome > error > disappointed > celebrate > working > idle。
     // welcome 不打断进行中的 error/disappointed 尾段（失败失落不该被新会话欢迎盖掉）。
@@ -187,7 +206,7 @@ export function apply(ctx) {
           // F3：账本与庆祝同源——记账即开庆祝窗口。页面关闭期间完成任务（轮询缺席、
           // deriveActivity 看不到翻转）时，重开后首次轮询仍能看到本窗口，同样庆祝；
           // 与轮询翻转的 celebrate 取 max 不叠加（CELEBRATE_MS 同 BURST_MS）。
-          celebrateUntil = Math.max(celebrateUntil, now + CELEBRATE_MS)
+          celebrateUntil = Math.max(celebrateUntil, now + configRef.celebrateMs)
           scheduleSave()
           emitSignal('celebrate', { label: snapshot.label ?? '未命名任务', level: state.level })
           if (result.leveledUp) emitSignal('levelUp', { level: state.level })
@@ -203,8 +222,8 @@ export function apply(ctx) {
         // 避免一次坏任务多次请求错误刷出「越挫越勇」称号、回忆里出现虚假的「任务失败」。
         // 窗口与任务失败统一：error(ERROR_MS) → disappointed(尾段)。
         const now = Date.now()
-        errorUntil = Math.max(errorUntil, now + ERROR_MS)
-        disappointedUntil = Math.max(disappointedUntil, now + ERROR_MS + DISAPPOINTED_MS)
+        errorUntil = Math.max(errorUntil, now + configRef.errorMs)
+        disappointedUntil = Math.max(disappointedUntil, now + configRef.errorMs + configRef.disappointedMs)
       }),
       ctx.on('agent/session-start', (payload) => {
         const now = Date.now()
@@ -212,7 +231,7 @@ export function apply(ctx) {
         // 新会话 +5 + 计数 + welcome；续接 +2 不计数不 welcome（避免切换即欢迎的噪音）。
         if (payload.source === 'startup') {
           state = recordSession(state, now).state
-          welcomeUntil = now + WELCOME_MS
+          welcomeUntil = now + configRef.welcomeMs
           emitSignal('session', { kind: 'new', level: state.level })
         } else {
           state = recordSessionResume(state, now).state
@@ -285,7 +304,24 @@ export function apply(ctx) {
             // 轮询端点：禁缓存，防止启发式缓存读到冻结状态。
             // 先跑 activity()（有记账副作用），再读 state——响应里的 pet 才是记账后的值。
             const act = activity()
-            json(res, 200, { pet: state, activity: act }, { 'cache-control': 'no-store' })
+            json(res, 200, { pet: state, activity: act, configRevision }, { 'cache-control': 'no-store' })
+          } catch (error) {
+            json(res, 500, { error: error instanceof Error ? error.message : String(error) })
+          }
+        },
+      }),
+      ctx.httpServer.register({
+        kind: 'exact',
+        path: CONFIG_PATH,
+        handler: async (req, res) => {
+          try {
+            if (req.method !== 'GET') {
+              json(res, 405, { error: 'method not allowed; use GET' }, { allow: 'GET' })
+              return
+            }
+            // 只读配置端点：返回解析后的体验层配置（客户端按 configRevision 拉取）。
+            // 写路径只有用户设置（settings 服务/文件）——插件不自建写面。
+            json(res, 200, { config: configRef, revision: configRevision }, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
           }

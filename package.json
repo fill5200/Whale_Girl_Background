@@ -12,6 +12,7 @@
     "check:client": "node scripts/build-client.mjs --check"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "schemastery": "^3.5.0"
   }
 }

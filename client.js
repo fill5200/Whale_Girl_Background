@@ -55,25 +55,29 @@
   // client/index.mjs
   var STATE_PATH = "/plugins/vlln/dsh-pet/state";
   var INTERACT_PATH = "/plugins/vlln/dsh-pet/interact";
+  var CONFIG_PATH = "/plugins/vlln/dsh-pet/config";
   var ASSETS_URL = "/plugins/vlln/dsh-pet/assets";
   var MANIFEST_URL = `${ASSETS_URL}/manifest.json`;
-  var POLL_MS = 3e3;
+  var CFG_DEFAULTS = {
+    size: 110,
+    opacity: 1,
+    walk: { enabled: true, minWaitMs: 18e3, maxWaitMs: 4e4, minMs: 3e3, maxMs: 6e3, speedPxPerSec: 45 },
+    sleepAfterMs: 6e4,
+    pollMs: 3e3,
+    idlePauseMs: 3500,
+    bubbleMs: 2500
+  };
+  var cfg = { ...CFG_DEFAULTS };
   var TICK_MS = 50;
-  var SLEEP_AFTER_MS = 6e4;
-  var SPRITE_MAX = 110;
-  var WANDER_MIN_WAIT_MS = 18e3;
-  var WANDER_MAX_WAIT_MS = 4e4;
-  var WALK_MIN_MS = 3e3;
-  var WALK_MAX_MS = 6e3;
-  var WALK_SPEED_PX_S = 45;
-  var IDLE_PAUSE_MS = 3500;
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  width: 110px; height: 110px; font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
-[data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
-  font-size: 44px; line-height: 1; text-align: center;
+  width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none;
+  opacity: var(--pet-opacity, 1); }
+[data-dsh-pet] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
+  font-size: calc(var(--pet-size, 110px) * 0.4); line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
-[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: 110px; height: 110px;
+[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
@@ -278,17 +282,17 @@
       emoji.textContent = EMOJI[name] ?? "\u{1F423}";
       stage.replaceChildren(emoji);
     };
-    const showSprite = (name, cfg) => {
-      const size = sheetSize.get(cfg.sheet);
+    const showSprite = (name, cfg2) => {
+      const size = sheetSize.get(cfg2.sheet);
       if (!size || size.w <= 0 || size.h <= 0) {
         showEmoji(name);
         return;
       }
       stage.replaceChildren(sprite);
-      const frameW = size.w / cfg.frames;
-      const scale = Math.min(SPRITE_MAX / frameW, SPRITE_MAX / size.h, 1);
+      const frameW = size.w / cfg2.frames;
+      const scale = Math.min(cfg2.size / frameW, cfg2.size / size.h, 1);
       sprite.className = "pet-sprite ready";
-      sprite.style.backgroundImage = `url("${ASSETS_URL}/${cfg.sheet}")`;
+      sprite.style.backgroundImage = `url("${ASSETS_URL}/${cfg2.sheet}")`;
       sprite.style.backgroundSize = `${size.w}px ${size.h}px`;
       sprite.style.width = `${frameW}px`;
       sprite.style.height = `${size.h}px`;
@@ -308,9 +312,9 @@
       for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
       const motion = manifest.states[name]?.motion;
       if (motion) stage.classList.add(`pet-motion-${motion}`);
-      const cfg = manifest.states[name];
-      if (cfg && loaded.has(cfg.sheet)) {
-        showSprite(name, cfg);
+      const cfg2 = manifest.states[name];
+      if (cfg2 && loaded.has(cfg2.sheet)) {
+        showSprite(name, cfg2);
         showingSprite = true;
       } else {
         showEmoji(name);
@@ -321,15 +325,15 @@
         stage.style.opacity = "1";
       }));
     };
-    const preload = (name, cfg) => new Promise((resolve) => {
+    const preload = (name, cfg2) => new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        sheetSize.set(cfg.sheet, { w: img.naturalWidth, h: img.naturalHeight });
-        loaded.add(cfg.sheet);
+        sheetSize.set(cfg2.sheet, { w: img.naturalWidth, h: img.naturalHeight });
+        loaded.add(cfg2.sheet);
         resolve();
       };
       img.onerror = resolve;
-      img.src = `${ASSETS_URL}/${cfg.sheet}`;
+      img.src = `${ASSETS_URL}/${cfg2.sheet}`;
     });
     const loadAssets = async () => {
       try {
@@ -338,7 +342,7 @@
         const next = await res.json();
         if (next === null || typeof next !== "object" || next.states === null || typeof next.states !== "object" || Array.isArray(next.states)) return;
         manifest = next;
-        await Promise.all(Object.entries(manifest.states).map(([n, cfg]) => preload(n, cfg)));
+        await Promise.all(Object.entries(manifest.states).map(([n, cfg2]) => preload(n, cfg2)));
       } catch {
       }
     };
@@ -356,17 +360,17 @@
       const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting });
       setState(target);
       const states = manifest.states;
-      const cfg = states === void 0 || states === null ? void 0 : states[animState];
-      if (cfg && loaded.has(cfg.sheet)) {
-        const size = sheetSize.get(cfg.sheet);
-        const frameW = size.w / cfg.frames;
+      const cfg2 = states === void 0 || states === null ? void 0 : states[animState];
+      if (cfg2 && loaded.has(cfg2.sheet)) {
+        const size = sheetSize.get(cfg2.sheet);
+        const frameW = size.w / cfg2.frames;
         if (!showingSprite) {
-          showSprite(animState, cfg);
+          showSprite(animState, cfg2);
           showingSprite = true;
           frame = 0;
           lastFrameAt = 0;
         }
-        if (cfg.frames > 1 && now - lastFrameAt >= 1e3 / cfg.fps) {
+        if (cfg2.frames > 1 && now - lastFrameAt >= 1e3 / cfg2.fps) {
           if (animState === "idle" && idlePausedUntil > now) return;
           if (animState === "idle" && idlePausedUntil !== 0 && now >= idlePausedUntil) {
             frame = 0;
@@ -378,16 +382,16 @@
           }
           lastFrameAt = now;
           frame += frameDirection;
-          if ((animState === "idle" || animState === "walk") && cfg.loop && cfg.frames > 1) {
-            if (frame >= cfg.frames - 1 || frame <= 0) frameDirection *= -1;
-            frame = Math.max(0, Math.min(cfg.frames - 1, frame));
+          if ((animState === "idle" || animState === "walk") && cfg2.loop && cfg2.frames > 1) {
+            if (frame >= cfg2.frames - 1 || frame <= 0) frameDirection *= -1;
+            frame = Math.max(0, Math.min(cfg2.frames - 1, frame));
             if (animState === "idle" && frame === 0 && frameDirection === 1) {
-              idlePausedUntil = now + IDLE_PAUSE_MS;
+              idlePausedUntil = now + cfg2.idlePauseMs;
             }
-          } else if (frame >= cfg.frames) {
-            if (cfg.loop) frame = 0;
+          } else if (frame >= cfg2.frames) {
+            if (cfg2.loop) frame = 0;
             else {
-              frame = cfg.frames - 1;
+              frame = cfg2.frames - 1;
               if (transient !== null && transient !== "wake") {
                 resetTransient(now);
               }
@@ -454,6 +458,32 @@
     };
     let refreshing = false;
     let failStreak = 0;
+    let lastConfigRevision = 0;
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(CONFIG_PATH);
+        if (!res.ok) return null;
+        const body = await res.json();
+        return body !== null && typeof body === "object" ? body.config : null;
+      } catch {
+        return null;
+      }
+    };
+    const applyClientConfig = (config) => {
+      if (config === null || typeof config !== "object") return;
+      cfg = { ...CFG_DEFAULTS, ...config };
+      if (typeof config.size === "number") {
+        host.style.setProperty("--pet-size", `${config.size}px`);
+        if (host.style.left) {
+          const x = Math.max(0, Math.min(parseFloat(host.style.left) || 0, window.innerWidth - host.offsetWidth));
+          const y = Math.max(0, Math.min(parseFloat(host.style.top) || 0, window.innerHeight - host.offsetHeight));
+          host.style.left = `${x}px`;
+          host.style.top = `${y}px`;
+        }
+      }
+      if (typeof config.opacity === "number") host.style.setProperty("--pet-opacity", String(config.opacity));
+      scheduleWander();
+    };
     const refresh = async () => {
       if (refreshing) return;
       refreshing = true;
@@ -469,7 +499,12 @@
           activity = act;
         }
         if (activity.name !== "idle" || activity.until > Date.now()) lastActiveAt = Date.now();
-        sleeping = activity.name === "idle" && Date.now() - lastActiveAt > SLEEP_AFTER_MS;
+        sleeping = activity.name === "idle" && Date.now() - lastActiveAt > cfg.sleepAfterMs;
+        if (typeof body?.configRevision === "number" && body.configRevision !== lastConfigRevision) {
+          lastConfigRevision = body.configRevision;
+          const config = await fetchConfig();
+          if (config !== null) applyClientConfig(config);
+        }
         if (wasSleeping && !sleeping && transient === null && !["welcome", "celebrate", "error", "disappointed", "working"].includes(activity.name)) {
           transient = "wake";
           transientUntil = Date.now() + WAKE_MS;
@@ -612,7 +647,8 @@
     };
     const scheduleWander = () => {
       clearTimeout(wanderTimer);
-      const wait = WANDER_MIN_WAIT_MS + Math.random() * (WANDER_MAX_WAIT_MS - WANDER_MIN_WAIT_MS);
+      if (!cfg.walk.enabled) return;
+      const wait = cfg.walk.minWaitMs + Math.random() * (cfg.walk.maxWaitMs - cfg.walk.minWaitMs);
       wanderTimer = setTimeout(() => {
         if (sleeping || sessionMood.thinking || sessionMood.waiting) {
           scheduleWander();
@@ -627,7 +663,7 @@
       flip = walkDir;
       const walkCfg = manifest.states.walk;
       if (animState === "walk" && walkCfg && loaded.has(walkCfg.sheet)) showSprite("walk", walkCfg);
-      const duration = WALK_MIN_MS + Math.random() * (WALK_MAX_MS - WALK_MIN_MS);
+      const duration = cfg.walk.minMs + Math.random() * (cfg.walk.maxMs - cfg.walk.minMs);
       const start = performance.now();
       const maxX = Math.max(0, window.innerWidth - host.offsetWidth);
       const maxY = Math.max(0, window.innerHeight - host.offsetHeight);
@@ -641,7 +677,7 @@
           stopWalk();
           return;
         }
-        const x = startLeft + walkDir * WALK_SPEED_PX_S * ((t - start) / 1e3);
+        const x = startLeft + walkDir * cfg.walk.speedPxPerSec * ((t - start) / 1e3);
         if (x <= 0 || x >= maxX || t - start >= duration) {
           host.style.left = `${Math.min(maxX, Math.max(0, x))}px`;
           host.style.top = `${startTop}px`;
@@ -656,7 +692,7 @@
     };
     loadAssets();
     refresh();
-    const timer = setInterval(refresh, POLL_MS);
+    const timer = setInterval(refresh, cfg.pollMs);
     const animTimer = setInterval(tick, TICK_MS);
     scheduleWander();
     const sessions = ctx.sessions ?? (typeof ctx.get === "function" ? ctx.get("sessions") : void 0);

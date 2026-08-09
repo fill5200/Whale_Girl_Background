@@ -14,27 +14,29 @@ import { EMOJI, TRANSIENT_MS, WAKE_MS, JOY_MS, pickState, deriveSessionMood } fr
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
+const CONFIG_PATH = '/plugins/vlln/dsh-pet/config'
 const ASSETS_URL = '/plugins/vlln/dsh-pet/assets'
 const MANIFEST_URL = `${ASSETS_URL}/manifest.json`
-const POLL_MS = 3000
+// 客户端运行参数：默认值与 Node half 的 src/config.mjs DEFAULTS 一致（单一来源——
+// 消费端不写第二份默认值，见 verify-config-sync 门禁）。/state 的 configRevision
+// 变化时拉取新值（applyClientConfig），未配置时用默认值。
+const CFG_DEFAULTS = {
+  size: 110, opacity: 1,
+  walk: { enabled: true, minWaitMs: 18000, maxWaitMs: 40000, minMs: 3000, maxMs: 6000, speedPxPerSec: 45 },
+  sleepAfterMs: 60000, pollMs: 3000, idlePauseMs: 3500, bubbleMs: 2500,
+}
+let cfg = { ...CFG_DEFAULTS }
 const TICK_MS = 50
-const SLEEP_AFTER_MS = 60000
-const SPRITE_MAX = 110
-// 游走行为：每 18~40s 沿视口底部散步 3~6s，速度 45px/s。
-const WANDER_MIN_WAIT_MS = 18000
-const WANDER_MAX_WAIT_MS = 40000
-const WALK_MIN_MS = 3000
-const WALK_MAX_MS = 6000
-const WALK_SPEED_PX_S = 45
-const IDLE_PAUSE_MS = 3500
 
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  width: 110px; height: 110px; font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
-[data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
-  font-size: 44px; line-height: 1; text-align: center;
+  width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none;
+  opacity: var(--pet-opacity, 1); }
+[data-dsh-pet] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
+  font-size: calc(var(--pet-size, 110px) * 0.4); line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
-[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: 110px; height: 110px;
+[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
@@ -276,7 +278,7 @@ export function apply(ctx = {}) {
     // 清掉前一状态的 emoji/sprite，确保 eat/play 不会在状态结束后残留。
     stage.replaceChildren(sprite)
     const frameW = size.w / cfg.frames
-    const scale = Math.min(SPRITE_MAX / frameW, SPRITE_MAX / size.h, 1)
+    const scale = Math.min(cfg.size / frameW, cfg.size / size.h, 1)
     sprite.className = 'pet-sprite ready'
     sprite.style.backgroundImage = `url("${ASSETS_URL}/${cfg.sheet}")`
     sprite.style.backgroundSize = `${size.w}px ${size.h}px`
@@ -388,7 +390,7 @@ export function apply(ctx = {}) {
           if (frame >= cfg.frames - 1 || frame <= 0) frameDirection *= -1
           frame = Math.max(0, Math.min(cfg.frames - 1, frame))
           if (animState === 'idle' && frame === 0 && frameDirection === 1) {
-            idlePausedUntil = now + IDLE_PAUSE_MS
+            idlePausedUntil = now + cfg.idlePauseMs
           }
         } else if (frame >= cfg.frames) {
           if (cfg.loop) frame = 0
@@ -475,6 +477,35 @@ export function apply(ctx = {}) {
   let refreshing = false
   // 离线指示：连续失败 ≥3 次后状态条显示离线标记，成功即清除。
   let failStreak = 0
+  // 配置热更新：configRevision 门控（变化才拉取/重应用，避免每 3s 重置游走计时器）。
+  let lastConfigRevision = 0
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch(CONFIG_PATH)
+      if (!res.ok) return null
+      const body = await res.json()
+      return (body !== null && typeof body === 'object') ? body.config : null
+    } catch {
+      return null // 瞬态错误：保持当前配置，下轮重试
+    }
+  }
+  // 应用客户端配置：尺寸/透明度走 CSS 变量；游走/睡眠/轮询参数更新 cfg（下次行为生效）。
+  const applyClientConfig = (config) => {
+    if (config === null || typeof config !== 'object') return
+    cfg = { ...CFG_DEFAULTS, ...config }
+    if (typeof config.size === 'number') {
+      host.style.setProperty('--pet-size', `${config.size}px`)
+      // 布局尺寸变化后重新 clamp 位置（防止变大后被推出边缘）。
+      if (host.style.left) {
+        const x = Math.max(0, Math.min(parseFloat(host.style.left) || 0, window.innerWidth - host.offsetWidth))
+        const y = Math.max(0, Math.min(parseFloat(host.style.top) || 0, window.innerHeight - host.offsetHeight))
+        host.style.left = `${x}px`
+        host.style.top = `${y}px`
+      }
+    }
+    if (typeof config.opacity === 'number') host.style.setProperty('--pet-opacity', String(config.opacity))
+    scheduleWander() // 游走参数可能变化：重排下一次游走
+  }
   const refresh = async () => {
     if (refreshing) return
     refreshing = true
@@ -491,7 +522,13 @@ export function apply(ctx = {}) {
         activity = act
       }
       if (activity.name !== 'idle' || activity.until > Date.now()) lastActiveAt = Date.now()
-      sleeping = activity.name === 'idle' && Date.now() - lastActiveAt > SLEEP_AFTER_MS
+      sleeping = activity.name === 'idle' && Date.now() - lastActiveAt > cfg.sleepAfterMs
+      // 配置热更新：/state 的 configRevision 变化 → 拉取 /config 应用（尺寸/透明度/游走/睡眠）。
+      if (typeof body?.configRevision === 'number' && body.configRevision !== lastConfigRevision) {
+        lastConfigRevision = body.configRevision
+        const config = await fetchConfig()
+        if (config !== null) applyClientConfig(config)
+      }
       // 睡醒过渡：sleep → 非 sleep 时播一次 wake（受 TRANSIENT_MS 超时兜底）。
       // wake 不抢占 burst/working：睡醒撞上庆祝/错误/欢迎/工作直接播对应状态，伸懒腰让位。
       if (wasSleeping && !sleeping && transient === null
@@ -663,7 +700,8 @@ export function apply(ctx = {}) {
   }
   const scheduleWander = () => {
     clearTimeout(wanderTimer)
-    const wait = WANDER_MIN_WAIT_MS + Math.random() * (WANDER_MAX_WAIT_MS - WANDER_MIN_WAIT_MS)
+    if (!cfg.walk.enabled) return // 游走开关关闭：不排程（walk.enabled 配置）
+    const wait = cfg.walk.minWaitMs + Math.random() * (cfg.walk.maxWaitMs - cfg.walk.minWaitMs)
     wanderTimer = setTimeout(() => {
       if (sleeping || sessionMood.thinking || sessionMood.waiting) {
         scheduleWander() // 睡着了或会话活跃（思考陪伴/等待批准）不走，延后重排
@@ -680,7 +718,7 @@ export function apply(ctx = {}) {
     // sprite transform，否则新一轮游走仍沿用上一轮朝向。
     const walkCfg = manifest.states.walk
     if (animState === 'walk' && walkCfg && loaded.has(walkCfg.sheet)) showSprite('walk', walkCfg)
-    const duration = WALK_MIN_MS + Math.random() * (WALK_MAX_MS - WALK_MIN_MS)
+    const duration = cfg.walk.minMs + Math.random() * (cfg.walk.maxMs - cfg.walk.minMs)
     const start = performance.now()
     const maxX = Math.max(0, window.innerWidth - host.offsetWidth)
     const maxY = Math.max(0, window.innerHeight - host.offsetHeight)
@@ -696,7 +734,7 @@ export function apply(ctx = {}) {
         stopWalk()
         return
       }
-      const x = startLeft + walkDir * WALK_SPEED_PX_S * ((t - start) / 1000)
+      const x = startLeft + walkDir * cfg.walk.speedPxPerSec * ((t - start) / 1000)
       if (x <= 0 || x >= maxX || t - start >= duration) {
         host.style.left = `${Math.min(maxX, Math.max(0, x))}px`
         host.style.top = `${startTop}px`
@@ -713,7 +751,7 @@ export function apply(ctx = {}) {
   // ---- 启动 ----
   loadAssets()
   refresh()
-  const timer = setInterval(refresh, POLL_MS)
+  const timer = setInterval(refresh, cfg.pollMs)
   const animTimer = setInterval(tick, TICK_MS)
   scheduleWander()
 
