@@ -252,7 +252,10 @@ export function apply(ctx = {}) {
     try {
       const res = await fetch(MANIFEST_URL)
       if (!res.ok) return
-      manifest = await res.json()
+      const next = await res.json()
+      // 结构守卫：states 必须是对象（坏 manifest 不赋值，保持上次有效值或空对象 → 全 emoji 兜底）。
+      if (next === null || typeof next !== 'object' || next.states === null || typeof next.states !== 'object' || Array.isArray(next.states)) return
+      manifest = next
       await Promise.all(Object.entries(manifest.states).map(([n, cfg]) => preload(n, cfg)))
     } catch {
       // manifest 不可用 → 全 emoji 兜底
@@ -275,7 +278,8 @@ export function apply(ctx = {}) {
     }
     const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting })
     setState(target)
-    const cfg = manifest.states[animState]
+    const states = manifest.states
+    const cfg = states === undefined || states === null ? undefined : states[animState]
     if (cfg && loaded.has(cfg.sheet)) {
       const size = sheetSize.get(cfg.sheet)
       const frameW = size.w / cfg.frames

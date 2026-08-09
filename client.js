@@ -266,7 +266,9 @@
       try {
         const res = await fetch(MANIFEST_URL);
         if (!res.ok) return;
-        manifest = await res.json();
+        const next = await res.json();
+        if (next === null || typeof next !== "object" || next.states === null || typeof next.states !== "object" || Array.isArray(next.states)) return;
+        manifest = next;
         await Promise.all(Object.entries(manifest.states).map(([n, cfg]) => preload(n, cfg)));
       } catch {
       }
@@ -284,7 +286,8 @@
       }
       const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting });
       setState(target);
-      const cfg = manifest.states[animState];
+      const states = manifest.states;
+      const cfg = states === void 0 || states === null ? void 0 : states[animState];
       if (cfg && loaded.has(cfg.sheet)) {
         const size = sheetSize.get(cfg.sheet);
         const frameW = size.w / cfg.frames;
