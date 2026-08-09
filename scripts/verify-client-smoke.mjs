@@ -36,6 +36,14 @@ function analyze(html) {
   // motion 配方生效（idle 兜底态必为 pet-motion-bob）与账本渲染（任务计数）——回归防线。
   if (!/pet-motion-[a-z]+/.test(html)) errors.push('未找到 pet-motion-* 运动类（motion 配方未生效）')
   if (!/<span class="pet-stats">\d+ 任务/.test(html)) errors.push('账本统计未渲染（任务计数缺失）')
+  // transform 合法性：sprite 的 transform 必须是合法 scale 数值（曾因 scale(NaN) 整条被
+  // 浏览器丢弃——尺寸变大 + flip 失效双回归，此处防线）。
+  if (stageHasSprite) {
+    const m = /transform:\s*scale\(([^)]+)\)[^>]*>/.exec(html)
+    if (m === null || m[1].trim() === 'NaN' || !Number.isFinite(Number(m[1]))) {
+      errors.push('sprite transform 非法（scale 非有限数——尺寸/flip 可能回归）')
+    }
+  }
   return { errors, stageHasSprite }
 }
 

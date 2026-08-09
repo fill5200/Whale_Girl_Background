@@ -344,18 +344,19 @@
     };
     const sheetKey = (sheet) => `${characterId}:${sheet}`;
     const sheetUrl = (sheet) => `${ASSETS_URL}/characters/${characterId}/${sheet}`;
-    const showSprite = (name, cfg2) => {
-      const key = sheetKey(cfg2.sheet);
+    const showSprite = (name, anim) => {
+      const key = sheetKey(anim.sheet);
       const size = sheetSize.get(key);
       if (!size || size.w <= 0 || size.h <= 0) {
         showEmoji(name);
         return;
       }
       stage.replaceChildren(sprite);
-      const frameW = size.w / cfg2.frames;
-      const scale = Math.min(cfg2.size / frameW, cfg2.size / size.h, 1);
+      const frameW = size.w / anim.frames;
+      const target = host.offsetWidth || 110;
+      const scale = Math.min(target / frameW, target / size.h, 1);
       sprite.className = "pet-sprite ready";
-      sprite.style.backgroundImage = `url("${sheetUrl(cfg2.sheet)}")`;
+      sprite.style.backgroundImage = `url("${sheetUrl(anim.sheet)}")`;
       sprite.style.backgroundSize = `${size.w}px ${size.h}px`;
       sprite.style.width = `${frameW}px`;
       sprite.style.height = `${size.h}px`;

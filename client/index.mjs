@@ -282,8 +282,10 @@ export function apply(ctx = {}) {
   // （parseCharacters 已过滤非法 id），assets 路由另有路径净化兜底。
   const sheetUrl = (sheet) => `${ASSETS_URL}/characters/${characterId}/${sheet}`
 
-  const showSprite = (name, cfg) => {
-    const key = sheetKey(cfg.sheet)
+  // showSprite 参数名 anim（manifest 状态动画集），避免遮蔽模块级客户端配置 cfg——
+  // 曾用 cfg.size（undefined）算 scale → NaN → transform 被浏览器丢弃（尺寸变大 + flip 失效）。
+  const showSprite = (name, anim) => {
+    const key = sheetKey(anim.sheet)
     const size = sheetSize.get(key)
     if (!size || size.w <= 0 || size.h <= 0) {
       showEmoji(name) // 未声明尺寸的 SVG（naturalWidth=0）→ 兜底，避免除零白屏
@@ -291,10 +293,13 @@ export function apply(ctx = {}) {
     }
     // 清掉前一状态的 emoji/sprite，确保 eat/play 不会在状态结束后残留。
     stage.replaceChildren(sprite)
-    const frameW = size.w / cfg.frames
-    const scale = Math.min(cfg.size / frameW, cfg.size / size.h, 1)
+    const frameW = size.w / anim.frames
+    // 目标尺寸用宿主实际盒（--pet-size/配置 size 生效后的真实值），而非状态集里的
+    // 悬空 size 字段——配置 size 走 CSS 变量路径，不进 manifest 状态条目。
+    const target = host.offsetWidth || 110
+    const scale = Math.min(target / frameW, target / size.h, 1)
     sprite.className = 'pet-sprite ready'
-    sprite.style.backgroundImage = `url("${sheetUrl(cfg.sheet)}")`
+    sprite.style.backgroundImage = `url("${sheetUrl(anim.sheet)}")`
     sprite.style.backgroundSize = `${size.w}px ${size.h}px`
     sprite.style.width = `${frameW}px`
     sprite.style.height = `${size.h}px`
