@@ -334,6 +334,7 @@
         heart.style.top = `${30 + Math.random() * 80}px`;
         stage.appendChild(heart);
         heart.addEventListener("animationend", () => heart.remove());
+        setTimeout(() => heart.remove(), 1100);
       }
     };
     const bubbleTimers = /* @__PURE__ */ new Set();

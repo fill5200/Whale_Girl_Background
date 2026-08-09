@@ -332,6 +332,9 @@ export function apply(ctx = {}) {
       heart.style.top = `${30 + Math.random() * 80}px`
       stage.appendChild(heart)
       heart.addEventListener('animationend', () => heart.remove())
+      // 兜底超时移除：reduced-motion 下动画被禁用（animation: none），
+      // animationend 永不触发 → 爱心永久残留 DOM（不可见但泄漏）。
+      setTimeout(() => heart.remove(), 1100)
     }
   }
 
