@@ -389,8 +389,13 @@
         const res = await fetch(STATE_PATH);
         if (!res.ok) throw new Error(`state ${res.status}`);
         const body = await res.json();
-        pet = body.pet;
-        activity = body.activity ?? { name: "idle", until: 0 };
+        if (body !== null && typeof body === "object" && body.pet !== null && typeof body.pet === "object") {
+          pet = body.pet;
+        }
+        const act = body?.activity;
+        if (act !== null && typeof act === "object" && typeof act.name === "string") {
+          activity = act;
+        }
         if (activity.name !== "idle" || activity.until > Date.now()) lastActiveAt = Date.now();
         sleeping = activity.name === "idle" && Date.now() - lastActiveAt > SLEEP_AFTER_MS;
         if (wasSleeping && !sleeping && transient === null && !["welcome", "celebrate", "error", "disappointed", "working"].includes(activity.name)) {

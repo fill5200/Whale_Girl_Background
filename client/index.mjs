@@ -399,8 +399,14 @@ export function apply(ctx = {}) {
       const res = await fetch(STATE_PATH)
       if (!res.ok) throw new Error(`state ${res.status}`)
       const body = await res.json()
-      pet = body.pet
-      activity = body.activity ?? { name: 'idle', until: 0 }
+      // 结构守卫：pet/activity 缺字段或类型错误时保持上次有效值（响应损坏不崩轮询）。
+      if (body !== null && typeof body === 'object' && body.pet !== null && typeof body.pet === 'object') {
+        pet = body.pet
+      }
+      const act = body?.activity
+      if (act !== null && typeof act === 'object' && typeof act.name === 'string') {
+        activity = act
+      }
       if (activity.name !== 'idle' || activity.until > Date.now()) lastActiveAt = Date.now()
       sleeping = activity.name === 'idle' && Date.now() - lastActiveAt > SLEEP_AFTER_MS
       // 睡醒过渡：sleep → 非 sleep 时播一次 wake（受 TRANSIENT_MS 超时兜底）。
