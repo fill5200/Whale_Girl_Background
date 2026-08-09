@@ -14,7 +14,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
   INITIAL_STATE, titleName, recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive, describe,
 } from './src/pet-state.mjs'
-import { deriveActivity } from './src/activity.mjs'
+import { deriveActivity, mergeCelebrate } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
 import { applyAction, isCrossOrigin } from './src/interact.mjs'
 import { normalizeState, serializeState } from './src/persistence.mjs'
@@ -28,10 +28,13 @@ export const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
 
-/** 瞬发窗口：错误惊吓 4s → 失落尾 6s（总负面 10s，任务失败与请求错误统一）；欢迎 6s。 */
+/** 瞬发窗口：错误惊吓 4s → 失落尾 6s（总负面 10s，任务失败与请求错误统一）；欢迎 6s；庆祝 6s。 */
 const ERROR_MS = 4000
 const DISAPPOINTED_MS = 6000
 const WELCOME_MS = 6000
+// 庆祝窗口与 deriveActivity 的 BURST_MS 同长：事件路径（onTaskDone）与轮询路径
+// （翻转检测）产出同一视觉窗口，两源取 max 不叠加延长。
+const CELEBRATE_MS = 6000
 
 /** 状态文件：<dshHome>/data/dsh-pet/state.json（不放插件目录——uninstall 会删）。 */
 const DSH_HOME = process.env.DSH_HOME ?? resolve(import.meta.dirname, '../../..')
@@ -105,10 +108,11 @@ export function apply(ctx) {
   const known = new Map()
   let wasWorking = false
   let lastActiveCheck = Date.now()
-  // 瞬发窗口（welcome > error > disappointed；celebrate 由任务派生）。
+  // 瞬发窗口（welcome > error > disappointed；celebrate 由任务派生——事件 + 轮询两源）。
   let errorUntil = 0
   let disappointedUntil = 0
   let welcomeUntil = 0
+  let celebrateUntil = 0
 
   // 派生活动 + 事件记账（积累）：完成 +XP/称号/回忆；失败计数；工作态累加活跃时长。
   const activity = () => {
@@ -131,11 +135,15 @@ export function apply(ctx) {
     }
     // burst 级联：welcome > error > disappointed > celebrate > working > idle。
     // welcome 不打断进行中的 error/disappointed 尾段（失败失落不该被新会话欢迎盖掉）。
+    // celebrate 双源同窗：轮询翻转（derived.burst）与事件记账（celebrateUntil，F3）
+    // 由 mergeCelebrate 取 max——页面关闭期间完成的任务（轮询缺席）重开后同样庆祝；
+    // error burst 优先，并发完成不盖掉失败。
     let name = derived.working ? 'working' : 'idle'
     let until = 0
-    if (derived.burst !== null && derived.burst.until > now) {
-      name = derived.burst.name
-      until = derived.burst.until
+    const burst = mergeCelebrate(derived.burst, celebrateUntil, now)
+    if (burst !== null && burst.until > now) {
+      name = burst.name
+      until = burst.until
     }
     if (disappointedUntil > now) {
       name = 'disappointed'
@@ -161,6 +169,10 @@ export function apply(ctx) {
         const now = Date.now()
         if (snapshot.status === 'completed') {
           state = recordTaskCompleted(state, snapshot.label ?? '未命名任务', now).state
+          // F3：账本与庆祝同源——记账即开庆祝窗口。页面关闭期间完成任务（轮询缺席、
+          // deriveActivity 看不到翻转）时，重开后首次轮询仍能看到本窗口，同样庆祝；
+          // 与轮询翻转的 celebrate 取 max 不叠加（CELEBRATE_MS 同 BURST_MS）。
+          celebrateUntil = Math.max(celebrateUntil, now + CELEBRATE_MS)
           scheduleSave()
         } else if (snapshot.status === 'failed') {
           state = recordFailure(state, now).state

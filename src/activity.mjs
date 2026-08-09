@@ -15,6 +15,23 @@ function betterBurst(a, b) {
 }
 
 /**
+ * 事件驱动庆祝与派生 burst 合并（F3）：onTaskDone 记账设置的 celebrate 窗口
+ * 与轮询翻转派生的 burst 取更晚者（同源不叠加延长）。
+ * 语义：error burst 优先——并发完成不把失败庆祝盖掉（失败窗口由宿主 errorUntil
+ * 独立级联兜底，这里保持派生 burst 不被事件庆祝覆盖）；celebrate 双源取 max。
+ * @param {null | { name: 'celebrate'|'error', until: number }} burst 派生 burst（可为 null）
+ * @param {number} celebrateUntil 事件 celebrate 窗口截止（宿主持有）
+ * @param {number} nowMs 当前时间
+ * @returns 合并后的 burst
+ */
+export function mergeCelebrate(burst, celebrateUntil, nowMs) {
+  if (celebrateUntil <= nowMs) return burst
+  if (burst !== null && burst.name === 'error') return burst
+  if (burst === null || celebrateUntil > burst.until) return { name: 'celebrate', until: celebrateUntil }
+  return burst
+}
+
+/**
  * 从任务快照推导活动状态。
  * @param {{ tasks: Array<{id: string, status: string}>, nowMs: number, known?: Map<string,string>, wasWorking?: boolean, errorMs?: number }} input
  *        errorMs：失败 burst 窗口（默认 BURST_MS；宿主可传更短的统一负面窗口）。

@@ -1,7 +1,7 @@
 // src/activity.mjs 单测（node:test）。归属：活动推导逻辑改动跑本文件。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { deriveActivity, BURST_MS } from '../src/activity.mjs'
+import { deriveActivity, BURST_MS, mergeCelebrate } from '../src/activity.mjs'
 
 test('无任务 → idle（working=false，无 burst）', () => {
   const r = deriveActivity({ tasks: [], nowMs: 1000 })
@@ -80,5 +80,26 @@ test('killed 中性：单轮内 running→killed 不发 burst', () => {
   const r = deriveActivity({ tasks: [{ id: 't1', status: 'killed' }], nowMs: 1000, known, wasWorking: true })
   assert.equal(r.burst, null)
   assert.equal(r.completed.length, 0)
+})
+
+test('mergeCelebrate：无派生 burst 时事件窗口直接生效（F3 关闭期任务庆祝）', () => {
+  assert.deepEqual(mergeCelebrate(null, 7000, 1000), { name: 'celebrate', until: 7000 })
+})
+
+test('mergeCelebrate：双源 celebrate 取更晚窗口（不叠加延长）', () => {
+  const burst = { name: 'celebrate', until: 6000 }
+  assert.deepEqual(mergeCelebrate(burst, 5000, 1000), burst) // 事件窗口更早 → 保留派生
+  assert.deepEqual(mergeCelebrate(burst, 8000, 1000), { name: 'celebrate', until: 8000 }) // 事件窗口更晚 → 取事件
+})
+
+test('mergeCelebrate：error burst 优先——并发完成不盖掉失败', () => {
+  const burst = { name: 'error', until: 6000 }
+  assert.deepEqual(mergeCelebrate(burst, 8000, 1000), burst) // 事件 celebrate 更晚也不替换 error
+})
+
+test('mergeCelebrate：事件窗口已过期则保持原 burst（不影响轮询路径）', () => {
+  const burst = { name: 'celebrate', until: 6000 }
+  assert.deepEqual(mergeCelebrate(burst, 500, 1000), burst)
+  assert.equal(mergeCelebrate(null, 500, 1000), null)
 })
 
