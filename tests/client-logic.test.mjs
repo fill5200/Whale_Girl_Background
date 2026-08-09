@@ -82,11 +82,19 @@ test('会话感知：等待批准 wait 优先于思考陪伴 think（都需要�
   assert.equal(pickState({ ...IDLE, sessionThink: true, sessionWait: true }), 'wait')
 })
 
-test('会话感知：思考陪伴覆盖 sleep/walk/working/joy（会话活跃时保持清醒陪伴）', () => {
+test('会话感知：思考陪伴覆盖 sleep/walk/joy（会话活跃时保持清醒陪伴）', () => {
   assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true }), 'think')
   assert.equal(pickState({ ...IDLE, sessionThink: true, walking: true }), 'think')
-  assert.equal(pickState({ ...IDLE, sessionThink: true, activity: { name: 'working', until: 0 } }), 'think')
   assert.equal(pickState({ ...IDLE, sessionThink: true, joyUntil: 1500 }), 'think')
+})
+
+test('工作陪伴交替：sessionThink+working 按时间片切 think/working（不止静态沉思）', () => {
+  // now=1000 → 周期内 working 活跃段（<2000）→ working
+  assert.equal(pickState({ ...IDLE, sessionThink: true, activity: { name: 'working', until: 0 }, now: 1000 }), 'working')
+  // now=2500 → 周期内 think 段（2000-3000）→ think
+  assert.equal(pickState({ ...IDLE, sessionThink: true, activity: { name: 'working', until: 0 }, now: 2500 }), 'think')
+  // 无 sessionThink 时纯 working（不交替）
+  assert.equal(pickState({ ...IDLE, activity: { name: 'working', until: 0 }, now: 2500 }), 'working')
 })
 
 test('会话感知：事件反馈与用户互动仍优先于陪伴状态（不抢戏）', () => {
@@ -144,4 +152,11 @@ test('STATE_TABLE 行序即优先级：手动验证关键竞争', () => {
   assert.equal(pickState({ ...IDLE, sessionWait: true, sessionThink: true, activity: { name: 'working', until: 0 } }), 'wait')
   // think > sleep（会话活跃保持清醒）
   assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true }), 'think')
+})
+
+test('拖拽放下缓冲：dragReleaseUntil 内短暂回 idle，再进入底层状态', () => {
+  // 放下缓冲期内：即使有 working/think 也先 idle
+  assert.equal(pickState({ ...IDLE, dragReleaseUntil: 2500, now: 1000, sessionThink: true, activity: { name: 'working', until: 0 } }), 'idle')
+  // 缓冲过期后：进入底层（工作陪伴交替）
+  assert.equal(pickState({ ...IDLE, dragReleaseUntil: 2500, now: 3000, sessionThink: true, activity: { name: 'working', until: 0 } }), 'working')
 })

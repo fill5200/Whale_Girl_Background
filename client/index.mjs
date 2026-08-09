@@ -28,6 +28,8 @@ const CFG_DEFAULTS = {
 }
 let cfg = { ...CFG_DEFAULTS }
 const TICK_MS = 50
+// 拖拽放下缓冲时长：放下后短暂回 idle（1.5s）再进入底层状态，避免生硬切换。
+const DRAG_RELEASE_MS = 1500
 
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
@@ -251,6 +253,7 @@ export function apply(ctx = {}) {
   let transient = null // 'eat' | 'play' | 'wake' | null（点击/睡醒后播一次）
   let transientUntil = 0 // 超时兜底：sheet 缺失/未播完也保证复位
   let joyUntil = 0 // 互动后短时喜悦（JOY_MS）
+  let dragReleaseUntil = 0 // 拖拽放下缓冲：短暂回 idle（1.5s）再进入底层状态
   let showingSprite = false // 当前 animState 是否以 sprite 呈现（迟到加载后换肤）
   let lastActiveAt = Date.now()
   let sleeping = false
@@ -517,7 +520,7 @@ export function apply(ctx = {}) {
     if (transient !== null && now >= transientUntil) {
       resetTransient(now)
     }
-    const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting })
+    const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting })
     setState(target)
     const cfg = stateOf(character, animState)
     if (cfg && loaded.has(sheetKey(cfg.sheet))) {
@@ -785,7 +788,10 @@ export function apply(ctx = {}) {
     pressed = false
     dragging = false
     if (hitarea.hasPointerCapture(e.pointerId)) hitarea.releasePointerCapture(e.pointerId)
-    if (moved) savePos() // 拖拽结束落盘位置
+    if (moved) {
+      savePos() // 拖拽结束落盘位置
+      dragReleaseUntil = Date.now() + DRAG_RELEASE_MS // 放下缓冲：短暂回 idle
+    }
     layoutStatus() // 拖拽结束：状态卡恢复（若仍在 hover）
     // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
     if (!moved && !e.target.closest('button')) toggleMenu()
