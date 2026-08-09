@@ -135,6 +135,8 @@
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
+[data-dsh-pet] .pet-hitarea { position: absolute; cursor: grab; touch-action: none; z-index: 1;
+  border-radius: 8px; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* \u72B6\u6001\u5361\uFF1A\u9ED8\u8BA4\u7F6E\u4E8E\u5BA0\u7269\u4E0B\u65B9\uFF0C\u8D34\u8FD1\u672C\u4F53\u4E14\u4E0D\u6491\u5927\u5BBF\u4E3B\u76D2\u3002 */
@@ -176,7 +178,7 @@
 [data-dsh-pet] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
-[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
   white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
   z-index: 3; }
@@ -264,7 +266,9 @@
     menu.append(feedBtn, playBtn, roleBtn);
     const effects = document.createElement("div");
     effects.className = "pet-effects";
-    host.append(effects, stage, status, menu);
+    const hitarea = document.createElement("div");
+    hitarea.className = "pet-hitarea";
+    host.append(effects, stage, hitarea, status, menu);
     const layoutStatus = () => {
       if (activeBubble !== null || dragging || menu.classList.contains("open")) {
         status.classList.add("pet-status-hidden");
@@ -389,11 +393,69 @@
         stage.style.opacity = "1";
       }));
     };
+    let contentBox = null;
+    const mergeContentBox = (box) => {
+      if (contentBox === null) {
+        contentBox = { ...box };
+        return;
+      }
+      const nx = Math.min(contentBox.x, box.x);
+      const ny = Math.min(contentBox.y, box.y);
+      const nr = Math.max(contentBox.x + contentBox.w, box.x + box.w);
+      const nb = Math.max(contentBox.y + contentBox.h, box.y + box.h);
+      contentBox = { x: nx, y: ny, w: nr - nx, h: nb - ny };
+    };
+    const applyHitArea = () => {
+      if (hitarea === null) return;
+      const size = parseFloat(getComputedStyle(host).getPropertyValue("--pet-size")) || 110;
+      const box = contentBox ?? { x: 0, y: 0, w: 1, h: 1 };
+      const hitW = Math.max(40, size * box.w);
+      const hitH = Math.max(40, size * box.h);
+      const offX = (size - hitW) / 2;
+      const offY = (size - hitH) / 2;
+      hitarea.style.left = `${offX}px`;
+      hitarea.style.top = `${offY}px`;
+      hitarea.style.width = `${hitW}px`;
+      hitarea.style.height = `${hitH}px`;
+    };
+    const resetContentBox = () => {
+      contentBox = null;
+    };
+    const analyzeSheet = (img, frames) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx2 = canvas.getContext("2d", { willReadFrequently: true });
+      ctx2.drawImage(img, 0, 0);
+      const data = ctx2.getImageData(0, 0, canvas.width, canvas.height).data;
+      const fw = img.naturalWidth / frames;
+      let minX = Infinity, minY = Infinity, maxX = -1, maxY = -1;
+      for (let y = 0; y < img.naturalHeight; y++) {
+        for (let x = 0; x < img.naturalWidth; x++) {
+          if (data[(y * img.naturalWidth + x) * 4 + 3] > 10) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return null;
+      return {
+        x: minX / img.naturalWidth,
+        y: minY / img.naturalHeight,
+        w: (maxX - minX + 1) / img.naturalWidth,
+        h: (maxY - minY + 1) / img.naturalHeight
+      };
+    };
     const preload = (name, cfg2) => new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
         sheetSize.set(sheetKey(cfg2.sheet), { w: img.naturalWidth, h: img.naturalHeight });
         loaded.add(sheetKey(cfg2.sheet));
+        const box = analyzeSheet(img, cfg2.frames);
+        if (box !== null) mergeContentBox(box);
+        applyHitArea();
         resolve();
       };
       img.onerror = resolve;
@@ -406,6 +468,7 @@
         const next = await res.json();
         if (next === null || typeof next !== "object") return;
         manifest = next;
+        resetContentBox();
         const pref = (() => {
           try {
             return localStorage.getItem("dsh-pet:character") ?? null;
@@ -429,6 +492,7 @@
       const target = getCharacter(manifest, id);
       if (target === null || id === characterId) return;
       try {
+        resetContentBox();
         const nextLoaded = /* @__PURE__ */ new Set();
         const nextSize = /* @__PURE__ */ new Map();
         await Promise.all(Object.entries(target.states).map(([n, cfg2]) => new Promise((resolve) => {
@@ -436,6 +500,9 @@
           img.onload = () => {
             nextSize.set(`${id}:${cfg2.sheet}`, { w: img.naturalWidth, h: img.naturalHeight });
             nextLoaded.add(`${id}:${cfg2.sheet}`);
+            const box = analyzeSheet(img, cfg2.frames);
+            if (box !== null) mergeContentBox(box);
+            applyHitArea();
             resolve();
           };
           img.onerror = resolve;
@@ -662,7 +729,7 @@
       }
     } catch {
     }
-    stage.addEventListener("pointerdown", (e) => {
+    hitarea.addEventListener("pointerdown", (e) => {
       pressed = true;
       dragging = false;
       moved = false;
@@ -674,10 +741,10 @@
       offsetX = e.clientX - host.offsetLeft;
       offsetY = e.clientY - host.offsetTop;
     });
-    stage.addEventListener("pointermove", (e) => {
+    hitarea.addEventListener("pointermove", (e) => {
       if (!pressed) return;
       if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
-        if (!moved) stage.setPointerCapture(e.pointerId);
+        if (!moved) hitarea.setPointerCapture(e.pointerId);
         moved = true;
         dragging = true;
         transient = null;
@@ -700,21 +767,21 @@
       host.style.right = "auto";
       host.style.bottom = "auto";
     });
-    stage.addEventListener("pointerup", (e) => {
+    hitarea.addEventListener("pointerup", (e) => {
       pressed = false;
       dragging = false;
-      if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+      if (hitarea.hasPointerCapture(e.pointerId)) hitarea.releasePointerCapture(e.pointerId);
       if (moved) savePos();
       layoutStatus();
       if (!moved && !e.target.closest("button")) toggleMenu();
     });
-    stage.addEventListener("pointercancel", () => {
+    hitarea.addEventListener("pointercancel", () => {
       pressed = false;
       dragging = false;
       moved = false;
       layoutStatus();
     });
-    stage.addEventListener("lostpointercapture", () => {
+    hitarea.addEventListener("lostpointercapture", () => {
       pressed = false;
       dragging = false;
       moved = false;

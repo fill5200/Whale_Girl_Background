@@ -39,6 +39,8 @@ const CSS = `
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
+[data-dsh-pet] .pet-hitarea { position: absolute; cursor: grab; touch-action: none; z-index: 1;
+  border-radius: 8px; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* 状态卡：默认置于宠物下方，贴近本体且不撑大宿主盒。 */
@@ -80,7 +82,7 @@ const CSS = `
 [data-dsh-pet] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
-[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
   white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
   z-index: 3; }
@@ -176,7 +178,11 @@ export function apply(ctx = {}) {
   // stage 的 replaceChildren/textContent 不会清掉正在播放的特效）。
   const effects = document.createElement('div')
   effects.className = 'pet-effects'
-  host.append(effects, stage, status, menu)
+  // 点击热区层：覆盖在角色内容上（贴合内容 bbox），pointer 事件绑此而非 stage——
+  // 拖拽/点击热区 = 角色实际轮廓，四周透明边缘不可点。
+  const hitarea = document.createElement('div')
+  hitarea.className = 'pet-hitarea'
+  host.append(effects, stage, hitarea, status, menu)
 
   // ---- 状态卡布局（视口感知：左右对齐，hover 显示时调用）----
   // status 绝对定位锚定宠物下方（始终不覆盖角色）；宠物贴左右缘 → 边缘对齐防横向溢出。
@@ -338,11 +344,76 @@ export function apply(ctx = {}) {
   }
 
   // ---- 资产加载 ----
+  // 角色内容 bbox（0-1 归一化比例）：所有状态 sheet 的不透明像素并集——
+  // 驱动点击热区贴合角色实际轮廓（四周透明边缘不算可点击，见手测反馈）。
+  // 初始为「空」而非「全图」：合并首个真实 bbox 时不被默认值污染。
+  let contentBox = null
+  const mergeContentBox = (box) => {
+    if (contentBox === null) {
+      contentBox = { ...box }
+      return
+    }
+    const nx = Math.min(contentBox.x, box.x)
+    const ny = Math.min(contentBox.y, box.y)
+    const nr = Math.max(contentBox.x + contentBox.w, box.x + box.w)
+    const nb = Math.max(contentBox.y + contentBox.h, box.y + box.h)
+    contentBox = { x: nx, y: ny, w: nr - nx, h: nb - ny }
+  }
+  // 应用点击热区：hitarea 层贴合角色内容 bbox（--pet-hit 驱动）。
+  // 角色内容约占帧的 74-90%（四周透明边缘），热区收窄到内容——不点透明区。
+  const applyHitArea = () => {
+    if (hitarea === null) return
+    const size = parseFloat(getComputedStyle(host).getPropertyValue('--pet-size')) || 110
+    const box = contentBox ?? { x: 0, y: 0, w: 1, h: 1 } // 未分析完成时用全图
+    const hitW = Math.max(40, size * box.w)
+    const hitH = Math.max(40, size * box.h)
+    const offX = (size - hitW) / 2 // 内容居中于 host
+    const offY = (size - hitH) / 2
+    hitarea.style.left = `${offX}px`
+    hitarea.style.top = `${offY}px`
+    hitarea.style.width = `${hitW}px`
+    hitarea.style.height = `${hitH}px`
+  }
+  // 换角色/重载时重置内容 bbox（新角色的轮廓不同）。
+  const resetContentBox = () => {
+    contentBox = null
+  }
+
+  // 用离屏 canvas 读 sheet 的不透明像素范围（仅首帧采样，性能可接受）。
+  const analyzeSheet = (img, frames) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    ctx.drawImage(img, 0, 0)
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    const fw = img.naturalWidth / frames
+    let minX = Infinity, minY = Infinity, maxX = -1, maxY = -1
+    for (let y = 0; y < img.naturalHeight; y++) {
+      for (let x = 0; x < img.naturalWidth; x++) {
+        if (data[(y * img.naturalWidth + x) * 4 + 3] > 10) {
+          if (x < minX) minX = x
+          if (x > maxX) maxX = x
+          if (y < minY) minY = y
+          if (y > maxY) maxY = y
+        }
+      }
+    }
+    if (maxX < 0) return null // 全透明
+    return {
+      x: minX / img.naturalWidth, y: minY / img.naturalHeight,
+      w: (maxX - minX + 1) / img.naturalWidth, h: (maxY - minY + 1) / img.naturalHeight,
+    }
+  }
+
   const preload = (name, cfg) => new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
       sheetSize.set(sheetKey(cfg.sheet), { w: img.naturalWidth, h: img.naturalHeight })
       loaded.add(sheetKey(cfg.sheet))
+      const box = analyzeSheet(img, cfg.frames)
+      if (box !== null) mergeContentBox(box)
+      applyHitArea()
       resolve()
     }
     img.onerror = resolve
@@ -357,6 +428,7 @@ export function apply(ctx = {}) {
       // 结构守卫：manifest 必须是对象且可解析出角色（坏 manifest 不赋值 → 全 emoji 兜底）。
       if (next === null || typeof next !== 'object') return
       manifest = next
+      resetContentBox() // 新角色轮廓：重置内容 bbox（preload 逐步合并）
       // 角色解析：默认角色 + 当前角色（localStorage 偏好，ROLE_ID_RE 已由 parseCharacters 过滤）。
       const pref = (() => { try { return localStorage.getItem('dsh-pet:character') ?? null } catch { return null } })()
       const roles = parseCharacters(manifest)
@@ -381,6 +453,7 @@ export function apply(ctx = {}) {
     const target = getCharacter(manifest, id)
     if (target === null || id === characterId) return
     try {
+      resetContentBox() // 新角色轮廓：重置内容 bbox
       const nextLoaded = new Set()
       const nextSize = new Map()
       await Promise.all(Object.entries(target.states).map(([n, cfg]) => new Promise((resolve) => {
@@ -388,6 +461,9 @@ export function apply(ctx = {}) {
         img.onload = () => {
           nextSize.set(`${id}:${cfg.sheet}`, { w: img.naturalWidth, h: img.naturalHeight })
           nextLoaded.add(`${id}:${cfg.sheet}`)
+          const box = analyzeSheet(img, cfg.frames)
+          if (box !== null) mergeContentBox(box)
+          applyHitArea()
           resolve()
         }
         img.onerror = resolve
@@ -655,7 +731,7 @@ export function apply(ctx = {}) {
 
   // capture 只在越过拖拽阈值后启用：纯点击不捕获，菜单按钮的 click 正常派发。
   // 热区只绑舞台本体（110×110）：状态条/菜单区不参与拖拽与点击切换，减少误触与遮挡。
-  stage.addEventListener('pointerdown', (e) => {
+  hitarea.addEventListener('pointerdown', (e) => {
     pressed = true
     dragging = false
     moved = false
@@ -667,10 +743,10 @@ export function apply(ctx = {}) {
     offsetX = e.clientX - host.offsetLeft
     offsetY = e.clientY - host.offsetTop
   })
-  stage.addEventListener('pointermove', (e) => {
+  hitarea.addEventListener('pointermove', (e) => {
     if (!pressed) return
     if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
-      if (!moved) stage.setPointerCapture(e.pointerId)
+      if (!moved) hitarea.setPointerCapture(e.pointerId)
       moved = true
       dragging = true
       // 拖拽打断当前互动：清掉 eat/play/wake 瞬发与互动喜悦——释放后回到拖拽前
@@ -695,23 +771,23 @@ export function apply(ctx = {}) {
     host.style.right = 'auto'
     host.style.bottom = 'auto'
   })
-  stage.addEventListener('pointerup', (e) => {
+  hitarea.addEventListener('pointerup', (e) => {
     pressed = false
     dragging = false
-    if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId)
+    if (hitarea.hasPointerCapture(e.pointerId)) hitarea.releasePointerCapture(e.pointerId)
     if (moved) savePos() // 拖拽结束落盘位置
     layoutStatus() // 拖拽结束：状态卡恢复（若仍在 hover）
     // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
     if (!moved && !e.target.closest('button')) toggleMenu()
   })
-  stage.addEventListener('pointercancel', () => {
+  hitarea.addEventListener('pointercancel', () => {
     pressed = false
     dragging = false
     moved = false
     layoutStatus()
   })
   // 捕获被系统强制释放（元素移除/其它元素抢捕获）时复位，防拖拽状态卡死。
-  stage.addEventListener('lostpointercapture', () => {
+  hitarea.addEventListener('lostpointercapture', () => {
     pressed = false
     dragging = false
     moved = false
