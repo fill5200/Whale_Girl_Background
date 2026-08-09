@@ -65,14 +65,7 @@ const CSS = `
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 [data-dsh-pet] .pet-note { color: #AEB6C4; font-size: 11px; line-height: 15px;
   text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-/* 翻转/对齐变体（layoutStatus 按视口位置切换）：
-   - 下方模式（宠物贴顶）：锚定宠物底部，尾巴朝上
-   - 左右对齐（宠物贴视口边缘）：卡边缘对齐宠物边缘，避免卡伸到视口外 */
-[data-dsh-pet] .pet-status.pet-status-above { left: 50%; top: auto; bottom: calc(100% + 6px); }
-[data-dsh-pet] .pet-status.pet-status-above::after { bottom: -5px; top: auto;
-  border-top: none; border-left: none;
-  border-right: 1px solid rgba(255,255,255,.10); border-bottom: 1px solid rgba(255,255,255,.10);
-  border-top-left-radius: 0; border-bottom-right-radius: 3px; }
+/* 左右对齐变体：宠物贴视口边缘时卡边缘对齐，避免横向溢出。 */
 [data-dsh-pet] .pet-status.pet-status-left { left: 0; transform: translateX(0); }
 [data-dsh-pet] .pet-status.pet-status-right { left: auto; right: 0; transform: translateX(0); }
 [data-dsh-pet]:hover .pet-status.pet-status-left,
@@ -120,6 +113,7 @@ const CSS = `
   100% { opacity: 0; transform: translateY(-72px) scale(1.25); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 [data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
+[data-dsh-pet][data-dsh-pet-hidden] { display: none; }
 [data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) {
   [data-dsh-pet] .pet-stage { animation: none !important; }
@@ -189,22 +183,18 @@ export function apply(ctx = {}) {
     }
     status.classList.remove('pet-status-hidden')
     const vw = window.innerWidth
-    const vh = window.innerHeight
     const rect = host.getBoundingClientRect()
     const cardW = status.offsetWidth || 190
-    const cardH = status.offsetHeight || 60
     const nearLeft = rect.left < cardW / 2 - 8
     const nearRight = rect.right > vw - (cardW / 2 - 8)
     // 翻转/对齐类互斥：先清再设。
-    status.classList.remove('pet-status-above', 'pet-status-left', 'pet-status-right')
+    status.classList.remove('pet-status-left', 'pet-status-right')
     if (nearLeft && !nearRight) status.classList.add('pet-status-left')
     else if (nearRight && !nearLeft) status.classList.add('pet-status-right')
-    const nearBottom = rect.bottom > vh - cardH - 12
-    if (nearBottom) status.classList.add('pet-status-above')
   }
   const onHostEnter = () => layoutStatus()
   const onHostLeave = () => {
-    status.classList.remove('pet-status-above', 'pet-status-left', 'pet-status-right', 'pet-status-hidden')
+    status.classList.remove('pet-status-left', 'pet-status-right', 'pet-status-hidden')
   }
   host.addEventListener('mouseenter', onHostEnter)
   host.addEventListener('mouseleave', onHostLeave)
@@ -749,14 +739,26 @@ export function apply(ctx = {}) {
   }
   window.addEventListener('resize', onResize)
 
-  // 弹窗感知：DSH 打开 dialog 时宠物降为 inert（不遮挡、不拦截点击）。
-  // 边沿触发：只在 dialog 存在状态翻转时改属性——聊天 GUI 高频增删节点时不全量重扫。
-  let dialogOpen = false
+  // 页面状态感知：DSH 处于初始配置/欢迎页（onboarding）时宠物**完全隐藏**（不遮向导）；
+  // 打开 dialog 时宠物降为 inert（半透明、不挡点击）。onboarding 是 CSS module 哈希
+  // 类名，用 [class*="onboarding"] 子串匹配；边沿触发只在状态翻转时改属性。
+  let pageHidden = false
   const syncInert = () => {
-    const open = document.querySelector('[role="dialog"]') !== null
-    if (open !== dialogOpen) {
-      dialogOpen = open
-      host.toggleAttribute('data-dsh-pet-inert', open)
+    const onboarding = document.querySelector('[class*="onboarding"]') !== null
+    const dialog = document.querySelector('[role="dialog"]') !== null
+    const next = onboarding ? 'onboarding' : dialog ? 'dialog' : null
+    if (next !== pageHidden) {
+      pageHidden = next
+      if (next === null) {
+        host.removeAttribute('data-dsh-pet-inert')
+        host.removeAttribute('data-dsh-pet-hidden')
+      } else if (next === 'onboarding') {
+        host.removeAttribute('data-dsh-pet-inert')
+        host.setAttribute('data-dsh-pet-hidden', '')
+      } else {
+        host.removeAttribute('data-dsh-pet-hidden')
+        host.setAttribute('data-dsh-pet-inert', '')
+      }
     }
   }
   const dialogObserver = new MutationObserver(syncInert)

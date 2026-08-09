@@ -104,14 +104,7 @@
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 [data-dsh-pet] .pet-note { color: #AEB6C4; font-size: 11px; line-height: 15px;
   text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-/* \u7FFB\u8F6C/\u5BF9\u9F50\u53D8\u4F53\uFF08layoutStatus \u6309\u89C6\u53E3\u4F4D\u7F6E\u5207\u6362\uFF09\uFF1A
-   - \u4E0B\u65B9\u6A21\u5F0F\uFF08\u5BA0\u7269\u8D34\u9876\uFF09\uFF1A\u951A\u5B9A\u5BA0\u7269\u5E95\u90E8\uFF0C\u5C3E\u5DF4\u671D\u4E0A
-   - \u5DE6\u53F3\u5BF9\u9F50\uFF08\u5BA0\u7269\u8D34\u89C6\u53E3\u8FB9\u7F18\uFF09\uFF1A\u5361\u8FB9\u7F18\u5BF9\u9F50\u5BA0\u7269\u8FB9\u7F18\uFF0C\u907F\u514D\u5361\u4F38\u5230\u89C6\u53E3\u5916 */
-[data-dsh-pet] .pet-status.pet-status-above { left: 50%; top: auto; bottom: calc(100% + 6px); }
-[data-dsh-pet] .pet-status.pet-status-above::after { bottom: -5px; top: auto;
-  border-top: none; border-left: none;
-  border-right: 1px solid rgba(255,255,255,.10); border-bottom: 1px solid rgba(255,255,255,.10);
-  border-top-left-radius: 0; border-bottom-right-radius: 3px; }
+/* \u5DE6\u53F3\u5BF9\u9F50\u53D8\u4F53\uFF1A\u5BA0\u7269\u8D34\u89C6\u53E3\u8FB9\u7F18\u65F6\u5361\u8FB9\u7F18\u5BF9\u9F50\uFF0C\u907F\u514D\u6A2A\u5411\u6EA2\u51FA\u3002 */
 [data-dsh-pet] .pet-status.pet-status-left { left: 0; transform: translateX(0); }
 [data-dsh-pet] .pet-status.pet-status-right { left: auto; right: 0; transform: translateX(0); }
 [data-dsh-pet]:hover .pet-status.pet-status-left,
@@ -159,6 +152,7 @@
   100% { opacity: 0; transform: translateY(-72px) scale(1.25); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 [data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
+[data-dsh-pet][data-dsh-pet-hidden] { display: none; }
 [data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) {
   [data-dsh-pet] .pet-stage { animation: none !important; }
@@ -216,21 +210,17 @@
       }
       status.classList.remove("pet-status-hidden");
       const vw = window.innerWidth;
-      const vh = window.innerHeight;
       const rect = host.getBoundingClientRect();
       const cardW = status.offsetWidth || 190;
-      const cardH = status.offsetHeight || 60;
       const nearLeft = rect.left < cardW / 2 - 8;
       const nearRight = rect.right > vw - (cardW / 2 - 8);
-      status.classList.remove("pet-status-above", "pet-status-left", "pet-status-right");
+      status.classList.remove("pet-status-left", "pet-status-right");
       if (nearLeft && !nearRight) status.classList.add("pet-status-left");
       else if (nearRight && !nearLeft) status.classList.add("pet-status-right");
-      const nearBottom = rect.bottom > vh - cardH - 12;
-      if (nearBottom) status.classList.add("pet-status-above");
     };
     const onHostEnter = () => layoutStatus();
     const onHostLeave = () => {
-      status.classList.remove("pet-status-above", "pet-status-left", "pet-status-right", "pet-status-hidden");
+      status.classList.remove("pet-status-left", "pet-status-right", "pet-status-hidden");
     };
     host.addEventListener("mouseenter", onHostEnter);
     host.addEventListener("mouseleave", onHostLeave);
@@ -690,12 +680,23 @@
       layoutStatus();
     };
     window.addEventListener("resize", onResize);
-    let dialogOpen = false;
+    let pageHidden = false;
     const syncInert = () => {
-      const open = document.querySelector('[role="dialog"]') !== null;
-      if (open !== dialogOpen) {
-        dialogOpen = open;
-        host.toggleAttribute("data-dsh-pet-inert", open);
+      const onboarding = document.querySelector('[class*="onboarding"]') !== null;
+      const dialog = document.querySelector('[role="dialog"]') !== null;
+      const next = onboarding ? "onboarding" : dialog ? "dialog" : null;
+      if (next !== pageHidden) {
+        pageHidden = next;
+        if (next === null) {
+          host.removeAttribute("data-dsh-pet-inert");
+          host.removeAttribute("data-dsh-pet-hidden");
+        } else if (next === "onboarding") {
+          host.removeAttribute("data-dsh-pet-inert");
+          host.setAttribute("data-dsh-pet-hidden", "");
+        } else {
+          host.removeAttribute("data-dsh-pet-hidden");
+          host.setAttribute("data-dsh-pet-inert", "");
+        }
       }
     };
     const dialogObserver = new MutationObserver(syncInert);
