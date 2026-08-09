@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
-  INITIAL_STATE, titleName, recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive, describe,
+  INITIAL_STATE, titleName, recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive,
 } from './src/pet-state.mjs'
 import { deriveActivity, mergeCelebrate } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
