@@ -30,9 +30,10 @@
     { state: "play", when: (c) => c.transient === "play" },
     { state: "wake", when: (c) => c.transient === "wake" },
     { state: "wait", when: (c) => c.sessionWait },
-    // 工作陪伴时间片：会话思考中且有任务跑时，think（沉思）与 working（托腮小灯泡）交替，
-    // 避免一直 think 显得静态。workingSlice 由 pickState 按周期计算。
-    { state: "working", when: (c) => c.activity.name === "working" && (c.workingSlice || !c.sessionThink) },
+    // 工作陪伴时间片：会话活跃（sessionThink）时 think（沉思）与 working（托腮小灯泡）
+    // 交替——不依赖 activity.working（思考阶段无任务，activity 可能是 idle）。
+    // 避免单帧 think 长时间静态；纯任务（无会话思考）时仍走 working。
+    { state: "working", when: (c) => c.sessionThink && c.workingSlice || !c.sessionThink && c.activity.name === "working" },
     { state: "think", when: (c) => c.sessionThink },
     { state: "joy", when: (c) => c.now < c.joyUntil },
     { state: "sleep", when: (c) => c.sleeping },

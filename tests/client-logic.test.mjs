@@ -77,15 +77,17 @@ test('TRANSIENT_MS/JOY_MS 与 EMOJI 完整性（每个可达状态都有兜底�
 })
 
 test('会话感知：等待批准 wait 优先于思考陪伴 think（都需要用户注意）', () => {
-  assert.equal(pickState({ ...IDLE, sessionThink: true }), 'think')
+  // now=2500 → 时间片 think 段，sessionThink 时思考陪伴
+  assert.equal(pickState({ ...IDLE, sessionThink: true, now: 2500 }), 'think')
   assert.equal(pickState({ ...IDLE, sessionWait: true }), 'wait')
   assert.equal(pickState({ ...IDLE, sessionThink: true, sessionWait: true }), 'wait')
 })
 
 test('会话感知：思考陪伴覆盖 sleep/walk/joy（会话活跃时保持清醒陪伴）', () => {
-  assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true }), 'think')
-  assert.equal(pickState({ ...IDLE, sessionThink: true, walking: true }), 'think')
-  assert.equal(pickState({ ...IDLE, sessionThink: true, joyUntil: 1500 }), 'think')
+  // now 取 think 段，验证陪伴优先于睡眠/漫游/喜悦
+  assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true, now: 2500 }), 'think')
+  assert.equal(pickState({ ...IDLE, sessionThink: true, walking: true, now: 2500 }), 'think')
+  assert.equal(pickState({ ...IDLE, sessionThink: true, joyUntil: 1500, now: 2500 }), 'think')
 })
 
 test('工作陪伴交替：sessionThink+working 按时间片切 think/working（不止静态沉思）', () => {
@@ -95,6 +97,12 @@ test('工作陪伴交替：sessionThink+working 按时间片切 think/working（
   assert.equal(pickState({ ...IDLE, sessionThink: true, activity: { name: 'working', until: 0 }, now: 2500 }), 'think')
   // 无 sessionThink 时纯 working（不交替）
   assert.equal(pickState({ ...IDLE, activity: { name: 'working', until: 0 }, now: 2500 }), 'working')
+})
+
+test('工作陪伴交替不依赖 activity：思考阶段（activity idle）也按时间片交替 think/working（修复「始终 think 单帧」）', () => {
+  // 思考中但 Node half 无任务（activity idle）——仍按时间片交替
+  assert.equal(pickState({ ...IDLE, sessionThink: true, activity: { name: 'idle', until: 0 }, now: 1000 }), 'working')
+  assert.equal(pickState({ ...IDLE, sessionThink: true, activity: { name: 'idle', until: 0 }, now: 2500 }), 'think')
 })
 
 test('会话感知：事件反馈与用户互动仍优先于陪伴状态（不抢戏）', () => {
@@ -150,8 +158,8 @@ test('STATE_TABLE 行序即优先级：手动验证关键竞争', () => {
   assert.equal(pickState({ ...IDLE, activity: { name: 'welcome', until: 5000 }, transient: 'eat' }), 'welcome')
   // wait > think > working
   assert.equal(pickState({ ...IDLE, sessionWait: true, sessionThink: true, activity: { name: 'working', until: 0 } }), 'wait')
-  // think > sleep（会话活跃保持清醒）
-  assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true }), 'think')
+  // think > sleep（会话活跃保持清醒；now 取 think 段）
+  assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true, now: 2500 }), 'think')
 })
 
 test('拖拽放下缓冲：dragReleaseUntil 内短暂回 idle，再进入底层状态', () => {
