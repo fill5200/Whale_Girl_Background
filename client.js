@@ -74,22 +74,58 @@
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: 110px; height: 110px;
-  pointer-events: none; overflow: visible; }
+  pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
-[data-dsh-pet] .pet-status { min-width: 110px; margin-top: 6px; padding: 6px 8px;
-  background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
-  display: grid; gap: 3px;
-  /* \u9ED8\u8BA4\u9690\u85CF\uFF08\u4E0D\u5360\u89C6\u89C9\u3001\u4E0D\u6321\u70B9\u51FB\uFF09\uFF0C\u60AC\u505C/\u805A\u7126\u5BA0\u7269\u65F6\u6DE1\u5165\u2014\u2014\u5E73\u65F6\u53EA\u5269\u5E72\u51C0\u7684\u5BA0\u7269\u672C\u4F53\u3002 */
-  opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+/* \u72B6\u6001\u5361\uFF1A\u7EDD\u5BF9\u5B9A\u4F4D\u951A\u5B9A\u5BA0\u7269\u9876\u90E8\uFF08\u8131\u79BB\u6D41\u5F0F\u2014\u2014\u4E0D\u6491\u5927\u5BBF\u4E3B\u76D2\u3001\u4E0D\u906E\u5BA0\u7269\u672C\u4F53\uFF09\u3002
+   hover/focus \u663E\u793A\uFF0C\u79FB\u8D70\u6D88\u5931\uFF1B\u5E26\u6307\u5411\u5BA0\u7269\u5934\u9876\u7684\u8FDE\u63A5\u5C3E\u3002\u9ED8\u8BA4 opacity:0\u3002 */
+[data-dsh-pet] .pet-status { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+  min-width: 140px; max-width: 200px; padding: 8px 12px;
+  background: rgba(27,30,40,.94); backdrop-filter: blur(10px) saturate(1.15);
+  border: 1px solid rgba(255,255,255,.10); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.38), 0 3px 8px rgba(0,0,0,.28);
+  color: #E8EBF2; font-size: 11px; display: grid; gap: 4px; z-index: 1;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .15s ease-out, transform .15s ease-out, visibility 0s linear .2s; }
+[data-dsh-pet] .pet-status::after { /* \u8FDE\u63A5\u5C3E\uFF1A\u547D\u4E2D\u533A\u8986\u76D6\u5BA0\u7269\u2194\u5361\u7247\u95F4\u9699\uFF0Chover \u8FDE\u7EED\u4E0D\u95EA\u65AD */
+  content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
+  transform: translateX(-50%) rotate(45deg); background: rgba(27,30,40,.94);
+  border-right: 1px solid rgba(255,255,255,.10); border-bottom: 1px solid rgba(255,255,255,.10);
+  border-bottom-right-radius: 3px; pointer-events: auto; }
 [data-dsh-pet]:hover .pet-status,
-[data-dsh-pet]:focus-within .pet-status { opacity: 1; }
+[data-dsh-pet]:focus-within .pet-status {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity .2s cubic-bezier(.16,1,.3,1), transform .2s cubic-bezier(.16,1,.3,1), visibility 0s;
+  transition-delay: .06s; }
+[data-dsh-pet] .pet-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+[data-dsh-pet] .pet-lv { background: rgba(86,134,254,.16); color: #B7C8FE; border-radius: 5px;
+  padding: 2px 6px; font-size: 10px; font-weight: 600; line-height: 16px; white-space: nowrap; }
+[data-dsh-pet] .pet-stats { color: #AEB6C4; font-size: 11px; line-height: 16px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+[data-dsh-pet] .pet-note { color: #AEB6C4; font-size: 11px; line-height: 15px;
+  text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+/* \u7FFB\u8F6C/\u5BF9\u9F50\u53D8\u4F53\uFF08layoutStatus \u6309\u89C6\u53E3\u4F4D\u7F6E\u5207\u6362\uFF09\uFF1A
+   - \u4E0B\u65B9\u6A21\u5F0F\uFF08\u5BA0\u7269\u8D34\u9876\uFF09\uFF1A\u951A\u5B9A\u5BA0\u7269\u5E95\u90E8\uFF0C\u5C3E\u5DF4\u671D\u4E0A
+   - \u5DE6\u53F3\u5BF9\u9F50\uFF08\u5BA0\u7269\u8D34\u89C6\u53E3\u8FB9\u7F18\uFF09\uFF1A\u5361\u8FB9\u7F18\u5BF9\u9F50\u5BA0\u7269\u8FB9\u7F18\uFF0C\u907F\u514D\u5361\u4F38\u5230\u89C6\u53E3\u5916 */
+[data-dsh-pet] .pet-status.pet-status-below { left: 50%; bottom: auto; top: calc(100% + 8px); }
+[data-dsh-pet] .pet-status.pet-status-below::after { bottom: auto; top: -5px;
+  border-right: 1px solid rgba(255,255,255,.10); border-bottom: none;
+  border-top: 1px solid rgba(255,255,255,.10); border-bottom-right-radius: 0;
+  border-top-left-radius: 3px; }
+[data-dsh-pet] .pet-status.pet-status-left { left: 0; transform: translateX(0); }
+[data-dsh-pet] .pet-status.pet-status-right { left: auto; right: 0; transform: translateX(0); }
+[data-dsh-pet]:hover .pet-status.pet-status-left,
+[data-dsh-pet]:focus-within .pet-status.pet-status-left,
+[data-dsh-pet]:hover .pet-status.pet-status-right,
+[data-dsh-pet]:focus-within .pet-status.pet-status-right { transform: translateX(0); }
+/* \u6C14\u6CE1\u6FC0\u6D3B\u6216\u83DC\u5355\u6253\u5F00\u65F6\u72B6\u6001\u5361\u8BA9\u4F4D\u9690\u85CF\uFF08\u6C14\u6CE1/\u83DC\u5355\u4F18\u5148\uFF0C\u89C1\u5171\u5B58\u7B56\u7565\uFF09\u3002 */
+[data-dsh-pet] .pet-status.pet-status-hidden { opacity: 0 !important; visibility: hidden !important; }
+[data-dsh-pet] .pet-menu.open ~ .pet-status { opacity: 0 !important; visibility: hidden !important; }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
-  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out; }
-[data-dsh-pet] .pet-meta { display: flex; justify-content: space-between; color: rgba(255,255,255,.75); }
-[data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
-  background: rgba(20,20,28,.72); }
+  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
+  z-index: 3; }
 [data-dsh-pet] .pet-menu.open { display: flex; }
 [data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 12px; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; }
@@ -128,6 +164,7 @@
   [data-dsh-pet] .pet-sprite { animation: none !important; }
   [data-dsh-pet] .pet-heart { animation: none; opacity: 0; }
   [data-dsh-pet] .pet-bubble { animation: none; }
+  [data-dsh-pet] .pet-status { transition: none !important; }
 }
 `;
   function apply(ctx = {}) {
@@ -171,6 +208,34 @@
     const effects = document.createElement("div");
     effects.className = "pet-effects";
     host.append(effects, stage, status, menu);
+    const layoutStatus = () => {
+      if (activeBubble !== null || dragging) {
+        status.classList.add("pet-status-hidden");
+        return;
+      }
+      status.classList.remove("pet-status-hidden");
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const rect = host.getBoundingClientRect();
+      const cardW = status.offsetWidth || 190;
+      const cardH = status.offsetHeight || 60;
+      const nearLeft = rect.left < cardW / 2 - 8;
+      const nearRight = rect.right > vw - (cardW / 2 - 8);
+      const nearTop = rect.top < cardH + 12;
+      status.classList.remove("pet-status-below", "pet-status-left", "pet-status-right");
+      if (nearLeft && !nearRight) status.classList.add("pet-status-left");
+      else if (nearRight && !nearLeft) status.classList.add("pet-status-right");
+      if (nearTop) status.classList.add("pet-status-below");
+    };
+    const onHostEnter = () => layoutStatus();
+    const onHostLeave = () => {
+      status.classList.remove("pet-status-below", "pet-status-left", "pet-status-right", "pet-status-hidden");
+    };
+    host.addEventListener("mouseenter", onHostEnter);
+    host.addEventListener("mouseleave", onHostLeave);
+    const onBubbleShown = () => {
+      if (document.querySelector(":hover") === host) layoutStatus();
+    };
     const toggleMenu = (open) => {
       const next = open ?? !menu.classList.contains("open");
       menu.classList.toggle("open", next);
@@ -208,7 +273,7 @@
     const renderStatus = () => {
       if (pet) {
         metaLv.textContent = `Lv.${pet.level}`;
-        metaStats.textContent = `${pet.stats.tasksDone} \u4EFB\u52A1 \xB7 ${pet.stats.failures} \u5931\u8D25`;
+        metaStats.textContent = pet.stats.failures > 0 ? `${pet.stats.tasksDone} \u4EFB\u52A1 \xB7 ${pet.stats.failures} \u5931\u8D25` : `${pet.stats.tasksDone} \u4EFB\u52A1`;
         const last = pet.memory[pet.memory.length - 1];
         metaNote.textContent = last ?? (pet.titles.length > 0 ? `\u79F0\u53F7\u300C${pet.titles.join("\u300D\u300C")}\u300D` : "\u2026");
       }
@@ -363,10 +428,12 @@
       bubble.textContent = text;
       effects.appendChild(bubble);
       activeBubble = bubble;
+      if (typeof onBubbleShown === "function") onBubbleShown();
       const timer2 = setTimeout(() => {
         bubbleTimers.delete(timer2);
         if (activeBubble === bubble) activeBubble = null;
         bubble.remove();
+        if (typeof onBubbleShown === "function") onBubbleShown();
       }, 2500);
       bubbleTimers.add(timer2);
     };
@@ -465,6 +532,7 @@
         if (!moved) stage.setPointerCapture(e.pointerId);
         moved = true;
         dragging = true;
+        layoutStatus();
         const nextFlip = e.clientX < lastPointerX ? -1 : 1;
         if (nextFlip !== flip) {
           flip = nextFlip;
@@ -486,17 +554,20 @@
       dragging = false;
       if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
       if (moved) savePos();
+      layoutStatus();
       if (!moved && !e.target.closest("button")) toggleMenu();
     });
     stage.addEventListener("pointercancel", () => {
       pressed = false;
       dragging = false;
       moved = false;
+      layoutStatus();
     });
     stage.addEventListener("lostpointercapture", () => {
       pressed = false;
       dragging = false;
       moved = false;
+      layoutStatus();
     });
     stage.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -609,6 +680,7 @@
       const y = Math.max(0, Math.min(parseFloat(host.style.top) || 0, window.innerHeight - host.offsetHeight));
       host.style.left = `${x}px`;
       host.style.top = `${y}px`;
+      layoutStatus();
     };
     window.addEventListener("resize", onResize);
     let dialogOpen = false;
@@ -635,6 +707,8 @@
       document.removeEventListener("pointerdown", onDocPointerDown);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
+      host.removeEventListener("mouseenter", onHostEnter);
+      host.removeEventListener("mouseleave", onHostLeave);
       window.removeEventListener("resize", onResize);
       host.remove();
       style.remove();

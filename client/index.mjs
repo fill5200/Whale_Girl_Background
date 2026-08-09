@@ -35,22 +35,58 @@ const CSS = `
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: 110px; height: 110px;
-  pointer-events: none; overflow: visible; }
+  pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
-[data-dsh-pet] .pet-status { min-width: 110px; margin-top: 6px; padding: 6px 8px;
-  background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
-  display: grid; gap: 3px;
-  /* 默认隐藏（不占视觉、不挡点击），悬停/聚焦宠物时淡入——平时只剩干净的宠物本体。 */
-  opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+/* 状态卡：绝对定位锚定宠物顶部（脱离流式——不撑大宿主盒、不遮宠物本体）。
+   hover/focus 显示，移走消失；带指向宠物头顶的连接尾。默认 opacity:0。 */
+[data-dsh-pet] .pet-status { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+  min-width: 140px; max-width: 200px; padding: 8px 12px;
+  background: rgba(27,30,40,.94); backdrop-filter: blur(10px) saturate(1.15);
+  border: 1px solid rgba(255,255,255,.10); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.38), 0 3px 8px rgba(0,0,0,.28);
+  color: #E8EBF2; font-size: 11px; display: grid; gap: 4px; z-index: 1;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .15s ease-out, transform .15s ease-out, visibility 0s linear .2s; }
+[data-dsh-pet] .pet-status::after { /* 连接尾：命中区覆盖宠物↔卡片间隙，hover 连续不闪断 */
+  content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
+  transform: translateX(-50%) rotate(45deg); background: rgba(27,30,40,.94);
+  border-right: 1px solid rgba(255,255,255,.10); border-bottom: 1px solid rgba(255,255,255,.10);
+  border-bottom-right-radius: 3px; pointer-events: auto; }
 [data-dsh-pet]:hover .pet-status,
-[data-dsh-pet]:focus-within .pet-status { opacity: 1; }
+[data-dsh-pet]:focus-within .pet-status {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity .2s cubic-bezier(.16,1,.3,1), transform .2s cubic-bezier(.16,1,.3,1), visibility 0s;
+  transition-delay: .06s; }
+[data-dsh-pet] .pet-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+[data-dsh-pet] .pet-lv { background: rgba(86,134,254,.16); color: #B7C8FE; border-radius: 5px;
+  padding: 2px 6px; font-size: 10px; font-weight: 600; line-height: 16px; white-space: nowrap; }
+[data-dsh-pet] .pet-stats { color: #AEB6C4; font-size: 11px; line-height: 16px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+[data-dsh-pet] .pet-note { color: #AEB6C4; font-size: 11px; line-height: 15px;
+  text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+/* 翻转/对齐变体（layoutStatus 按视口位置切换）：
+   - 下方模式（宠物贴顶）：锚定宠物底部，尾巴朝上
+   - 左右对齐（宠物贴视口边缘）：卡边缘对齐宠物边缘，避免卡伸到视口外 */
+[data-dsh-pet] .pet-status.pet-status-below { left: 50%; bottom: auto; top: calc(100% + 8px); }
+[data-dsh-pet] .pet-status.pet-status-below::after { bottom: auto; top: -5px;
+  border-right: 1px solid rgba(255,255,255,.10); border-bottom: none;
+  border-top: 1px solid rgba(255,255,255,.10); border-bottom-right-radius: 0;
+  border-top-left-radius: 3px; }
+[data-dsh-pet] .pet-status.pet-status-left { left: 0; transform: translateX(0); }
+[data-dsh-pet] .pet-status.pet-status-right { left: auto; right: 0; transform: translateX(0); }
+[data-dsh-pet]:hover .pet-status.pet-status-left,
+[data-dsh-pet]:focus-within .pet-status.pet-status-left,
+[data-dsh-pet]:hover .pet-status.pet-status-right,
+[data-dsh-pet]:focus-within .pet-status.pet-status-right { transform: translateX(0); }
+/* 气泡激活或菜单打开时状态卡让位隐藏（气泡/菜单优先，见共存策略）。 */
+[data-dsh-pet] .pet-status.pet-status-hidden { opacity: 0 !important; visibility: hidden !important; }
+[data-dsh-pet] .pet-menu.open ~ .pet-status { opacity: 0 !important; visibility: hidden !important; }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
-  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out; }
-[data-dsh-pet] .pet-meta { display: flex; justify-content: space-between; color: rgba(255,255,255,.75); }
-[data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
-  background: rgba(20,20,28,.72); }
+  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
+  z-index: 3; }
 [data-dsh-pet] .pet-menu.open { display: flex; }
 [data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 12px; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; }
@@ -89,6 +125,7 @@ const CSS = `
   [data-dsh-pet] .pet-sprite { animation: none !important; }
   [data-dsh-pet] .pet-heart { animation: none; opacity: 0; }
   [data-dsh-pet] .pet-bubble { animation: none; }
+  [data-dsh-pet] .pet-status { transition: none !important; }
 }
 `
 
@@ -141,6 +178,40 @@ export function apply(ctx = {}) {
   effects.className = 'pet-effects'
   host.append(effects, stage, status, menu)
 
+  // ---- 状态卡布局（视口感知：翻转/对齐，hover 显示时调用）----
+  // status 绝对定位锚定宠物上方；宠物贴顶 → 翻下方；贴左右缘 → 边缘对齐。
+  // 气泡激活（activeBubble）或拖拽中 → 隐藏让位（气泡/移动是主角）。
+  const layoutStatus = () => {
+    if (activeBubble !== null || dragging) {
+      status.classList.add('pet-status-hidden')
+      return
+    }
+    status.classList.remove('pet-status-hidden')
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const rect = host.getBoundingClientRect()
+    const cardW = status.offsetWidth || 190
+    const cardH = status.offsetHeight || 60
+    const nearLeft = rect.left < cardW / 2 - 8
+    const nearRight = rect.right > vw - (cardW / 2 - 8)
+    const nearTop = rect.top < cardH + 12
+    // 翻转/对齐类互斥：先清再设。
+    status.classList.remove('pet-status-below', 'pet-status-left', 'pet-status-right')
+    if (nearLeft && !nearRight) status.classList.add('pet-status-left')
+    else if (nearRight && !nearLeft) status.classList.add('pet-status-right')
+    if (nearTop) status.classList.add('pet-status-below')
+  }
+  const onHostEnter = () => layoutStatus()
+  const onHostLeave = () => {
+    status.classList.remove('pet-status-below', 'pet-status-left', 'pet-status-right', 'pet-status-hidden')
+  }
+  host.addEventListener('mouseenter', onHostEnter)
+  host.addEventListener('mouseleave', onHostLeave)
+  // 气泡出现时让状态卡让位：showReply 后立即重排（气泡是主角）。
+  const onBubbleShown = () => {
+    if (document.querySelector(':hover') === host) layoutStatus()
+  }
+
   // 菜单开关（同步 aria-expanded；open 缺省时切换）。
   const toggleMenu = (open) => {
     const next = open ?? !menu.classList.contains('open')
@@ -185,7 +256,10 @@ export function apply(ctx = {}) {
   const renderStatus = () => {
     if (pet) {
       metaLv.textContent = `Lv.${pet.level}`
-      metaStats.textContent = `${pet.stats.tasksDone} 任务 · ${pet.stats.failures} 失败`
+      // 任务计数：失败为 0 时省略「· 0 失败」（保持安静，不抢眼）。
+      metaStats.textContent = pet.stats.failures > 0
+        ? `${pet.stats.tasksDone} 任务 · ${pet.stats.failures} 失败`
+        : `${pet.stats.tasksDone} 任务`
       const last = pet.memory[pet.memory.length - 1]
       metaNote.textContent = last ?? (pet.titles.length > 0 ? `称号「${pet.titles.join('」「')}」` : '…')
     }
@@ -370,10 +444,12 @@ export function apply(ctx = {}) {
     bubble.textContent = text
     effects.appendChild(bubble)
     activeBubble = bubble
+    if (typeof onBubbleShown === 'function') onBubbleShown()
     const timer = setTimeout(() => {
       bubbleTimers.delete(timer)
       if (activeBubble === bubble) activeBubble = null
       bubble.remove()
+      if (typeof onBubbleShown === 'function') onBubbleShown() // 气泡消失后恢复状态卡
     }, 2500)
     bubbleTimers.add(timer)
   }
@@ -492,6 +568,7 @@ export function apply(ctx = {}) {
       if (!moved) stage.setPointerCapture(e.pointerId)
       moved = true
       dragging = true
+      layoutStatus() // 拖拽中隐藏状态卡（宠物是主角，卡片跟随移动会闪）
       const nextFlip = e.clientX < lastPointerX ? -1 : 1
       if (nextFlip !== flip) {
         flip = nextFlip
@@ -513,6 +590,7 @@ export function apply(ctx = {}) {
     dragging = false
     if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId)
     if (moved) savePos() // 拖拽结束落盘位置
+    layoutStatus() // 拖拽结束：状态卡恢复（若仍在 hover）
     // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
     if (!moved && !e.target.closest('button')) toggleMenu()
   })
@@ -520,12 +598,14 @@ export function apply(ctx = {}) {
     pressed = false
     dragging = false
     moved = false
+    layoutStatus()
   })
   // 捕获被系统强制释放（元素移除/其它元素抢捕获）时复位，防拖拽状态卡死。
   stage.addEventListener('lostpointercapture', () => {
     pressed = false
     dragging = false
     moved = false
+    layoutStatus()
   })
   // 键盘（a11y）：Enter/Space 切换菜单；Esc 关闭；点外部关闭。
   stage.addEventListener('keydown', (e) => {
@@ -649,13 +729,14 @@ export function apply(ctx = {}) {
   }
   document.addEventListener('visibilitychange', onVisibility)
 
-  // 窗口缩放后把已拖拽的位置重新 clamp 进视口。
+  // 窗口缩放后把已拖拽的位置重新 clamp 进视口，并重算状态卡布局（视口边界变化）。
   const onResize = () => {
     if (!host.style.left) return // 默认右下角锚定无需处理
     const x = Math.max(0, Math.min(parseFloat(host.style.left) || 0, window.innerWidth - host.offsetWidth))
     const y = Math.max(0, Math.min(parseFloat(host.style.top) || 0, window.innerHeight - host.offsetHeight))
     host.style.left = `${x}px`
     host.style.top = `${y}px`
+    layoutStatus()
   }
   window.addEventListener('resize', onResize)
 
@@ -686,6 +767,8 @@ export function apply(ctx = {}) {
     document.removeEventListener('pointerdown', onDocPointerDown)
     document.removeEventListener('keydown', onKeyDown)
     document.removeEventListener('visibilitychange', onVisibility)
+    host.removeEventListener('mouseenter', onHostEnter)
+    host.removeEventListener('mouseleave', onHostLeave)
     window.removeEventListener('resize', onResize)
     host.remove()
     style.remove()
