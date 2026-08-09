@@ -521,8 +521,8 @@ export function apply(ctx = {}) {
     clearTimeout(wanderTimer)
     const wait = WANDER_MIN_WAIT_MS + Math.random() * (WANDER_MAX_WAIT_MS - WANDER_MIN_WAIT_MS)
     wanderTimer = setTimeout(() => {
-      if (sleeping) {
-        scheduleWander() // 睡着了不走，延后重排
+      if (sleeping || sessionMood.thinking || sessionMood.waiting) {
+        scheduleWander() // 睡着了或会话活跃（思考陪伴/等待批准）不走，延后重排
         return
       }
       wander()
@@ -545,7 +545,7 @@ export function apply(ctx = {}) {
     host.style.right = 'auto'
     host.style.bottom = 'auto'
     const step = (t) => {
-      if (sleeping || dragging) {
+      if (sleeping || dragging || sessionMood.thinking || sessionMood.waiting) {
         stopWalk()
         return
       }

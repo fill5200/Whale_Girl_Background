@@ -498,7 +498,7 @@
       clearTimeout(wanderTimer);
       const wait = WANDER_MIN_WAIT_MS + Math.random() * (WANDER_MAX_WAIT_MS - WANDER_MIN_WAIT_MS);
       wanderTimer = setTimeout(() => {
-        if (sleeping) {
+        if (sleeping || sessionMood.thinking || sessionMood.waiting) {
           scheduleWander();
           return;
         }
@@ -520,7 +520,7 @@
       host.style.right = "auto";
       host.style.bottom = "auto";
       const step = (t) => {
-        if (sleeping || dragging) {
+        if (sleeping || dragging || sessionMood.thinking || sessionMood.waiting) {
           stopWalk();
           return;
         }
