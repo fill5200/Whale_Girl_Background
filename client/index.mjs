@@ -38,10 +38,9 @@ const CSS = `
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
-/* 状态卡：绝对定位锚定宠物顶部（脱离流式——不撑大宿主盒、不遮宠物本体）。
-   hover/focus 显示，移走消失；带指向宠物头顶的连接尾。默认 opacity:0。 */
-[data-dsh-pet] .pet-status { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
-  min-width: 140px; max-width: 200px; padding: 8px 12px;
+/* 状态卡：默认置于宠物下方，贴近本体且不撑大宿主盒。 */
+[data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
+  width: 128px; max-width: calc(100vw - 24px); padding: 5px 8px;
   background: rgba(27,30,40,.94); backdrop-filter: blur(10px) saturate(1.15);
   border: 1px solid rgba(255,255,255,.10); border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0,0,0,.38), 0 3px 8px rgba(0,0,0,.28);
@@ -49,10 +48,10 @@ const CSS = `
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity .15s ease-out, transform .15s ease-out, visibility 0s linear .2s; }
 [data-dsh-pet] .pet-status::after { /* 连接尾：命中区覆盖宠物↔卡片间隙，hover 连续不闪断 */
-  content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
+  content: ''; position: absolute; left: 50%; top: -5px; width: 10px; height: 10px;
   transform: translateX(-50%) rotate(45deg); background: rgba(27,30,40,.94);
-  border-right: 1px solid rgba(255,255,255,.10); border-bottom: 1px solid rgba(255,255,255,.10);
-  border-bottom-right-radius: 3px; pointer-events: auto; }
+  border-top: 1px solid rgba(255,255,255,.10); border-left: 1px solid rgba(255,255,255,.10);
+  border-top-left-radius: 3px; pointer-events: auto; }
 [data-dsh-pet]:hover .pet-status,
 [data-dsh-pet]:focus-within .pet-status {
   opacity: 1; visibility: visible; pointer-events: auto;
@@ -69,11 +68,11 @@ const CSS = `
 /* 翻转/对齐变体（layoutStatus 按视口位置切换）：
    - 下方模式（宠物贴顶）：锚定宠物底部，尾巴朝上
    - 左右对齐（宠物贴视口边缘）：卡边缘对齐宠物边缘，避免卡伸到视口外 */
-[data-dsh-pet] .pet-status.pet-status-below { left: 50%; bottom: auto; top: calc(100% + 8px); }
-[data-dsh-pet] .pet-status.pet-status-below::after { bottom: auto; top: -5px;
-  border-right: 1px solid rgba(255,255,255,.10); border-bottom: none;
-  border-top: 1px solid rgba(255,255,255,.10); border-bottom-right-radius: 0;
-  border-top-left-radius: 3px; }
+[data-dsh-pet] .pet-status.pet-status-above { left: 50%; top: auto; bottom: calc(100% + 6px); }
+[data-dsh-pet] .pet-status.pet-status-above::after { bottom: -5px; top: auto;
+  border-top: none; border-left: none;
+  border-right: 1px solid rgba(255,255,255,.10); border-bottom: 1px solid rgba(255,255,255,.10);
+  border-top-left-radius: 0; border-bottom-right-radius: 3px; }
 [data-dsh-pet] .pet-status.pet-status-left { left: 0; transform: translateX(0); }
 [data-dsh-pet] .pet-status.pet-status-right { left: auto; right: 0; transform: translateX(0); }
 [data-dsh-pet]:hover .pet-status.pet-status-left,
@@ -83,6 +82,8 @@ const CSS = `
 /* 气泡激活或菜单打开时状态卡让位隐藏（气泡/菜单优先，见共存策略）。 */
 [data-dsh-pet] .pet-status.pet-status-hidden { opacity: 0 !important; visibility: hidden !important; }
 [data-dsh-pet] .pet-menu.open ~ .pet-status { opacity: 0 !important; visibility: hidden !important; }
+[data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
+  background: rgba(20,20,28,.72); }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
   white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
@@ -194,16 +195,16 @@ export function apply(ctx = {}) {
     const cardH = status.offsetHeight || 60
     const nearLeft = rect.left < cardW / 2 - 8
     const nearRight = rect.right > vw - (cardW / 2 - 8)
-    const nearTop = rect.top < cardH + 12
     // 翻转/对齐类互斥：先清再设。
-    status.classList.remove('pet-status-below', 'pet-status-left', 'pet-status-right')
+    status.classList.remove('pet-status-above', 'pet-status-left', 'pet-status-right')
     if (nearLeft && !nearRight) status.classList.add('pet-status-left')
     else if (nearRight && !nearLeft) status.classList.add('pet-status-right')
-    if (nearTop) status.classList.add('pet-status-below')
+    const nearBottom = rect.bottom > vh - cardH - 12
+    if (nearBottom) status.classList.add('pet-status-above')
   }
   const onHostEnter = () => layoutStatus()
   const onHostLeave = () => {
-    status.classList.remove('pet-status-below', 'pet-status-left', 'pet-status-right', 'pet-status-hidden')
+    status.classList.remove('pet-status-above', 'pet-status-left', 'pet-status-right', 'pet-status-hidden')
   }
   host.addEventListener('mouseenter', onHostEnter)
   host.addEventListener('mouseleave', onHostLeave)
@@ -266,8 +267,12 @@ export function apply(ctx = {}) {
   }
 
   const showEmoji = (name) => {
+    // 舞台只承载一个视觉节点；互动 props/气泡放在 effects，不能残留在状态层。
     sprite.classList.remove('ready')
-    stage.textContent = EMOJI[name] ?? '🐣'
+    const emoji = document.createElement('span')
+    emoji.className = 'pet-emoji'
+    emoji.textContent = EMOJI[name] ?? '🐣'
+    stage.replaceChildren(emoji)
   }
 
   const showSprite = (name, cfg) => {
@@ -276,8 +281,7 @@ export function apply(ctx = {}) {
       showEmoji(name) // 未声明尺寸的 SVG（naturalWidth=0）→ 兜底，避免除零白屏
       return
     }
-    // replaceChildren(sprite)：清掉 emoji 文本等其它子节点，并确保 sprite 在 DOM 里
-    // （textContent='' 会把 sprite 也摘掉，样式作用在脱离 DOM 的节点上——空舞台 bug）。
+    // 清掉前一状态的 emoji/sprite，确保 eat/play 不会在状态结束后残留。
     stage.replaceChildren(sprite)
     const frameW = size.w / cfg.frames
     const scale = Math.min(SPRITE_MAX / frameW, SPRITE_MAX / size.h, 1)
@@ -568,6 +572,11 @@ export function apply(ctx = {}) {
       if (!moved) stage.setPointerCapture(e.pointerId)
       moved = true
       dragging = true
+      // 拖拽打断当前互动：清掉 eat/play/wake 瞬发与互动喜悦——释放后回到拖拽前
+      // 的底层状态（如 idle/think），而不是继续播放被打断的 play。
+      transient = null
+      transientUntil = 0
+      joyUntil = 0
       layoutStatus() // 拖拽中隐藏状态卡（宠物是主角，卡片跟随移动会闪）
       const nextFlip = e.clientX < lastPointerX ? -1 : 1
       if (nextFlip !== flip) {

@@ -17,6 +17,7 @@ Status: implemented
 - `walk` 同样采用往返帧播放；游走起点正确保留 `x=0`，避免左边界被误判为缺省位置。
 - 每轮游走开始时即时刷新 sprite 的 `scaleX`；即使状态仍为 `walk`，新方向也不会沿用上一轮朝向。
 - 拖拽越过阈值后按连续横向位移更新 `scaleX`，中途反向立即翻转 drag sprite。
+- 状态卡默认紧凑地显示在宠物下方，仅在视口底部空间不足时翻到上方；舞台状态切换只保留当前 sprite 或 emoji，互动特效留在独立 effects 层，避免残影。
 
 ## Alternatives considered
 
