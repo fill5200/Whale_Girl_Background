@@ -74,6 +74,7 @@ drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
 ### 加角色（不新增状态）
 - 角色只用**现有状态**（`characters.<id>.states` 部分映射），缺的 emoji 兜底
 - 帧数/fps/motion 角色可选（表现层）；触发/优先级全角色共通（行为层）
+- **完整操作指南（事件→动作映射、动作槽位、动手步骤）见 [adding-a-character.md](adding-a-character.md)**
 - 详见 [character-manifest 决策](../decisions/implemented/feature/2026-08-09-character-manifest.md)
 
 ### 新角色的「核心状态集」建议（低成本下限）

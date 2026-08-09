@@ -28,7 +28,7 @@ dsh-pet:
 
 ## 角色（换角色零改代码）
 
-`assets/manifest.json` 是角色索引：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）+ `default`。换角色 = 新增角色目录 + manifest 条目 + 设置 localStorage `dsh-pet:character`（P2 将加菜单 UI）；缺 sheet 状态自动 emoji 兜底。旧格式顶层 `states`（sheet 平铺 `assets/`）兼容。
+`assets/manifest.json` 是角色索引：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）+ `default`。换角色 = 新增角色目录 + manifest 条目 + 设置 localStorage `dsh-pet:character`（或点菜单「🎭 换角色」按钮循环切换）；缺 sheet 状态自动 emoji 兜底。**完整开发指南（事件→动作映射、动作槽位、扩展边界、动手步骤）见 [docs/adding-a-character.md](docs/adding-a-character.md)**。旧格式顶层 `states`（sheet 平铺 `assets/`）兼容。
 
 ## 开发循环
 
