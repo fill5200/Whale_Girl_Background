@@ -19,7 +19,7 @@ const MANIFEST_URL = `${ASSETS_URL}/manifest.json`
 const POLL_MS = 3000
 const TICK_MS = 50
 const SLEEP_AFTER_MS = 60000
-const SPRITE_MAX = 150
+const SPRITE_MAX = 110
 // 游走行为：每 18~40s 沿视口底部散步 3~6s，速度 45px/s。
 const WANDER_MIN_WAIT_MS = 18000
 const WANDER_MAX_WAIT_MS = 40000
@@ -31,14 +31,18 @@ const IDLE_PAUSE_MS = 3500
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
-[data-dsh-pet] .pet-stage { position: relative; width: 150px; height: 150px; display: grid; place-items: center;
-  font-size: 56px; line-height: 1; text-align: center;
+[data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
+  font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
-[data-dsh-pet] .pet-status { min-width: 120px; margin-top: 6px; padding: 6px 8px;
+[data-dsh-pet] .pet-status { min-width: 110px; margin-top: 6px; padding: 6px 8px;
   background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
-  display: grid; gap: 3px; }
+  display: grid; gap: 3px;
+  /* 默认隐藏（不占视觉、不挡点击），悬停/聚焦宠物时淡入——平时只剩干净的宠物本体。 */
+  opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+[data-dsh-pet]:hover .pet-status,
+[data-dsh-pet]:focus-within .pet-status { opacity: 1; }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
   white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out; }
@@ -462,7 +466,8 @@ export function apply(ctx = {}) {
   }
 
   // capture 只在越过拖拽阈值后启用：纯点击不捕获，菜单按钮的 click 正常派发。
-  host.addEventListener('pointerdown', (e) => {
+  // 热区只绑舞台本体（110×110）：状态条/菜单区不参与拖拽与点击切换，减少误触与遮挡。
+  stage.addEventListener('pointerdown', (e) => {
     pressed = true
     dragging = false
     moved = false
@@ -474,10 +479,10 @@ export function apply(ctx = {}) {
     offsetX = e.clientX - host.offsetLeft
     offsetY = e.clientY - host.offsetTop
   })
-  host.addEventListener('pointermove', (e) => {
+  stage.addEventListener('pointermove', (e) => {
     if (!pressed) return
     if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
-      if (!moved) host.setPointerCapture(e.pointerId)
+      if (!moved) stage.setPointerCapture(e.pointerId)
       moved = true
       dragging = true
       const nextFlip = e.clientX < lastPointerX ? -1 : 1
@@ -496,21 +501,21 @@ export function apply(ctx = {}) {
     host.style.right = 'auto'
     host.style.bottom = 'auto'
   })
-  host.addEventListener('pointerup', (e) => {
+  stage.addEventListener('pointerup', (e) => {
     pressed = false
     dragging = false
-    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId)
+    if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId)
     if (moved) savePos() // 拖拽结束落盘位置
     // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
     if (!moved && !e.target.closest('button')) toggleMenu()
   })
-  host.addEventListener('pointercancel', () => {
+  stage.addEventListener('pointercancel', () => {
     pressed = false
     dragging = false
     moved = false
   })
   // 捕获被系统强制释放（元素移除/其它元素抢捕获）时复位，防拖拽状态卡死。
-  host.addEventListener('lostpointercapture', () => {
+  stage.addEventListener('lostpointercapture', () => {
     pressed = false
     dragging = false
     moved = false

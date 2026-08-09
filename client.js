@@ -60,7 +60,7 @@
   var POLL_MS = 3e3;
   var TICK_MS = 50;
   var SLEEP_AFTER_MS = 6e4;
-  var SPRITE_MAX = 150;
+  var SPRITE_MAX = 110;
   var WANDER_MIN_WAIT_MS = 18e3;
   var WANDER_MAX_WAIT_MS = 4e4;
   var WALK_MIN_MS = 3e3;
@@ -70,14 +70,18 @@
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
-[data-dsh-pet] .pet-stage { position: relative; width: 150px; height: 150px; display: grid; place-items: center;
-  font-size: 56px; line-height: 1; text-align: center;
+[data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
+  font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
-[data-dsh-pet] .pet-status { min-width: 120px; margin-top: 6px; padding: 6px 8px;
+[data-dsh-pet] .pet-status { min-width: 110px; margin-top: 6px; padding: 6px 8px;
   background: rgba(20,20,28,.72); color: #eee; border-radius: 8px; font-size: 11px;
-  display: grid; gap: 3px; }
+  display: grid; gap: 3px;
+  /* \u9ED8\u8BA4\u9690\u85CF\uFF08\u4E0D\u5360\u89C6\u89C9\u3001\u4E0D\u6321\u70B9\u51FB\uFF09\uFF0C\u60AC\u505C/\u805A\u7126\u5BA0\u7269\u65F6\u6DE1\u5165\u2014\u2014\u5E73\u65F6\u53EA\u5269\u5E72\u51C0\u7684\u5BA0\u7269\u672C\u4F53\u3002 */
+  opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+[data-dsh-pet]:hover .pet-status,
+[data-dsh-pet]:focus-within .pet-status { opacity: 1; }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
   white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out; }
@@ -438,7 +442,7 @@
       }
     } catch {
     }
-    host.addEventListener("pointerdown", (e) => {
+    stage.addEventListener("pointerdown", (e) => {
       pressed = true;
       dragging = false;
       moved = false;
@@ -450,10 +454,10 @@
       offsetX = e.clientX - host.offsetLeft;
       offsetY = e.clientY - host.offsetTop;
     });
-    host.addEventListener("pointermove", (e) => {
+    stage.addEventListener("pointermove", (e) => {
       if (!pressed) return;
       if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
-        if (!moved) host.setPointerCapture(e.pointerId);
+        if (!moved) stage.setPointerCapture(e.pointerId);
         moved = true;
         dragging = true;
         const nextFlip = e.clientX < lastPointerX ? -1 : 1;
@@ -472,19 +476,19 @@
       host.style.right = "auto";
       host.style.bottom = "auto";
     });
-    host.addEventListener("pointerup", (e) => {
+    stage.addEventListener("pointerup", (e) => {
       pressed = false;
       dragging = false;
-      if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+      if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
       if (moved) savePos();
       if (!moved && !e.target.closest("button")) toggleMenu();
     });
-    host.addEventListener("pointercancel", () => {
+    stage.addEventListener("pointercancel", () => {
       pressed = false;
       dragging = false;
       moved = false;
     });
-    host.addEventListener("lostpointercapture", () => {
+    stage.addEventListener("lostpointercapture", () => {
       pressed = false;
       dragging = false;
       moved = false;
