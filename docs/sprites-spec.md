@@ -40,7 +40,7 @@
 
 ## 状态总表（权威，15 状态）
 
-窗口时长不在此重复：burst/瞬发窗口的毫秒值只存 [index.mjs](../index.mjs)（本表触发列只写事件来源）。motion 配方与帧播放器默认互斥（`motion` 只配 `frames:1`）；`error` 是唯一多帧+运动叠加的定向例外（见下方规则）。`think`/`wait` 当前无 sheet（emoji 兜底），表内标注期望画面供补图。
+窗口时长不在此重复：burst/瞬发窗口的毫秒值只存 [index.mjs](../index.mjs)（本表触发列只写事件来源）。motion 配方与帧播放器默认互斥（`motion` 只配 `frames:1`）；`error` 是唯一多帧+运动叠加的定向例外（见下方规则）。`think`/`wait` 已有 sheet（1 帧 + `float`/`wiggle` 运动配方），表内为实际投放。
 
 | 状态 | 触发 | 帧数 | motion 配方 | loop | 画面 |
 |---|---|---|---|---|---|
@@ -57,14 +57,14 @@
 | `sleep` | 空闲 ≥60s | 2 | — | ✓ | 蜷睡 |
 | `wake` | 睡醒过渡（瞬发） | 2 | — | ✗ | 伸懒腰 |
 | `welcome` | 新会话（burst） | 2 | — | ✓ | 挥手打招呼 |
-| `think` | 任一会话运行中（sessions 订阅，陪伴底座） | 1 | — | — | 沉思陪伴（当前 emoji 兜底 💭） |
-| `wait` | 任一会话等待批准（sessions 订阅，陪伴底座） | 1 | — | — | 等待回应（当前 emoji 兜底 👀） |
+| `think` | 任一会话运行中（sessions 订阅，陪伴底座） | 1 | `float` | ✓ | 沉思陪伴（托腮望向远处，上下浮动） |
+| `wait` | 任一会话等待批准（sessions 订阅，陪伴底座） | 1 | `wiggle` | ✓ | 等待回应（前倾看向观众，左右摇摆） |
 
 优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > `think` > `working` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 
 ## manifest 模板（角色索引；whale-girl 13 个有 sheet 状态）
 
-`think`/`wait` 当前无 sheet（client 的 EMOJI 兜底表提供表情，见 [client/logic.mjs](../client/logic.mjs)）；补图后在此加入条目（`verify-assets` 要求 manifest 状态 ∈ EMOJI 表，反向不必）。角色索引格式：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）；`default` 指定默认角色；顶层 `states` 为旧格式兼容简写（单角色、sheet 平铺 `assets/`），`verify-assets` 两种格式都校验。
+`think`/`wait` 已有 sheet（`think.png`/`wait.png`，1 帧 + 运动配方）；缺 sheet 的状态仍由 EMOJI 兜底（`verify-assets` 要求 manifest 状态 ∈ EMOJI 表，反向不必）。角色索引格式：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）；`default` 指定默认角色；顶层 `states` 为旧格式兼容简写（单角色、sheet 平铺 `assets/`），`verify-assets` 两种格式都校验。
 
 ```json
 {
@@ -86,7 +86,9 @@
         "walk":         { "sheet": "walk.png",         "frames": 3, "fps": 6,  "loop": true },
         "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "loop": true },
         "wake":         { "sheet": "wake.png",         "frames": 2, "fps": 3,  "loop": false },
-        "welcome":      { "sheet": "welcome.png",      "frames": 2, "fps": 3,  "loop": true }
+        "welcome":      { "sheet": "welcome.png",      "frames": 2, "fps": 3,  "loop": true },
+        "think":        { "sheet": "think.png",        "frames": 1, "fps": 2,  "loop": true,  "motion": "float" },
+        "wait":         { "sheet": "wait.png",         "frames": 1, "fps": 2,  "loop": true,  "motion": "wiggle" }
       }
     }
   },

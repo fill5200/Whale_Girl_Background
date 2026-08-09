@@ -86,6 +86,20 @@
           "frames": 2,
           "fps": 3,
           "loop": true
+        },
+        "think": {
+          "sheet": "think.png",
+          "frames": 1,
+          "fps": 2,
+          "loop": true,
+          "motion": "float"
+        },
+        "wait": {
+          "sheet": "wait.png",
+          "frames": 1,
+          "fps": 2,
+          "loop": true,
+          "motion": "wiggle"
         }
       }
     }
