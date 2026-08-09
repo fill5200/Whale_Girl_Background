@@ -46,10 +46,13 @@
 **核心状态集**（idle/walk/working/celebrate/error/sleep/wake/joy 必做）与可选状态集。
 
 ### 演进路径
-- **P1 角色清单化**（一个 PR）：manifest 升级 + `client/character.mjs` 纯函数解析层 + 单测 +
-  三处参数化 + verify-assets 多角色遍历 + spec 角色层规格。
-- **P2 切换 UX**：菜单「换角色」+ localStorage 偏好 + 可选 `emojiOverrides`。
-- **P4 外部角色包**：需 plugin-registry 机制配合，非单插件自造（明确边界）。
+- **P1 角色清单化**：✅ 已完成（manifest 角色索引 + client/character.mjs + 门禁多角色，见 [character-manifest](../decisions/implemented/feature/2026-08-09-character-manifest.md)）。
+- **P2 切换 UX**：✅ 已完成（菜单「换角色」+ localStorage 偏好 + emojiOverrides + stageSize 接入 --pet-size）。
+- **P4 外部角色包——留档边界（当前不做）**：
+  - **是什么**：第三方开发者独立发布「角色皮肤包」插件，用户安装后宠物可换用该角色——像游戏 MOD/皮肤市场。角色从「随 dsh-pet 内置」升级为「独立分发单元」。
+  - **为什么需要 plugin-registry**：registry 是生态里「独立分发一个包」的唯一机制（`dsh plugin install <dir|tgz>`，每插件独立安装/启用/卸载 + 信任模型）；dsh-pet 是单插件，无法自造「安装另一个独立包」的能力，重复造轮子还会破坏统一生命周期与信任模型。
+  - **需要的机制改动（触发时做）**：① registry `contributes` 开放角色包声明（当前封闭集合仅 tools/skills）；② registry 暴露「按插件 id 读静态资源」通道（dsh-pet 的 assets 路由只读自己目录）；③ dsh-pet 角色清单双来源（内置 + 外部角色包扫描）、资源 URL 跨包；④ 角色包协议文档（character.json + 素材规格，复用 sprites-spec 纯绿/帧契约）。
+  - **触发条件**：出现真实第三方角色包需求（有第二个角色、有人要发包）——需求为零时做平台级能力是过度设计；自然演进是先有第二个**内置**角色（验证多角色系统），再启动 P4。
 
 ## 二、开放性（subagent：open）
 
