@@ -1,6 +1,7 @@
 (() => {
   // client/logic.mjs
   var TRANSIENT_MS = 1500;
+  var WAKE_MS = 3e3;
   var JOY_MS = 1600;
   var EMOJI = {
     idle: "\u{1F423}",
@@ -15,19 +16,40 @@
     walk: "\u{1F6B6}",
     sleep: "\u{1F4A4}",
     wake: "\u{1F62A}",
-    welcome: "\u{1F44B}"
+    welcome: "\u{1F44B}",
+    think: "\u{1F4AD}",
+    wait: "\u{1F440}"
   };
-  function pickState({ activity, dragging, walking, transient, sleeping, joyUntil = 0, now = Date.now() }) {
+  function pickState({ activity, dragging, walking, transient, sleeping, joyUntil = 0, now = Date.now(), sessionThink = false, sessionWait = false }) {
     if (dragging) return "drag";
-    if (walking) return "walk";
-    if (transient !== null) return transient;
     if (activity.name !== "idle" && activity.name !== "working" && activity.until > now) {
       return activity.name;
     }
+    if (transient === "eat" || transient === "play") return transient;
+    if (transient === "wake") return "wake";
+    if (sessionWait) return "wait";
+    if (sessionThink) return "think";
     if (activity.name === "working") return "working";
     if (now < joyUntil) return "joy";
     if (sleeping) return "sleep";
+    if (walking) return "walk";
     return "idle";
+  }
+  function deriveSessionMood(snapshot) {
+    const byId = snapshot?.byId ?? {};
+    let thinking = false;
+    let waiting = false;
+    const titles = [];
+    for (const id of Object.keys(byId)) {
+      const s = byId[id];
+      if (s === void 0 || s === null) continue;
+      if (s.running === true) {
+        thinking = true;
+        titles.push(s.displayTitle ?? id);
+      }
+      if (s.pendingInteraction !== void 0) waiting = true;
+    }
+    return { thinking, waiting, titles };
   }
 
   // client/index.mjs
@@ -44,6 +66,7 @@
   var WALK_MIN_MS = 3e3;
   var WALK_MAX_MS = 6e3;
   var WALK_SPEED_PX_S = 45;
+  var IDLE_PAUSE_MS = 3500;
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
@@ -100,7 +123,7 @@
   [data-dsh-pet] .pet-bubble { animation: none; }
 }
 `;
-  function apply() {
+  function apply(ctx = {}) {
     if (document.querySelector("[data-dsh-pet]") !== null) {
       console.warn("[dsh-pet] apply \u5DF2\u5B58\u5728\u5B9E\u4F8B\uFF0C\u8DF3\u8FC7\u91CD\u590D\u6302\u8F7D");
       return () => {
@@ -153,6 +176,7 @@
     const loaded = /* @__PURE__ */ new Set();
     const sheetSize = /* @__PURE__ */ new Map();
     let dragging = false;
+    let pressed = false;
     let moved = false;
     let transient = null;
     let transientUntil = 0;
@@ -163,12 +187,16 @@
     let wasSleeping = false;
     let animState = null;
     let frame = 0;
+    let frameDirection = 1;
+    let idlePausedUntil = 0;
     let lastFrameAt = 0;
     let walking = false;
     let walkDir = 1;
     let flip = 1;
     let wanderTimer = null;
     let walkRaf = null;
+    let sessionMood = { thinking: false, waiting: false, titles: [] };
+    let sessionsUnsub = null;
     const renderStatus = () => {
       if (pet) {
         metaLv.textContent = `Lv.${pet.level}`;
@@ -205,6 +233,8 @@
       if (name === animState) return;
       animState = name;
       frame = 0;
+      frameDirection = 1;
+      idlePausedUntil = 0;
       lastFrameAt = 0;
       for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
       const motion = manifest.states[name]?.motion;
@@ -252,7 +282,7 @@
       if (transient !== null && now >= transientUntil) {
         resetTransient(now);
       }
-      const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now });
+      const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting });
       setState(target);
       const cfg = manifest.states[animState];
       if (cfg && loaded.has(cfg.sheet)) {
@@ -265,13 +295,28 @@
           lastFrameAt = 0;
         }
         if (cfg.frames > 1 && now - lastFrameAt >= 1e3 / cfg.fps) {
+          if (animState === "idle" && idlePausedUntil > now) return;
+          if (animState === "idle" && idlePausedUntil !== 0 && now >= idlePausedUntil) {
+            frame = 0;
+            frameDirection = 1;
+            idlePausedUntil = 0;
+            lastFrameAt = now;
+            applyFrame(frameW, frame);
+            return;
+          }
           lastFrameAt = now;
-          frame += 1;
-          if (frame >= cfg.frames) {
+          frame += frameDirection;
+          if ((animState === "idle" || animState === "walk") && cfg.loop && cfg.frames > 1) {
+            if (frame >= cfg.frames - 1 || frame <= 0) frameDirection *= -1;
+            frame = Math.max(0, Math.min(cfg.frames - 1, frame));
+            if (animState === "idle" && frame === 0 && frameDirection === 1) {
+              idlePausedUntil = now + IDLE_PAUSE_MS;
+            }
+          } else if (frame >= cfg.frames) {
             if (cfg.loop) frame = 0;
             else {
               frame = cfg.frames - 1;
-              if (transient !== null) {
+              if (transient !== null && transient !== "wake") {
                 resetTransient(now);
               }
             }
@@ -336,7 +381,7 @@
         sleeping = activity.name === "idle" && Date.now() - lastActiveAt > SLEEP_AFTER_MS;
         if (wasSleeping && !sleeping && transient === null && !["welcome", "celebrate", "error", "disappointed", "working"].includes(activity.name)) {
           transient = "wake";
-          transientUntil = Date.now() + TRANSIENT_MS;
+          transientUntil = Date.now() + WAKE_MS;
         }
         wasSleeping = sleeping;
         failStreak = 0;
@@ -350,6 +395,7 @@
     };
     let startX = 0;
     let startY = 0;
+    let lastPointerX = 0;
     let offsetX = 0;
     let offsetY = 0;
     const POS_KEY = "dsh-pet:pos";
@@ -374,21 +420,31 @@
     } catch {
     }
     host.addEventListener("pointerdown", (e) => {
-      dragging = true;
+      pressed = true;
+      dragging = false;
       moved = false;
       stopWalk();
       lastActiveAt = Date.now();
       startX = e.clientX;
       startY = e.clientY;
+      lastPointerX = e.clientX;
       offsetX = e.clientX - host.offsetLeft;
       offsetY = e.clientY - host.offsetTop;
     });
     host.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
+      if (!pressed) return;
       if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
         if (!moved) host.setPointerCapture(e.pointerId);
         moved = true;
+        dragging = true;
+        const nextFlip = e.clientX < lastPointerX ? -1 : 1;
+        if (nextFlip !== flip) {
+          flip = nextFlip;
+          const dragCfg = manifest.states.drag;
+          if (animState === "drag" && dragCfg && loaded.has(dragCfg.sheet)) showSprite("drag", dragCfg);
+        }
       }
+      lastPointerX = e.clientX;
       if (!moved) return;
       const x = Math.max(0, Math.min(e.clientX - offsetX, window.innerWidth - host.offsetWidth));
       const y = Math.max(0, Math.min(e.clientY - offsetY, window.innerHeight - host.offsetHeight));
@@ -398,16 +454,19 @@
       host.style.bottom = "auto";
     });
     host.addEventListener("pointerup", (e) => {
+      pressed = false;
       dragging = false;
       if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
       if (moved) savePos();
       if (!moved && !e.target.closest("button")) toggleMenu();
     });
     host.addEventListener("pointercancel", () => {
+      pressed = false;
       dragging = false;
       moved = false;
     });
     host.addEventListener("lostpointercapture", () => {
+      pressed = false;
       dragging = false;
       moved = false;
     });
@@ -433,6 +492,7 @@
         cancelAnimationFrame(walkRaf);
         walkRaf = null;
       }
+      scheduleWander();
     };
     const scheduleWander = () => {
       clearTimeout(wanderTimer);
@@ -449,11 +509,14 @@
       walking = true;
       walkDir = Math.random() < 0.5 ? 1 : -1;
       flip = walkDir;
+      const walkCfg = manifest.states.walk;
+      if (animState === "walk" && walkCfg && loaded.has(walkCfg.sheet)) showSprite("walk", walkCfg);
       const duration = WALK_MIN_MS + Math.random() * (WALK_MAX_MS - WALK_MIN_MS);
       const start = performance.now();
       const maxX = Math.max(0, window.innerWidth - host.offsetWidth);
       const bottomY = Math.max(0, window.innerHeight - host.offsetHeight - 16);
-      const startLeft = Math.min(Math.max(parseFloat(host.style.left) || maxX - 16, 0), maxX);
+      const savedLeft = parseFloat(host.style.left);
+      const startLeft = Math.min(Math.max(Number.isFinite(savedLeft) ? savedLeft : maxX - 16, 0), maxX);
       host.style.right = "auto";
       host.style.bottom = "auto";
       const step = (t) => {
@@ -479,6 +542,35 @@
     const timer = setInterval(refresh, POLL_MS);
     const animTimer = setInterval(tick, TICK_MS);
     scheduleWander();
+    const sessions = ctx.sessions ?? (typeof ctx.get === "function" ? ctx.get("sessions") : void 0);
+    if (sessions?.list && typeof sessions.list.getSnapshot === "function") {
+      const seenCompleted = /* @__PURE__ */ new Set();
+      let seeded = false;
+      const onSessions = () => {
+        try {
+          const snap = sessions.list.getSnapshot();
+          sessionMood = deriveSessionMood(snap);
+          if (seeded) {
+            const byId = snap?.byId ?? {};
+            for (const id of Object.keys(byId)) {
+              const s = byId[id];
+              if (s?.completed === true && !seenCompleted.has(id) && id !== snap?.current) {
+                seenCompleted.add(id);
+                const title = s.displayTitle ?? id;
+                showReply(`\u2728 ${title} \u5B8C\u6210\u4E86`);
+              }
+            }
+          }
+          for (const id of Object.keys(snap?.byId ?? {})) {
+            if (snap.byId[id]?.completed === true) seenCompleted.add(id);
+          }
+          seeded = true;
+        } catch {
+        }
+      };
+      onSessions();
+      sessionsUnsub = sessions.list.subscribe(onSessions);
+    }
     const onVisibility = () => {
       if (document.visibilityState === "visible") refresh();
     };
@@ -507,6 +599,7 @@
       clearInterval(animTimer);
       clearTimeout(wanderTimer);
       if (walkRaf !== null) cancelAnimationFrame(walkRaf);
+      if (sessionsUnsub !== null) sessionsUnsub();
       for (const t of bubbleTimers) clearTimeout(t);
       bubbleTimers.clear();
       dialogObserver.disconnect();
@@ -522,7 +615,7 @@
     id: "vlln/dsh-pet",
     factory: (require2) => ({
       name: "dsh-pet-client",
-      inject: [],
+      inject: ["sessions"],
       apply
     })
   });

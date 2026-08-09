@@ -10,7 +10,7 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { EMOJI, TRANSIENT_MS, JOY_MS, pickState } from './logic.mjs'
+import { EMOJI, TRANSIENT_MS, WAKE_MS, JOY_MS, pickState, deriveSessionMood } from './logic.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
@@ -26,6 +26,7 @@ const WANDER_MAX_WAIT_MS = 40000
 const WALK_MIN_MS = 3000
 const WALK_MAX_MS = 6000
 const WALK_SPEED_PX_S = 45
+const IDLE_PAUSE_MS = 3500
 
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
@@ -84,7 +85,7 @@ const CSS = `
 }
 `
 
-export function apply() {
+export function apply(ctx = {}) {
   // 幂等守卫：bundle 重复执行（dev/HMR 重建、loader 重跑）时不双宠物双 style。
   if (document.querySelector('[data-dsh-pet]') !== null) {
     console.warn('[dsh-pet] apply 已存在实例，跳过重复挂载')
@@ -146,6 +147,7 @@ export function apply() {
   const loaded = new Set() // 已加载成功的 sheet 名
   const sheetSize = new Map() // sheet 名 → { w, h }（自然尺寸）
   let dragging = false
+  let pressed = false
   let moved = false
   let transient = null // 'eat' | 'play' | 'wake' | null（点击/睡醒后播一次）
   let transientUntil = 0 // 超时兜底：sheet 缺失/未播完也保证复位
@@ -156,6 +158,8 @@ export function apply() {
   let wasSleeping = false // 睡醒过渡（wake 瞬发）触发依据
   let animState = null
   let frame = 0
+  let frameDirection = 1
+  let idlePausedUntil = 0
   let lastFrameAt = 0
   // 游走（walk）：周期性沿视口底部散步。
   let walking = false
@@ -163,6 +167,9 @@ export function apply() {
   let flip = 1 // sprite 水平翻转（scaleX），行走方向
   let wanderTimer = null
   let walkRaf = null
+  // 会话感知（P2 思考态）：由 host sessions 服务快照派生的陪伴信号。
+  let sessionMood = { thinking: false, waiting: false, titles: [] }
+  let sessionsUnsub = null
 
   // ---- 渲染 ----
   const renderStatus = () => {
@@ -208,6 +215,8 @@ export function apply() {
     if (name === animState) return
     animState = name
     frame = 0
+    frameDirection = 1
+    idlePausedUntil = 0
     lastFrameAt = 0
     // 运动配方：manifest.motion → 舞台类（emoji 与 sprite 路径都生效；无 motion 时清类）。
     // 快照迭代再删：活 DOMTokenList 边遍历边删可能跳项（当前单类无碍，加固免踩）。
@@ -264,7 +273,7 @@ export function apply() {
     if (transient !== null && now >= transientUntil) {
       resetTransient(now)
     }
-    const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now })
+    const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting })
     setState(target)
     const cfg = manifest.states[animState]
     if (cfg && loaded.has(cfg.sheet)) {
@@ -280,13 +289,28 @@ export function apply() {
       // frames>1 才走帧循环；frames=1 的单图状态由 manifest.motion 的 CSS 动画驱动，不推进帧
       // （否则会推进到 -width 位置闪空白）。
       if (cfg.frames > 1 && now - lastFrameAt >= 1000 / cfg.fps) {
+        if (animState === 'idle' && idlePausedUntil > now) return
+        if (animState === 'idle' && idlePausedUntil !== 0 && now >= idlePausedUntil) {
+          frame = 0
+          frameDirection = 1
+          idlePausedUntil = 0
+          lastFrameAt = now
+          applyFrame(frameW, frame)
+          return
+        }
         lastFrameAt = now
-        frame += 1
-        if (frame >= cfg.frames) {
+        frame += frameDirection
+        if ((animState === 'idle' || animState === 'walk') && cfg.loop && cfg.frames > 1) {
+          if (frame >= cfg.frames - 1 || frame <= 0) frameDirection *= -1
+          frame = Math.max(0, Math.min(cfg.frames - 1, frame))
+          if (animState === 'idle' && frame === 0 && frameDirection === 1) {
+            idlePausedUntil = now + IDLE_PAUSE_MS
+          }
+        } else if (frame >= cfg.frames) {
           if (cfg.loop) frame = 0
           else {
             frame = cfg.frames - 1
-            if (transient !== null) {
+            if (transient !== null && transient !== 'wake') {
               resetTransient(now) // 非循环 sheet 播完即复位（早于超时）
             }
           }
@@ -365,7 +389,7 @@ export function apply() {
       if (wasSleeping && !sleeping && transient === null
         && !['welcome', 'celebrate', 'error', 'disappointed', 'working'].includes(activity.name)) {
         transient = 'wake'
-        transientUntil = Date.now() + TRANSIENT_MS
+        transientUntil = Date.now() + WAKE_MS
       }
       wasSleeping = sleeping
       failStreak = 0
@@ -382,6 +406,7 @@ export function apply() {
   // ---- 拖拽（pointer 事件；位移 < 6px 视为点击切换菜单）----
   let startX = 0
   let startY = 0
+  let lastPointerX = 0
   let offsetX = 0
   let offsetY = 0
 
@@ -413,21 +438,31 @@ export function apply() {
 
   // capture 只在越过拖拽阈值后启用：纯点击不捕获，菜单按钮的 click 正常派发。
   host.addEventListener('pointerdown', (e) => {
-    dragging = true
+    pressed = true
+    dragging = false
     moved = false
     stopWalk() // 被拖走即停下游走
     lastActiveAt = Date.now()
     startX = e.clientX
     startY = e.clientY
+    lastPointerX = e.clientX
     offsetX = e.clientX - host.offsetLeft
     offsetY = e.clientY - host.offsetTop
   })
   host.addEventListener('pointermove', (e) => {
-    if (!dragging) return
+    if (!pressed) return
     if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
       if (!moved) host.setPointerCapture(e.pointerId)
       moved = true
+      dragging = true
+      const nextFlip = e.clientX < lastPointerX ? -1 : 1
+      if (nextFlip !== flip) {
+        flip = nextFlip
+        const dragCfg = manifest.states.drag
+        if (animState === 'drag' && dragCfg && loaded.has(dragCfg.sheet)) showSprite('drag', dragCfg)
+      }
     }
+    lastPointerX = e.clientX
     if (!moved) return
     const x = Math.max(0, Math.min(e.clientX - offsetX, window.innerWidth - host.offsetWidth))
     const y = Math.max(0, Math.min(e.clientY - offsetY, window.innerHeight - host.offsetHeight))
@@ -437,6 +472,7 @@ export function apply() {
     host.style.bottom = 'auto'
   })
   host.addEventListener('pointerup', (e) => {
+    pressed = false
     dragging = false
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId)
     if (moved) savePos() // 拖拽结束落盘位置
@@ -444,11 +480,13 @@ export function apply() {
     if (!moved && !e.target.closest('button')) toggleMenu()
   })
   host.addEventListener('pointercancel', () => {
+    pressed = false
     dragging = false
     moved = false
   })
   // 捕获被系统强制释放（元素移除/其它元素抢捕获）时复位，防拖拽状态卡死。
   host.addEventListener('lostpointercapture', () => {
+    pressed = false
     dragging = false
     moved = false
   })
@@ -477,6 +515,7 @@ export function apply() {
       cancelAnimationFrame(walkRaf)
       walkRaf = null
     }
+    scheduleWander()
   }
   const scheduleWander = () => {
     clearTimeout(wanderTimer)
@@ -493,11 +532,16 @@ export function apply() {
     walking = true
     walkDir = Math.random() < 0.5 ? 1 : -1
     flip = walkDir // sprite scaleX 翻转（showSprite 应用）
+    // walk 可能已经是当前状态；此时 setState 会短路，必须主动刷新
+    // sprite transform，否则新一轮游走仍沿用上一轮朝向。
+    const walkCfg = manifest.states.walk
+    if (animState === 'walk' && walkCfg && loaded.has(walkCfg.sheet)) showSprite('walk', walkCfg)
     const duration = WALK_MIN_MS + Math.random() * (WALK_MAX_MS - WALK_MIN_MS)
     const start = performance.now()
     const maxX = Math.max(0, window.innerWidth - host.offsetWidth)
     const bottomY = Math.max(0, window.innerHeight - host.offsetHeight - 16)
-    const startLeft = Math.min(Math.max(parseFloat(host.style.left) || maxX - 16, 0), maxX)
+    const savedLeft = parseFloat(host.style.left)
+    const startLeft = Math.min(Math.max(Number.isFinite(savedLeft) ? savedLeft : maxX - 16, 0), maxX)
     host.style.right = 'auto'
     host.style.bottom = 'auto'
     const step = (t) => {
@@ -525,6 +569,42 @@ export function apply() {
   const timer = setInterval(refresh, POLL_MS)
   const animTimer = setInterval(tick, TICK_MS)
   scheduleWander()
+
+  // ---- 会话感知订阅（P2 思考态）----
+  // 订阅 host sessions 列表：任一活跃会话的 running/pending 驱动陪伴状态（think/wait）。
+  // sessions 服务由 bundle 导出面 inject 声明等待；缺失时降级——宠物照常跑，只是没有思考陪伴。
+  // 回合完成提示：completed 从无到有（翻转）且非当前会话 → 一次气泡轻提示，不重复播报。
+  const sessions = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
+  if (sessions?.list && typeof sessions.list.getSnapshot === 'function') {
+    const seenCompleted = new Set()
+    let seeded = false
+    const onSessions = () => {
+      try {
+        const snap = sessions.list.getSnapshot()
+        sessionMood = deriveSessionMood(snap)
+        // completed 翻转检测：仅对「从未见过」的 completed 会话播报，且跳过当前会话（用户在看，无需提醒）。
+        if (seeded) {
+          const byId = snap?.byId ?? {}
+          for (const id of Object.keys(byId)) {
+            const s = byId[id]
+            if (s?.completed === true && !seenCompleted.has(id) && id !== snap?.current) {
+              seenCompleted.add(id)
+              const title = s.displayTitle ?? id
+              showReply(`✨ ${title} 完成了`)
+            }
+          }
+        }
+        for (const id of Object.keys(snap?.byId ?? {})) {
+          if (snap.byId[id]?.completed === true) seenCompleted.add(id)
+        }
+        seeded = true
+      } catch {
+        // 快照异常（服务中途消失）：保留上次 mood，下一轮重试
+      }
+    }
+    onSessions()
+    sessionsUnsub = sessions.list.subscribe(onSessions)
+  }
 
   // 回前台立即刷新（后台标签轮询被节流，状态可能陈旧）。
   const onVisibility = () => {
@@ -561,6 +641,7 @@ export function apply() {
     clearInterval(animTimer)
     clearTimeout(wanderTimer)
     if (walkRaf !== null) cancelAnimationFrame(walkRaf)
+    if (sessionsUnsub !== null) sessionsUnsub()
     for (const t of bubbleTimers) clearTimeout(t) // 气泡残留计时器一并清
     bubbleTimers.clear()
     dialogObserver.disconnect()
@@ -574,11 +655,12 @@ export function apply() {
 }
 
 // 加载器契约：id 必须等于插件 id（dsh.plugin.json 的 id）；factory 返回插件导出面。
+// inject 声明浏览器 fiber 等待的服务（sessions：会话感知——思考陪伴/等待批准/回合完成提示）。
 window.__ModuleLoader__.load({
   id: 'vlln/dsh-pet',
   factory: (require) => ({
     name: 'dsh-pet-client',
-    inject: [],
+    inject: ['sessions'],
     apply,
   }),
 })
