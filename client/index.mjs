@@ -992,25 +992,21 @@ export function apply(ctx = {}) {
   }
   window.addEventListener('resize', onResize)
 
-  // 页面状态感知：DSH 处于初始配置/欢迎页（onboarding）时宠物**完全隐藏**（不遮向导）；
-  // 打开 dialog 时宠物降为 inert（半透明、不挡点击）。onboarding 是 CSS module 哈希
-  // 类名，用 [class*="onboarding"] 子串匹配；边沿触发只在状态翻转时改属性。
+  // 页面状态感知：DSH 打开 dialog 时宠物降为 inert（半透明、不挡点击）。
+  // 注：不检测 onboarding（[class*="onboarding"] 子串会误伤无会话的测试/隔离站——
+  // 它们显示欢迎页 UI 但宠物应可交互；宠物在右下角与向导实际不冲突）。
   let pageHidden = false
   const syncInert = () => {
-    const onboarding = document.querySelector('[class*="onboarding"]') !== null
     const dialog = document.querySelector('[role="dialog"]') !== null
-    const next = onboarding ? 'onboarding' : dialog ? 'dialog' : null
+    const next = dialog ? 'dialog' : null
     if (next !== pageHidden) {
       pageHidden = next
-      if (next === null) {
-        host.removeAttribute('data-dsh-pet-inert')
-        host.removeAttribute('data-dsh-pet-hidden')
-      } else if (next === 'onboarding') {
-        host.removeAttribute('data-dsh-pet-inert')
-        host.setAttribute('data-dsh-pet-hidden', '')
-      } else {
+      if (next === 'dialog') {
         host.removeAttribute('data-dsh-pet-hidden')
         host.setAttribute('data-dsh-pet-inert', '')
+      } else {
+        host.removeAttribute('data-dsh-pet-inert')
+        host.removeAttribute('data-dsh-pet-hidden')
       }
     }
   }

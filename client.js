@@ -968,20 +968,16 @@
     window.addEventListener("resize", onResize);
     let pageHidden = false;
     const syncInert = () => {
-      const onboarding = document.querySelector('[class*="onboarding"]') !== null;
       const dialog = document.querySelector('[role="dialog"]') !== null;
-      const next = onboarding ? "onboarding" : dialog ? "dialog" : null;
+      const next = dialog ? "dialog" : null;
       if (next !== pageHidden) {
         pageHidden = next;
-        if (next === null) {
-          host.removeAttribute("data-dsh-pet-inert");
-          host.removeAttribute("data-dsh-pet-hidden");
-        } else if (next === "onboarding") {
-          host.removeAttribute("data-dsh-pet-inert");
-          host.setAttribute("data-dsh-pet-hidden", "");
-        } else {
+        if (next === "dialog") {
           host.removeAttribute("data-dsh-pet-hidden");
           host.setAttribute("data-dsh-pet-inert", "");
+        } else {
+          host.removeAttribute("data-dsh-pet-inert");
+          host.removeAttribute("data-dsh-pet-hidden");
         }
       }
     };
