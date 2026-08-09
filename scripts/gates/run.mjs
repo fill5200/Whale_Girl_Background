@@ -17,6 +17,7 @@ const GATES = [
   { name: 'verify-spec-states', group: 'local', args: ['scripts/gates/verify-spec-states.mjs'] },
   { name: 'verify-contributes', group: 'local', args: ['scripts/gates/verify-contributes.mjs'] },
   { name: 'verify-tool-schemas', group: 'local', args: ['scripts/gates/verify-tool-schemas.mjs'] },
+  { name: 'verify-config-sync', group: 'local', args: ['scripts/gates/verify-config-sync.mjs'] },
   { name: 'check-generated', group: 'local', args: ['scripts/build-client.mjs', '--check'] },
   { name: 'unit-tests', group: 'ci', args: ['--test', 'tests/*.test.mjs'] },
   { name: 'gate-self-tests', group: 'ci', args: ['--test', 'scripts/gates/*.test.mjs'] },
