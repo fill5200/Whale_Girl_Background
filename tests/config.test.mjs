@@ -33,3 +33,8 @@ test('validateConfig：缺 walk 或空值安全', () => {
   assert.doesNotThrow(() => validateConfig({}))
   assert.doesNotThrow(() => validateConfig({ walk: undefined }))
 })
+
+test('DEFAULTS.replies：内置回话池非空且为数组', () => {
+  assert.ok(Array.isArray(DEFAULTS.replies.feed) && DEFAULTS.replies.feed.length > 0)
+  assert.ok(Array.isArray(DEFAULTS.replies.play) && DEFAULTS.replies.play.length > 0)
+})

@@ -43,3 +43,18 @@ test('isCrossOrigin: 无 Sec-Fetch-Site 时用 Origin', () => {
 test('isCrossOrigin: 无头（非浏览器客户端）视为同源', () => {
   assert.equal(isCrossOrigin({}, '127.0.0.1:60135'), false)
 })
+
+test('applyAction: 配置回话池生效（自定义文案被使用）', () => {
+  const replies = { feed: ['「自定义投喂」'], play: ['「自定义玩耍」'] }
+  const r1 = applyAction(base, 'feed', replies)
+  assert.equal(r1.body.reply, '「自定义投喂」')
+  const r2 = applyAction(base, 'play', replies)
+  assert.equal(r2.body.reply, '「自定义玩耍」')
+})
+
+test('applyAction: 空/缺配置回话池回退内置（配置损坏不崩互动）', () => {
+  assert.match(applyAction(base, 'feed', null).body.reply, /「/)
+  assert.match(applyAction(base, 'play', undefined).body.reply, /「/)
+  assert.match(applyAction(base, 'feed', { feed: [], play: [] }).body.reply, /「/)
+  assert.match(applyAction(base, 'play', { feed: ['x'], play: [] }).body.reply, /「/)
+})

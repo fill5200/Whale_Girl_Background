@@ -34,6 +34,10 @@ export const DEFAULTS = Object.freeze({
   celebrateMs: 6000,      // 庆祝窗口
   errorMs: 4000,          // 惊吓窗口
   disappointedMs: 6000,   // 失落尾窗
+  replies: {              // 互动回话文案池（用户可自定义追加；空则回退内置）
+    feed: ['「啊呜——谢谢投喂！」', '「好好吃，能量满满！」', '「嘻嘻，投喂成功！」'],
+    play: ['「嘿嘿，再来一次！」', '「玩得好开心～」', '「我赢了！再来！」'],
+  },
 })
 
 /** schemastery schema（settings.register 用；默认值= DEFAULTS，防双源漂移）。 */
@@ -57,6 +61,10 @@ export function buildSchema() {
       celebrateMs: z.number().min(0).max(30000).default(DEFAULTS.celebrateMs),
       errorMs: z.number().min(0).max(15000).default(DEFAULTS.errorMs),
       disappointedMs: z.number().min(0).max(15000).default(DEFAULTS.disappointedMs),
+      replies: z.object({
+        feed: z.array(z.string()).default(DEFAULTS.replies.feed),
+        play: z.array(z.string()).default(DEFAULTS.replies.play),
+      }),
     })
 }
 

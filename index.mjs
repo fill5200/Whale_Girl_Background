@@ -244,14 +244,14 @@ export function apply(ctx) {
         description: '投喂桌面宠物（社交娱乐）：纯乐趣互动，宠物会回话，不影响资历。',
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
-        execute: async () => applyAction(state, 'feed').body.reply,
+        execute: async () => applyAction(state, 'feed', configRef.replies).body.reply,
       })),
       ctx.tools.register(defineTool({
         name: 'pet_play',
         description: '陪桌面宠物玩耍（社交娱乐）：纯乐趣互动，宠物会回话，不影响资历。',
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
-        execute: async () => applyAction(state, 'play').body.reply,
+        execute: async () => applyAction(state, 'play', configRef.replies).body.reply,
       })),
       ctx.tools.register(defineTool({
         name: 'pet_status',
@@ -357,7 +357,7 @@ export function apply(ctx) {
               json(res, 400, { error: 'body must be a JSON object' })
               return
             }
-            const result = applyAction(state, body.action)
+            const result = applyAction(state, body.action, configRef.replies)
             json(res, result.status, result.body, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
