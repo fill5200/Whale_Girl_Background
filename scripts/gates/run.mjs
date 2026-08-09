@@ -14,6 +14,7 @@ const GATES = [
   { name: 'verify-md-links', group: 'local', args: ['scripts/gates/verify-md-links.mjs'] },
   { name: 'verify-decisions', group: 'local', args: ['scripts/gates/verify-decisions.mjs'] },
   { name: 'verify-assets', group: 'local', args: ['scripts/gates/verify-assets.mjs'] },
+  { name: 'verify-spec-states', group: 'local', args: ['scripts/gates/verify-spec-states.mjs'] },
   { name: 'verify-contributes', group: 'local', args: ['scripts/gates/verify-contributes.mjs'] },
   { name: 'verify-tool-schemas', group: 'local', args: ['scripts/gates/verify-tool-schemas.mjs'] },
   { name: 'check-generated', group: 'local', args: ['scripts/build-client.mjs', '--check'] },

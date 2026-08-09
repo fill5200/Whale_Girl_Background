@@ -35,16 +35,18 @@
 | `sleep` | 2 | 蜷缩闭眼睡觉：身体随呼吸起伏两态，头顶 Zzz |
 | `wake` | 2 | 伸懒腰：第 1 帧闭眼张嘴打哈欠、第 2 帧揉眼睛睁开 |
 | `welcome` | 2 | 举手挥手打招呼：两帧为挥手上下摆动，周围小星星 |
+| `think` | 1 | 沉思陪伴：双手托腮、眼神望向远处（会话思考中），单帧 + 轻微上下浮动 |
+| `wait` | 1 | 等待回应：身体前倾、眼睛看向观众（等待批准时），单帧 + 轻微左右摇摆 |
 
-## 状态总表（权威，13 状态）
+## 状态总表（权威，15 状态）
 
-窗口时长不在此重复：burst/瞬发窗口的毫秒值只存 [index.mjs](../index.mjs)（本表触发列只写事件来源）。motion 配方与帧播放器默认互斥（`motion` 只配 `frames:1`）；`error` 是唯一多帧+运动叠加的定向例外（见下方规则）。
+窗口时长不在此重复：burst/瞬发窗口的毫秒值只存 [index.mjs](../index.mjs)（本表触发列只写事件来源）。motion 配方与帧播放器默认互斥（`motion` 只配 `frames:1`）；`error` 是唯一多帧+运动叠加的定向例外（见下方规则）。`think`/`wait` 当前无 sheet（emoji 兜底），表内标注期望画面供补图。
 
 | 状态 | 触发 | 帧数 | motion 配方 | loop | 画面 |
 |---|---|---|---|---|---|
 | `idle` | 默认 | 3 | — | ✓ | 待机站姿（眨眼+呼吸） |
 | `working` | agent 任务 running | 3 | — | ✓ | 托腮思考 |
-| `celebrate` | 任务完成/升级/称号（burst） | 3 | — | ✓ | 举手欢呼 |
+| `celebrate` | 任务完成/升级/称号（burst，事件+轮询双源） | 3 | — | ✓ | 举手欢呼 |
 | `error` | 失败/`agent/request-error`（burst） | 2 | `shake`（定向例外） | ✗ | 正常→惊吓，僵住颤抖 |
 | `disappointed` | 失败后短时失落（burst 尾段） | 2 | — | ✓ | 垂头含泪 |
 | `joy` | 投喂/玩耍后短时 | 2 | — | ✓ | 眯眼笑 |
@@ -55,10 +57,14 @@
 | `sleep` | 空闲 ≥60s | 2 | — | ✓ | 蜷睡 |
 | `wake` | 睡醒过渡（瞬发） | 2 | — | ✗ | 伸懒腰 |
 | `welcome` | 新会话（burst） | 2 | — | ✓ | 挥手打招呼 |
+| `think` | 任一会话运行中（sessions 订阅，陪伴底座） | 1 | — | — | 沉思陪伴（当前 emoji 兜底 💭） |
+| `wait` | 任一会话等待批准（sessions 订阅，陪伴底座） | 1 | — | — | 等待回应（当前 emoji 兜底 👀） |
 
-优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > `walk` > 瞬发（`eat`/`play`/`wake`）> burst（`error`/`disappointed` 窗口内，`welcome`/`celebrate` 不打断负面尾段）> `working` > `joy` > `sleep` > `idle`。
+优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > `think` > `working` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 
-## manifest 模板（全 13 状态，与部署实况一致）
+## manifest 模板（13 个有 sheet 状态，与部署实况一致）
+
+`think`/`wait` 当前无 sheet（client 的 EMOJI 兜底表提供表情，见 [client/logic.mjs](../client/logic.mjs)）；补图后在此加入条目（`verify-assets` 要求 manifest 状态 ∈ EMOJI 表，反向不必）。
 
 ```json
 {
@@ -84,7 +90,7 @@
 
 ## 资历与称号（积累型）
 
-- **XP 来源**：完成任务 +10、新会话 +5；**无任何衰减/惩罚**。
+- **XP 来源**：完成任务 +10、新会话（startup）+5、续接/延续（resume/compact/clear）+2；**无任何衰减/惩罚**。
 - **等级**：xp 三角数列（L2=50，L3=150，L4=300…），纯派生。
 - **称号**（里程碑解锁，封闭集合在 [src/pet-state.mjs](../src/pet-state.mjs)）：
 
