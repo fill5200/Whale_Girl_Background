@@ -69,11 +69,7 @@
   var IDLE_PAUSE_MS = 3500;
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none;
-  /* \u9ED8\u8BA4\u534A\u900F\u660E\uFF1A\u5BA0\u7269\u60AC\u6D6E\u4F46\u4E0B\u65B9\u804A\u5929\u6D88\u606F\u4ECD\u53EF\u8BFB\uFF08\u91CD\u53E0\u5173\u7CFB\u53CB\u597D\uFF09\uFF1B
-     hover/\u805A\u7126\u65F6\u5168\u4E0D\u900F\u660E\uFF08\u4E92\u52A8\u53CD\u9988\u6E05\u6670\uFF09\u3002 */
-  opacity: .72; transition: opacity .2s ease; }
-[data-dsh-pet]:hover, [data-dsh-pet]:focus-within { opacity: 1; }
+  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
@@ -96,8 +92,8 @@
 [data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 12px; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; }
 [data-dsh-pet] .pet-menu button:hover { background: rgba(255,255,255,.28); }
-[data-dsh-pet] .pet-heart { position: absolute; font-size: 18px; pointer-events: none;
-  animation: dsh-pet-float 1s ease-out forwards; }
+[data-dsh-pet] .pet-heart { position: absolute; font-size: 20px; pointer-events: none;
+  animation: dsh-pet-float 1.8s ease-out forwards; }
 /* \u72B6\u6001\u8FD0\u52A8\u914D\u65B9\uFF08manifest.motion \u2192 \u821E\u53F0 CSS \u7C7B\uFF1Bframes>1 \u8D70\u5E27\u64AD\u653E\u5668\uFF0Cframes=1 \u8D70\u6B64\u52A8\u753B\uFF09\u3002
    \u52A8\u753B\u4F5C\u7528\u4E8E\u821E\u53F0\uFF08\u65E0\u5185\u8054 transform\uFF09\uFF0C\u4E0E sprite \u7684\u5185\u8054 scale \u4E0D\u51B2\u7A81\u3002
    \u5E45\u5EA6\u514B\u5236\uFF08\xB12~6px/deg\uFF09+ \u4E2D\u95F4\u5173\u952E\u5E27\uFF080\u21921/4\u21921/2\u21923/4\u21921\uFF09\uFF1A\u65E0\u7A81\u53D8\u7684\u5F80\u590D\u3002 */
@@ -120,7 +116,8 @@
 @keyframes dsh-pet-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes dsh-pet-m-wave { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } }
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
-  100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-72px) scale(1.25); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 [data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
 [data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
@@ -145,7 +142,6 @@
     host.setAttribute("role", "group");
     host.setAttribute("aria-label", "\u684C\u9762\u5BA0\u7269");
     host.setAttribute("aria-expanded", "false");
-    host.setAttribute("title", "dsh-pet\uFF1A\u70B9\u51FB\u4E92\u52A8\uFF0C\u62D6\u62FD\u79FB\u52A8");
     document.body.appendChild(host);
     const stage = document.createElement("div");
     stage.className = "pet-stage";
@@ -345,7 +341,7 @@
         heart.style.top = `${30 + Math.random() * 80}px`;
         stage.appendChild(heart);
         heart.addEventListener("animationend", () => heart.remove());
-        setTimeout(() => heart.remove(), 1100);
+        setTimeout(() => heart.remove(), 2e3);
       }
     };
     const bubbleTimers = /* @__PURE__ */ new Set();

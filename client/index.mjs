@@ -30,11 +30,7 @@ const IDLE_PAUSE_MS = 3500
 
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none;
-  /* 默认半透明：宠物悬浮但下方聊天消息仍可读（重叠关系友好）；
-     hover/聚焦时全不透明（互动反馈清晰）。 */
-  opacity: .72; transition: opacity .2s ease; }
-[data-dsh-pet]:hover, [data-dsh-pet]:focus-within { opacity: 1; }
+  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
@@ -57,8 +53,8 @@ const CSS = `
 [data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 12px; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; }
 [data-dsh-pet] .pet-menu button:hover { background: rgba(255,255,255,.28); }
-[data-dsh-pet] .pet-heart { position: absolute; font-size: 18px; pointer-events: none;
-  animation: dsh-pet-float 1s ease-out forwards; }
+[data-dsh-pet] .pet-heart { position: absolute; font-size: 20px; pointer-events: none;
+  animation: dsh-pet-float 1.8s ease-out forwards; }
 /* 状态运动配方（manifest.motion → 舞台 CSS 类；frames>1 走帧播放器，frames=1 走此动画）。
    动画作用于舞台（无内联 transform），与 sprite 的内联 scale 不冲突。
    幅度克制（±2~6px/deg）+ 中间关键帧（0→1/4→1/2→3/4→1）：无突变的往复。 */
@@ -81,7 +77,8 @@ const CSS = `
 @keyframes dsh-pet-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes dsh-pet-m-wave { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } }
 @keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
-  100% { opacity: 0; transform: translateY(-48px) scale(1.2); } }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-72px) scale(1.25); } }
 @keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 [data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
 [data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
@@ -108,7 +105,6 @@ export function apply(ctx = {}) {
   host.setAttribute('role', 'group')
   host.setAttribute('aria-label', '桌面宠物')
   host.setAttribute('aria-expanded', 'false')
-  host.setAttribute('title', 'dsh-pet：点击互动，拖拽移动')
   document.body.appendChild(host)
 
   const stage = document.createElement('div')
@@ -346,7 +342,7 @@ export function apply(ctx = {}) {
       heart.addEventListener('animationend', () => heart.remove())
       // 兜底超时移除：reduced-motion 下动画被禁用（animation: none），
       // animationend 永不触发 → 爱心永久残留 DOM（不可见但泄漏）。
-      setTimeout(() => heart.remove(), 1100)
+      setTimeout(() => heart.remove(), 2000)
     }
   }
 
