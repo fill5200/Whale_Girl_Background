@@ -173,8 +173,8 @@ export function apply(ctx = {}) {
   effects.className = 'pet-effects'
   host.append(effects, stage, status, menu)
 
-  // ---- 状态卡布局（视口感知：翻转/对齐，hover 显示时调用）----
-  // status 绝对定位锚定宠物上方；宠物贴顶 → 翻下方；贴左右缘 → 边缘对齐。
+  // ---- 状态卡布局（视口感知：左右对齐，hover 显示时调用）----
+  // status 绝对定位锚定宠物下方（始终不覆盖角色）；宠物贴左右缘 → 边缘对齐防横向溢出。
   // 气泡激活（activeBubble）或拖拽中 → 隐藏让位（气泡/移动是主角）。
   const layoutStatus = () => {
     if (activeBubble !== null || dragging) {
@@ -655,9 +655,12 @@ export function apply(ctx = {}) {
     const duration = WALK_MIN_MS + Math.random() * (WALK_MAX_MS - WALK_MIN_MS)
     const start = performance.now()
     const maxX = Math.max(0, window.innerWidth - host.offsetWidth)
-    const bottomY = Math.max(0, window.innerHeight - host.offsetHeight - 16)
-    const savedLeft = parseFloat(host.style.left)
-    const startLeft = Math.min(Math.max(Number.isFinite(savedLeft) ? savedLeft : maxX - 16, 0), maxX)
+    const maxY = Math.max(0, window.innerHeight - host.offsetHeight)
+    // 从当前位置开始走（不跳位）：垂直保持宠物当前 top，水平从当前 left 起步。
+    // 默认锚定（right/bottom 无内联样式）时 getBoundingClientRect 给出真实位置。
+    const rect = host.getBoundingClientRect()
+    const startLeft = Math.min(Math.max(rect.left, 0), maxX)
+    const startTop = Math.min(Math.max(rect.top, 0), maxY)
     host.style.right = 'auto'
     host.style.bottom = 'auto'
     const step = (t) => {
@@ -668,12 +671,12 @@ export function apply(ctx = {}) {
       const x = startLeft + walkDir * WALK_SPEED_PX_S * ((t - start) / 1000)
       if (x <= 0 || x >= maxX || t - start >= duration) {
         host.style.left = `${Math.min(maxX, Math.max(0, x))}px`
-        host.style.top = `${bottomY}px`
+        host.style.top = `${startTop}px`
         stopWalk()
         return
       }
       host.style.left = `${x}px`
-      host.style.top = `${bottomY}px`
+      host.style.top = `${startTop}px`
       walkRaf = requestAnimationFrame(step)
     }
     walkRaf = requestAnimationFrame(step)

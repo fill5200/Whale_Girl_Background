@@ -610,9 +610,10 @@
       const duration = WALK_MIN_MS + Math.random() * (WALK_MAX_MS - WALK_MIN_MS);
       const start = performance.now();
       const maxX = Math.max(0, window.innerWidth - host.offsetWidth);
-      const bottomY = Math.max(0, window.innerHeight - host.offsetHeight - 16);
-      const savedLeft = parseFloat(host.style.left);
-      const startLeft = Math.min(Math.max(Number.isFinite(savedLeft) ? savedLeft : maxX - 16, 0), maxX);
+      const maxY = Math.max(0, window.innerHeight - host.offsetHeight);
+      const rect = host.getBoundingClientRect();
+      const startLeft = Math.min(Math.max(rect.left, 0), maxX);
+      const startTop = Math.min(Math.max(rect.top, 0), maxY);
       host.style.right = "auto";
       host.style.bottom = "auto";
       const step = (t) => {
@@ -623,12 +624,12 @@
         const x = startLeft + walkDir * WALK_SPEED_PX_S * ((t - start) / 1e3);
         if (x <= 0 || x >= maxX || t - start >= duration) {
           host.style.left = `${Math.min(maxX, Math.max(0, x))}px`;
-          host.style.top = `${bottomY}px`;
+          host.style.top = `${startTop}px`;
           stopWalk();
           return;
         }
         host.style.left = `${x}px`;
-        host.style.top = `${bottomY}px`;
+        host.style.top = `${startTop}px`;
         walkRaf = requestAnimationFrame(step);
       };
       walkRaf = requestAnimationFrame(step);
