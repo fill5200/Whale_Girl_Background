@@ -30,7 +30,11 @@ const IDLE_PAUSE_MS = 3500
 
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
+  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none;
+  /* 默认半透明：宠物悬浮但下方聊天消息仍可读（重叠关系友好）；
+     hover/聚焦时全不透明（互动反馈清晰）。 */
+  opacity: .72; transition: opacity .2s ease; }
+[data-dsh-pet]:hover, [data-dsh-pet]:focus-within { opacity: 1; }
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
@@ -373,6 +377,7 @@ export function apply(ctx = {}) {
   }
 
   const interact = async (action) => {
+    stopWalk() // 互动即停下游走：eat/play 动画期间位置保持不动（点击时 walking 未停会继续移动）
     transient = action === 'feed' ? 'eat' : 'play'
     transientUntil = Date.now() + TRANSIENT_MS
     lastActiveAt = Date.now()

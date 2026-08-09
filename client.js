@@ -69,7 +69,11 @@
   var IDLE_PAUSE_MS = 3500;
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
+  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none;
+  /* \u9ED8\u8BA4\u534A\u900F\u660E\uFF1A\u5BA0\u7269\u60AC\u6D6E\u4F46\u4E0B\u65B9\u804A\u5929\u6D88\u606F\u4ECD\u53EF\u8BFB\uFF08\u91CD\u53E0\u5173\u7CFB\u53CB\u597D\uFF09\uFF1B
+     hover/\u805A\u7126\u65F6\u5168\u4E0D\u900F\u660E\uFF08\u4E92\u52A8\u53CD\u9988\u6E05\u6670\uFF09\u3002 */
+  opacity: .72; transition: opacity .2s ease; }
+[data-dsh-pet]:hover, [data-dsh-pet]:focus-within { opacity: 1; }
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
@@ -367,6 +371,7 @@
       bubbleTimers.add(timer2);
     };
     const interact = async (action) => {
+      stopWalk();
       transient = action === "feed" ? "eat" : "play";
       transientUntil = Date.now() + TRANSIENT_MS;
       lastActiveAt = Date.now();

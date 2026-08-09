@@ -47,3 +47,7 @@ dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh reg
 ## 边界
 
 宠物只存在于 DSH Web GUI 页面内；关掉页面宠物即消失。真·OS 桌面宠物（脱离浏览器、置顶、托盘）不在本插件能力内（见决策记录的备选方案 B'）。
+
+## 致谢
+
+角色形象由 [ZipZipPipe](https://space.bilibili.com/4168597) 创作（《鲸鱼娘》表情包角色），sprites 基于其角色设定生成。
