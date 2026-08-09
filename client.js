@@ -269,6 +269,16 @@
     stage.appendChild(sprite);
     const status = document.createElement("div");
     status.className = "pet-status";
+    status.style.cssText = `
+    position: absolute; left: 50%; top: calc(100% + 18px);
+    transform: translateX(-50%); width: max-content; min-width: 96px;
+    max-width: calc(100vw - 24px); padding: 5px 8px;
+    background: rgba(27,30,40,.94); border: 1px solid rgba(255,255,255,.10);
+    border-radius: 10px; color: #E8EBF2; font-size: 11px;
+    display: grid; gap: 4px; z-index: 1;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .15s ease-out, visibility 0s linear .2s;
+  `.replace(/\s+/g, " ");
     status.innerHTML = `
     <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-stats">0 \u4EFB\u52A1</span></div>
     <div class="pet-note">\u2026</div>`;
@@ -289,9 +299,16 @@
     const hitarea = document.createElement("div");
     hitarea.className = "pet-hitarea";
     host.append(effects, stage, hitarea, status, menu);
+    const setStatusVisible = (visible) => {
+      status.style.opacity = visible ? "1" : "0";
+      status.style.visibility = visible ? "visible" : "hidden";
+      status.style.pointerEvents = visible ? "auto" : "none";
+      status.style.transition = visible ? "opacity .2s cubic-bezier(.16,1,.3,1)" : "opacity .15s ease-out, visibility 0s linear .2s";
+    };
     const layoutStatus = () => {
       if (activeBubble !== null || dragging || menu.classList.contains("open")) {
         status.classList.add("pet-status-hidden");
+        setStatusVisible(false);
         return;
       }
       status.classList.remove("pet-status-hidden");
@@ -308,10 +325,14 @@
       if (nearLeft && !nearRight) status.classList.add("pet-status-left");
       else if (nearRight && !nearLeft) status.classList.add("pet-status-right");
     };
-    const onHostEnter = () => layoutStatus();
+    const onHostEnter = () => {
+      layoutStatus();
+      if (!status.classList.contains("pet-status-hidden")) setStatusVisible(true);
+    };
     const onHostLeave = () => {
       if (menu.classList.contains("open")) return;
       status.classList.remove("pet-status-left", "pet-status-right", "pet-status-above", "pet-status-hidden");
+      setStatusVisible(false);
     };
     host.addEventListener("mouseenter", onHostEnter);
     host.addEventListener("mouseleave", onHostLeave);
@@ -322,6 +343,7 @@
       const next = open ?? !menu.classList.contains("open");
       menu.classList.toggle("open", next);
       status.classList.toggle("pet-status-hidden", next);
+      if (next) setStatusVisible(false);
       host.setAttribute("aria-expanded", String(next));
       if (next) lastActiveAt = Date.now();
       return next;

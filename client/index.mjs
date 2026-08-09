@@ -163,6 +163,17 @@ export function apply(ctx = {}) {
 
   const status = document.createElement('div')
   status.className = 'pet-status'
+  // 关键样式 JS 内联（不依赖 CSS 注入——宿主环境可能覆盖/清理 style 标签，内联保证生效）。
+  status.style.cssText = `
+    position: absolute; left: 50%; top: calc(100% + 18px);
+    transform: translateX(-50%); width: max-content; min-width: 96px;
+    max-width: calc(100vw - 24px); padding: 5px 8px;
+    background: rgba(27,30,40,.94); border: 1px solid rgba(255,255,255,.10);
+    border-radius: 10px; color: #E8EBF2; font-size: 11px;
+    display: grid; gap: 4px; z-index: 1;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .15s ease-out, visibility 0s linear .2s;
+  `.replace(/\s+/g, ' ')
   status.innerHTML = `
     <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-stats">0 任务</span></div>
     <div class="pet-note">…</div>`
@@ -193,9 +204,19 @@ export function apply(ctx = {}) {
   // ---- 状态卡布局（视口感知：左右对齐，hover 显示时调用）----
   // status 绝对定位锚定宠物下方（始终不覆盖角色）；宠物贴左右缘 → 边缘对齐防横向溢出。
   // 气泡激活（activeBubble）或拖拽中 → 隐藏让位（气泡/移动是主角）。
+  // 显式显示控制（内联 style，不依赖 CSS :hover 层叠——宿主环境可能覆盖样式）。
+  const setStatusVisible = (visible) => {
+    status.style.opacity = visible ? '1' : '0'
+    status.style.visibility = visible ? 'visible' : 'hidden'
+    status.style.pointerEvents = visible ? 'auto' : 'none'
+    status.style.transition = visible
+      ? 'opacity .2s cubic-bezier(.16,1,.3,1)'
+      : 'opacity .15s ease-out, visibility 0s linear .2s'
+  }
   const layoutStatus = () => {
     if (activeBubble !== null || dragging || menu.classList.contains('open')) {
       status.classList.add('pet-status-hidden')
+      setStatusVisible(false)
       return
     }
     status.classList.remove('pet-status-hidden')
@@ -213,10 +234,14 @@ export function apply(ctx = {}) {
     if (nearLeft && !nearRight) status.classList.add('pet-status-left')
     else if (nearRight && !nearLeft) status.classList.add('pet-status-right')
   }
-  const onHostEnter = () => layoutStatus()
+  const onHostEnter = () => {
+    layoutStatus()
+    if (!status.classList.contains('pet-status-hidden')) setStatusVisible(true)
+  }
   const onHostLeave = () => {
     if (menu.classList.contains('open')) return
     status.classList.remove('pet-status-left', 'pet-status-right', 'pet-status-above', 'pet-status-hidden')
+    setStatusVisible(false)
   }
   host.addEventListener('mouseenter', onHostEnter)
   host.addEventListener('mouseleave', onHostLeave)
@@ -230,6 +255,7 @@ export function apply(ctx = {}) {
     const next = open ?? !menu.classList.contains('open')
     menu.classList.toggle('open', next)
     status.classList.toggle('pet-status-hidden', next)
+    if (next) setStatusVisible(false)
     host.setAttribute('aria-expanded', String(next))
     if (next) lastActiveAt = Date.now() // 键盘/点击打开菜单也算活跃（防睡着）
     return next
