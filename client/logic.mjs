@@ -1,6 +1,7 @@
 // client 纯逻辑：动画状态选择与表情映射（无 DOM 引用，可脱离浏览器单测）。
-// 契约：pickState 输入 { activity, pet, dragging, transient, sleeping, joyUntil, now, sessionThink, sessionWait }，
-// 返回动画状态名；pet 不再驱动状态（零负反馈——无 hunger/mood 属性状态）。
+// 契约：pickState 输入 { activity, pet, dragging, transient, sleeping, joyUntil, now,
+//   sessionThink, sessionWait, workingActive, celebrateUntil }，返回动画状态名；
+//   pet 不再驱动状态（零负反馈——无 hunger/mood 属性状态）。
 // 状态优先级由 STATE_TABLE 声明（顺序即优先级，文法单源——加状态/调优先级只改此表，
 // 不再散落 if 链）；Node half 的窗口级联仍输出 { name, until }（burst 权威，两半分工：
 // Node 出事实窗口、client 出本地交互选择）。
@@ -8,12 +9,18 @@
 // transient 由宿主计时（TRANSIENT_MS 超时兜底），本模块只做选择；burst 由 activity.until 窗口决定。
 // 会话感知（P2 思考态）：sessionThink/sessionWait 由 host sessions 服务聚合（见 deriveSessionMood），
 // 是持续陪伴底座——任一会话活跃时宠物保持清醒陪伴（覆盖 sleep/walk），低于用户互动与事件反馈。
+// 行为节奏（v3）：working 不是任务状态指示灯，而是 client 节奏器随机插入的工作插曲
+// （workingActive 由宿主随机调度：偶尔、随机时长），think 是思考陪伴的常态；
+// 回合完成（session running→completed 翻转）由宿主经 celebrateUntil 本地窗口播庆祝，
+// 与 Node 的任务完成 celebrate（activity burst）并列、优先级更低。
 
 export const TRANSIENT_MS = 1500
 // wake 是从长时间休眠回来的过渡，不与短促的 eat/play 互动共用时长；
 // 非循环 wake sheet 播完后保持末帧，直到 WAKE_MS 到期。
 export const WAKE_MS = 3000
 export const JOY_MS = 1600
+// 回合完成庆祝窗口（client 本地）：session running→completed 翻转后播 celebrate 的时长。
+export const ROUND_CELEBRATE_MS = 4000
 
 export const EMOJI = {
   idle: '🐣', working: '🤔', celebrate: '🎉', error: '😱', disappointed: '😞',
@@ -37,20 +44,19 @@ export const STATE_TABLE = [
   { state: 'play', when: (c) => c.transient === 'play' },
   { state: 'wake', when: (c) => c.transient === 'wake' },
   { state: 'wait', when: (c) => c.sessionWait },
-  // 工作陪伴时间片：会话活跃（sessionThink）时 think（沉思）与 working（托腮小灯泡）
-  // 交替——不依赖 activity.working（思考阶段无任务，activity 可能是 idle）。
-  // 避免单帧 think 长时间静态；纯任务（无会话思考）时仍走 working。
-  { state: 'working', when: (c) => (c.sessionThink && c.workingSlice) || (!c.sessionThink && c.activity.name === 'working') },
+  // 回合完成庆祝（client 本地窗口）：session running→completed 翻转后庆祝——
+  // 低于 Node 事件 burst（任务完成的 celebrate 仍走 burst 行）、用户互动与等待批准
+  // （wait 需要用户注意），高于陪伴——庆祝是短时插曲，不打断互动反馈。
+  { state: 'celebrate', when: (c) => c.celebrateUntil > c.now },
+  // working 是随机工作插曲：client 节奏器在思考陪伴期间偶尔插入（workingActive），
+  // 不是任务状态指示灯——think 是常态，working 是「认真干活」的短时小动作。
+  { state: 'working', when: (c) => c.workingActive },
   { state: 'think', when: (c) => c.sessionThink },
   { state: 'joy', when: (c) => c.now < c.joyUntil },
   { state: 'sleep', when: (c) => c.sleeping },
   { state: 'walk', when: (c) => c.walking },
   { state: 'idle', when: () => true },
 ]
-
-// working/think 交替周期：每 3s 切一次（working 2s / think 1s，working 为主表现）。
-export const WORKING_SLICE_MS = 3000
-export const WORKING_ACTIVE_MS = 2000
 
 /** 选择当前应播放的动画状态名（now 显式传入，测试确定性；遍历 STATE_TABLE 首个命中）。 */
 export function pickState(input) {
@@ -61,8 +67,8 @@ export function pickState(input) {
     sessionThink: input.sessionThink ?? false,
     sessionWait: input.sessionWait ?? false,
     dragReleaseUntil: input.dragReleaseUntil ?? 0,
-    // working/think 交替时间片：now 落在周期内的 working 活跃段则为 true。
-    workingSlice: (input.now ?? Date.now()) % WORKING_SLICE_MS < WORKING_ACTIVE_MS,
+    workingActive: input.workingActive ?? false,
+    celebrateUntil: input.celebrateUntil ?? 0,
   }
   for (const row of STATE_TABLE) {
     if (row.when(ctx)) return row.resolve ? row.resolve(ctx) : row.state
@@ -93,4 +99,72 @@ export function deriveSessionMood(snapshot) {
     if (s.pendingInteraction !== undefined) waiting = true
   }
   return { thinking, waiting, titles }
+}
+
+// ---- 调度决策（v3 纯函数面）----
+// 调度状态（计时器窗口/随机插曲/边沿）从 index.mjs 闭包抽出为纯函数：
+// now 与随机源显式传入，输出可单测（确定性时间推进测试的落点）。
+// 纪律：这些函数只做「决策」不碰 DOM/定时器；index.mjs 是薄执行层。
+
+// working 随机插曲参数（L2 语义层，代码级，不可配——进不得 src/config.mjs）。
+export const WORKING_MIN_WAIT_MS = 12000 // 插曲最小间隔（think 常态）
+export const WORKING_MAX_WAIT_MS = 30000 // 插曲最大间隔
+export const WORKING_MIN_DUR_MS = 2500   // 插曲最短时长
+export const WORKING_MAX_DUR_MS = 6000   // 插曲最长时长
+
+/**
+ * working 随机插曲决策：会话思考期间偶尔插入 working 工作姿态，其余时间 think 常态。
+ * @param {object} input
+ * @param {number} input.now 当前时刻
+ * @param {boolean} input.sessionThink 会话思考中（插曲只在该窗口内武装）
+ * @param {object} input.working 当前插曲状态 { active: boolean, until: number }（宿主持有）
+ * @param {() => number} [input.random] 随机源（测试注入；默认 Math.random）
+ * @returns {{ active: boolean, until: number }} 新的插曲状态：active=是否进入 working，
+ *   until=该状态的目标结束时刻（宿主据此设 setTimeout/tick 判断）
+ */
+export function nextWorkingRhythm({ now, sessionThink, working, random = Math.random }) {
+  // 会话不活跃：插曲关闭，等下次思考再武装。
+  if (!sessionThink) return { active: false, until: 0 }
+  if (working.active) {
+    // working 中：随机时长后回到 think。
+    const dur = WORKING_MIN_DUR_MS + random() * (WORKING_MAX_DUR_MS - WORKING_MIN_DUR_MS)
+    return { active: false, until: now + dur }
+  }
+  // think 中：随机间隔后插入 working（大部分时间 think，偶尔工作）。
+  const wait = WORKING_MIN_WAIT_MS + random() * (WORKING_MAX_WAIT_MS - WORKING_MIN_WAIT_MS)
+  return { active: true, until: now + wait }
+}
+
+/**
+ * 回合完成翻转检测：sessions 快照里 completed 从无到有的会话。
+ * @param {object} snapshot sessions 快照 { byId: { [id]: { completed, displayTitle } } }
+ * @param {Set<string>} seen 已播报过的 completed 会话 id（宿主持有，去重）
+ * @param {string} [currentId] 当前会话 id（宿主快照 current；无需跳过的由调用方决定）
+ * @returns {{ flips: Array<{ id: string, title: string }>, seen: Set<string> }}
+ *   flips=本次新完成的会话；seen=更新后的去重集（宿主保存）
+ */
+export function detectRoundCompleted(snapshot, seen, currentId) {
+  const byId = snapshot?.byId ?? {}
+  const flips = []
+  const nextSeen = new Set(seen)
+  for (const id of Object.keys(byId)) {
+    const s = byId[id]
+    if (s === null || typeof s !== 'object') continue
+    if (s.completed === true && !nextSeen.has(id)) {
+      nextSeen.add(id)
+      flips.push({ id, title: s.displayTitle ?? id })
+    }
+  }
+  return { flips, seen: nextSeen }
+}
+
+/**
+ * 睡醒边沿判断：上一帧显示 sleep、本帧离开 sleep（非拖拽打断、无瞬发占用）→ 播 wake。
+ * @param {string} prevState 上一帧视觉状态（animState）
+ * @param {string} nextState 本帧目标状态（pickState 结果）
+ * @param {object} ctx { dragging, transient }
+ * @returns {boolean} 是否应播 wake
+ */
+export function shouldWake(prevState, nextState, ctx = {}) {
+  return prevState === 'sleep' && nextState !== 'sleep' && !ctx.dragging && (ctx.transient ?? null) === null
 }

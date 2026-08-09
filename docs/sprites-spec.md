@@ -55,8 +55,8 @@
 | 状态 | 触发 | 帧数 | motion 配方 | loop | 画面 |
 |---|---|---|---|---|---|
 | `idle` | 默认 | 3 | — | ✓ | 待机站姿（眨眼+呼吸） |
-| `working` | agent 任务 running | 3 | — | ✓ | 托腮思考 |
-| `celebrate` | 任务完成/升级/称号（burst，事件+轮询双源） | 3 | — | ✓ | 举手欢呼 |
+| `working` | 思考陪伴期随机插曲（client 节奏器，大部分时间 think） | 3 | — | ✓ | 托腮思考 |
+| `celebrate` | 任务完成/升级/称号（burst，事件+轮询双源）/回合完成（client 本地窗口） | 3 | — | ✓ | 举手欢呼 |
 | `error` | 失败/`agent/request-error`（burst） | 2 | `shake`（定向例外） | ✗ | 正常→惊吓，僵住颤抖 |
 | `disappointed` | 失败后短时失落（burst 尾段） | 2 | — | ✓ | 垂头含泪 |
 | `joy` | 投喂/玩耍后短时 | 2 | — | ✓ | 眯眼笑 |
@@ -70,7 +70,7 @@
 | `think` | 任一会话运行中（sessions 订阅，陪伴底座） | 1 | `float` | ✓ | 沉思陪伴（托腮望向远处，上下浮动） |
 | `wait` | 任一会话等待批准（sessions 订阅，陪伴底座） | 1 | `wiggle` | ✓ | 等待回应（前倾看向观众，左右摇摆） |
 
-优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > `think` > `working` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
+优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > 回合完成 `celebrate`（client 本地窗口）> `working`（随机插曲）> `think` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 
 ## manifest 模板（角色索引；whale-girl 13 个有 sheet 状态）
 

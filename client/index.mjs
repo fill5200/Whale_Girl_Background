@@ -10,7 +10,7 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { TRANSIENT_MS, WAKE_MS, JOY_MS, pickState, deriveSessionMood } from './logic.mjs'
+import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters, emojiFor } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
@@ -296,6 +296,12 @@ export function apply(ctx = {}) {
   let frameDirection = 1
   let idlePausedUntil = 0
   let lastFrameAt = 0
+  // working 随机插曲（v3）：think 常态、偶尔随机插入 working；由 nextWorkingRhythm 决策，
+  // 宿主只做「到点翻转」的薄执行。workingActive 喂 pickState；workingTimer 是翻转闹钟。
+  let working = { active: false, until: 0 }
+  let workingTimer = null
+  // 回合完成庆祝窗口（client 本地）：sessions completed 翻转后 ROUND_CELEBRATE_MS 内播 celebrate。
+  let celebrateUntil = 0
   // 游走（walk）：周期性沿视口底部散步。
   let walking = false
   let walkDir = 1
@@ -553,16 +559,16 @@ export function apply(ctx = {}) {
     if (transient !== null && now >= transientUntil) {
       resetTransient(now)
     }
-    const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting })
-    // 睡醒边沿（视觉驱动）：上一帧显示 sleep、本帧离开 sleep（非拖拽打断）→ 播 wake。
+    const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting, workingActive: working.active, celebrateUntil })
+    // 睡醒边沿（纯函数）：上一帧显示 sleep、本帧离开 sleep（非拖拽打断、无瞬发占用）→ 播 wake。
     // 不能用 sleeping 变量（Node half activity 判定）触发：会话活跃时 think/working 优先级
     // 高于 sleep，视觉已离开 sleep 但 sleeping 仍是 true（activity 还 idle）——旧边沿永不翻转，
     // wake 不可见。以实际显示的 animState 为准，视觉离开 sleep 的瞬间即过渡。
-    if (animState === 'sleep' && target !== 'sleep' && transient === null && !dragging) {
+    if (shouldWake(animState, target, { dragging, transient })) {
       transient = 'wake'
       transientUntil = now + WAKE_MS
       // transient 变化后重算：wake 行优先级高于 think/working/sleep/walk（见 STATE_TABLE）。
-      setState(pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting }))
+      setState(pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting, workingActive: working.active, celebrateUntil }))
       return
     }
     setState(target)
@@ -969,41 +975,64 @@ export function apply(ctx = {}) {
     walkRaf = requestAnimationFrame(step)
   }
 
+  // ---- working 随机插曲节奏器（v3）----
+  // think 是思考陪伴常态，working 是偶尔插入的工作姿态（随机触发、随机时长）。
+  // 决策在纯函数 nextWorkingRhythm（注入随机源、可单测）；本层只做「到点翻转」：
+  // 每次翻转后按决策结果安排下一次闹钟。会话不活跃时撤防（回 think，不安排闹钟，
+  // 由 onSessions 在会话开始时重新武装）。
+  const armWorking = () => {
+    if (workingTimer !== null) clearTimeout(workingTimer)
+    workingTimer = null
+    if (!sessionMood.thinking) {
+      working = { active: false, until: 0 } // 会话不活跃：插曲撤防
+      return
+    }
+    const decision = nextWorkingRhythm({ now: Date.now(), sessionThink: true, working, random: Math.random })
+    const delay = Math.max(0, decision.until - Date.now())
+    workingTimer = setTimeout(() => {
+      workingTimer = null
+      working = { active: decision.active, until: 0 } // 进入决策目标状态
+      armWorking() // 基于新状态做下一次决策（think→working→think…）
+    }, delay)
+  }
+
   // ---- 启动 ----
   loadAssets()
   refresh()
   const timer = setInterval(refresh, cfg.pollMs)
   const animTimer = setInterval(tick, TICK_MS)
   scheduleWander()
+  armWorking()
 
   // ---- 会话感知订阅（P2 思考态）----
   // 订阅 host sessions 列表：任一活跃会话的 running/pending 驱动陪伴状态（think/wait）。
   // sessions 服务由 bundle 导出面 inject 声明等待；缺失时降级——宠物照常跑，只是没有思考陪伴。
-  // 回合完成提示：completed 从无到有（翻转）且非当前会话 → 一次气泡轻提示，不重复播报。
+  // 回合完成（completed 翻转）：所有会话（含当前）→ celebrateUntil 窗口播庆祝动画；
+  // 气泡只给非当前会话（用户在看的会话无需文字提示，但庆祝动画不跳过——「agent 工作完成」）。
   const sessions = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
   if (sessions?.list && typeof sessions.list.getSnapshot === 'function') {
-    const seenCompleted = new Set()
+    let seenCompleted = new Set()
     let seeded = false
     const onSessions = () => {
       try {
         const snap = sessions.list.getSnapshot()
         sessionMood = deriveSessionMood(snap)
-        // completed 翻转检测：仅对「从未见过」的 completed 会话播报，且跳过当前会话（用户在看，无需提醒）。
+        // completed 翻转检测（纯函数）：从未见过的 completed 会话 → 播庆祝（含当前）。
         if (seeded) {
-          const byId = snap?.byId ?? {}
-          for (const id of Object.keys(byId)) {
-            const s = byId[id]
-            if (s?.completed === true && !seenCompleted.has(id) && id !== snap?.current) {
-              seenCompleted.add(id)
-              const title = s.displayTitle ?? id
-              showReply(`✨ ${title} 完成了`)
+          const { flips, seen } = detectRoundCompleted(snap, seenCompleted, snap?.current)
+          seenCompleted = seen
+          if (flips.length > 0) {
+            celebrateUntil = Date.now() + ROUND_CELEBRATE_MS
+            for (const f of flips) {
+              if (f.id !== snap?.current) showReply(`✨ ${f.title} 完成了`)
             }
           }
-        }
-        for (const id of Object.keys(snap?.byId ?? {})) {
-          if (snap.byId[id]?.completed === true) seenCompleted.add(id)
+        } else {
+          // 首帧 seed：不播报历史已完成会话，只记录 seen。
+          seenCompleted = detectRoundCompleted(snap, seenCompleted, snap?.current).seen
         }
         seeded = true
+        armWorking() // 会话活跃状态变化 → 重排 working 插曲（思考开始武装/结束撤防）
       } catch {
         // 快照异常（服务中途消失）：保留上次 mood，下一轮重试
       }
@@ -1055,6 +1084,7 @@ export function apply(ctx = {}) {
     clearInterval(timer)
     clearInterval(animTimer)
     clearTimeout(wanderTimer)
+    if (workingTimer !== null) clearTimeout(workingTimer)
     if (walkRaf !== null) cancelAnimationFrame(walkRaf)
     if (sessionsUnsub !== null) sessionsUnsub()
     for (const t of bubbleTimers) clearTimeout(t) // 气泡残留计时器一并清

@@ -26,7 +26,7 @@
 | 状态 | 触发事件 | 窗口 | 说明 |
 |---|---|---|---|
 | `welcome` | `agent/session-start`（startup） | 6s（可配） | 新会话欢迎 |
-| `celebrate` | 任务完成/升级/称号 | 6s（可配） | 双源同窗（事件+轮询） |
+| `celebrate` | 任务完成/升级/称号 + **回合完成**（session running→completed，含当前会话） | 6s（任务，可配）/ 4s（回合，client 本地） | 任务层双源同窗（事件+轮询）；回合层 client 本地窗口 |
 | `error` | 任务失败/`agent/request-error` | 4s（可配） | 惊吓，负面窗口 |
 | `disappointed` | 失败后尾段 | 6s（可配） | 失落，紧跟 error |
 
@@ -34,26 +34,23 @@
 
 | 状态 | 触发 | 说明 |
 |---|---|---|
-| `working` | 有任务在跑（Node `activity.working`） | 有 sessionThink 时与 think 交替（见下） |
-| `think` | 任一会话运行/思考（sessions 订阅） | 沉思陪伴 |
+| `working` | 思考陪伴期随机插曲（client 节奏器，`workingActive`） | 大部分时间 think，偶尔（随机触发、随机时长）工作姿态 |
+| `think` | 任一会话运行/思考（sessions 订阅） | 沉思陪伴（常态） |
 | `joy` | 互动后短时 | 1.6s |
 | `sleep` | 空闲 ≥60s（可配） | 打盹 |
 | `walk` | 周期性游走（18-40s 间隔，可配） | 散步 |
 | `idle` | 兜底 | 待机（眨眼+呼吸） |
 
-### 工作陪伴交替（working ↔ think）
+### 工作陪伴（working ↔ think）
 
-会话思考中（`sessionThink`）**且有任务跑**（`activity.working`）时，按 **3s 周期**交替：
-- **0-2s**：`working`（托腮小灯泡——「在干活」主表现）
-- **2-3s**：`think`（沉思——「在想」）
-
-无 `sessionThink` 时纯 `working`（不交替）。常量：`WORKING_SLICE_MS=3000`、`WORKING_ACTIVE_MS=2000`（[client/logic.mjs](../client/logic.mjs)）。
+`think` 是思考陪伴的**常态**（任一会话运行中）。`working` 是 client 节奏器**随机插入**的工作插曲：随机触发间隔（12-30s）、随机持续时长（2.5-6s），大部分时间保持 think 沉思，偶尔摆出「认真干活」姿态。插曲决策在纯函数 `nextWorkingRhythm`（注入随机源、可单测）；会话不活跃时插曲撤防。**working 不再是任务指示灯**（不再由 Node `activity.working` 驱动——agent 思考阶段本就无任务，旧时间片交替即由此失真）。
 
 ## 优先级（STATE_TABLE 行序，文法单源）
 
 ```
 drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
-> eat/play > wake > wait > working(交替) > think > joy > sleep > walk > idle
+> eat/play > wake > wait > 回合完成 celebrate(client 本地窗口)
+> working(随机插曲) > think(常态) > joy > sleep > walk > idle
 ```
 
 ## 状态转换语义
@@ -87,5 +84,6 @@ drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
 | `tasks.onTaskDone` | 记账 + celebrate/failure 窗口 | `activity` |
 | `agent/session-start` | 会话 XP + welcome 窗口 | `activity` |
 | `agent/request-error` | error/disappointed 窗口 | `activity` |
-| sessions.list 快照 | — | `sessionThink` / `sessionWait` |
+| sessions.list 快照 | — | `sessionThink` / `sessionWait` / 回合完成翻转→`celebrateUntil` |
+| 节奏器（client 本地） | — | `workingActive`（随机插曲）/ `celebrateUntil`（回合完成窗口） |
 | 用户 pointer/点击 | — | `dragging` / `transient` / `joyUntil` |

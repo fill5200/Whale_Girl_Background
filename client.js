@@ -3,6 +3,7 @@
   var TRANSIENT_MS = 1500;
   var WAKE_MS = 3e3;
   var JOY_MS = 1600;
+  var ROUND_CELEBRATE_MS = 4e3;
   var EMOJI = {
     idle: "\u{1F423}",
     working: "\u{1F914}",
@@ -30,18 +31,19 @@
     { state: "play", when: (c) => c.transient === "play" },
     { state: "wake", when: (c) => c.transient === "wake" },
     { state: "wait", when: (c) => c.sessionWait },
-    // 工作陪伴时间片：会话活跃（sessionThink）时 think（沉思）与 working（托腮小灯泡）
-    // 交替——不依赖 activity.working（思考阶段无任务，activity 可能是 idle）。
-    // 避免单帧 think 长时间静态；纯任务（无会话思考）时仍走 working。
-    { state: "working", when: (c) => c.sessionThink && c.workingSlice || !c.sessionThink && c.activity.name === "working" },
+    // 回合完成庆祝（client 本地窗口）：session running→completed 翻转后庆祝——
+    // 低于 Node 事件 burst（任务完成的 celebrate 仍走 burst 行）、用户互动与等待批准
+    // （wait 需要用户注意），高于陪伴——庆祝是短时插曲，不打断互动反馈。
+    { state: "celebrate", when: (c) => c.celebrateUntil > c.now },
+    // working 是随机工作插曲：client 节奏器在思考陪伴期间偶尔插入（workingActive），
+    // 不是任务状态指示灯——think 是常态，working 是「认真干活」的短时小动作。
+    { state: "working", when: (c) => c.workingActive },
     { state: "think", when: (c) => c.sessionThink },
     { state: "joy", when: (c) => c.now < c.joyUntil },
     { state: "sleep", when: (c) => c.sleeping },
     { state: "walk", when: (c) => c.walking },
     { state: "idle", when: () => true }
   ];
-  var WORKING_SLICE_MS = 3e3;
-  var WORKING_ACTIVE_MS = 2e3;
   function pickState(input) {
     const ctx = {
       ...input,
@@ -50,8 +52,8 @@
       sessionThink: input.sessionThink ?? false,
       sessionWait: input.sessionWait ?? false,
       dragReleaseUntil: input.dragReleaseUntil ?? 0,
-      // working/think 交替时间片：now 落在周期内的 working 活跃段则为 true。
-      workingSlice: (input.now ?? Date.now()) % WORKING_SLICE_MS < WORKING_ACTIVE_MS
+      workingActive: input.workingActive ?? false,
+      celebrateUntil: input.celebrateUntil ?? 0
     };
     for (const row of STATE_TABLE) {
       if (row.when(ctx)) return row.resolve ? row.resolve(ctx) : row.state;
@@ -73,6 +75,36 @@
       if (s.pendingInteraction !== void 0) waiting = true;
     }
     return { thinking, waiting, titles };
+  }
+  var WORKING_MIN_WAIT_MS = 12e3;
+  var WORKING_MAX_WAIT_MS = 3e4;
+  var WORKING_MIN_DUR_MS = 2500;
+  var WORKING_MAX_DUR_MS = 6e3;
+  function nextWorkingRhythm({ now, sessionThink, working, random = Math.random }) {
+    if (!sessionThink) return { active: false, until: 0 };
+    if (working.active) {
+      const dur = WORKING_MIN_DUR_MS + random() * (WORKING_MAX_DUR_MS - WORKING_MIN_DUR_MS);
+      return { active: false, until: now + dur };
+    }
+    const wait = WORKING_MIN_WAIT_MS + random() * (WORKING_MAX_WAIT_MS - WORKING_MIN_WAIT_MS);
+    return { active: true, until: now + wait };
+  }
+  function detectRoundCompleted(snapshot, seen, currentId) {
+    const byId = snapshot?.byId ?? {};
+    const flips = [];
+    const nextSeen = new Set(seen);
+    for (const id of Object.keys(byId)) {
+      const s = byId[id];
+      if (s === null || typeof s !== "object") continue;
+      if (s.completed === true && !nextSeen.has(id)) {
+        nextSeen.add(id);
+        flips.push({ id, title: s.displayTitle ?? id });
+      }
+    }
+    return { flips, seen: nextSeen };
+  }
+  function shouldWake(prevState, nextState, ctx = {}) {
+    return prevState === "sleep" && nextState !== "sleep" && !ctx.dragging && (ctx.transient ?? null) === null;
   }
 
   // client/character.mjs
@@ -378,6 +410,9 @@
     let frameDirection = 1;
     let idlePausedUntil = 0;
     let lastFrameAt = 0;
+    let working = { active: false, until: 0 };
+    let workingTimer = null;
+    let celebrateUntil = 0;
     let walking = false;
     let walkDir = 1;
     let flip = 1;
@@ -596,11 +631,11 @@
       if (transient !== null && now >= transientUntil) {
         resetTransient(now);
       }
-      const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting });
-      if (animState === "sleep" && target !== "sleep" && transient === null && !dragging) {
+      const target = pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting, workingActive: working.active, celebrateUntil });
+      if (shouldWake(animState, target, { dragging, transient })) {
         transient = "wake";
         transientUntil = now + WAKE_MS;
-        setState(pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting }));
+        setState(pickState({ activity, dragging, walking, transient, sleeping, joyUntil, dragReleaseUntil, now, sessionThink: sessionMood.thinking, sessionWait: sessionMood.waiting, workingActive: working.active, celebrateUntil }));
         return;
       }
       setState(target);
@@ -946,34 +981,49 @@
       };
       walkRaf = requestAnimationFrame(step);
     };
+    const armWorking = () => {
+      if (workingTimer !== null) clearTimeout(workingTimer);
+      workingTimer = null;
+      if (!sessionMood.thinking) {
+        working = { active: false, until: 0 };
+        return;
+      }
+      const decision = nextWorkingRhythm({ now: Date.now(), sessionThink: true, working, random: Math.random });
+      const delay = Math.max(0, decision.until - Date.now());
+      workingTimer = setTimeout(() => {
+        workingTimer = null;
+        working = { active: decision.active, until: 0 };
+        armWorking();
+      }, delay);
+    };
     loadAssets();
     refresh();
     const timer = setInterval(refresh, cfg.pollMs);
     const animTimer = setInterval(tick, TICK_MS);
     scheduleWander();
+    armWorking();
     const sessions = ctx.sessions ?? (typeof ctx.get === "function" ? ctx.get("sessions") : void 0);
     if (sessions?.list && typeof sessions.list.getSnapshot === "function") {
-      const seenCompleted = /* @__PURE__ */ new Set();
+      let seenCompleted = /* @__PURE__ */ new Set();
       let seeded = false;
       const onSessions = () => {
         try {
           const snap = sessions.list.getSnapshot();
           sessionMood = deriveSessionMood(snap);
           if (seeded) {
-            const byId = snap?.byId ?? {};
-            for (const id of Object.keys(byId)) {
-              const s = byId[id];
-              if (s?.completed === true && !seenCompleted.has(id) && id !== snap?.current) {
-                seenCompleted.add(id);
-                const title = s.displayTitle ?? id;
-                showReply(`\u2728 ${title} \u5B8C\u6210\u4E86`);
+            const { flips, seen } = detectRoundCompleted(snap, seenCompleted, snap?.current);
+            seenCompleted = seen;
+            if (flips.length > 0) {
+              celebrateUntil = Date.now() + ROUND_CELEBRATE_MS;
+              for (const f of flips) {
+                if (f.id !== snap?.current) showReply(`\u2728 ${f.title} \u5B8C\u6210\u4E86`);
               }
             }
-          }
-          for (const id of Object.keys(snap?.byId ?? {})) {
-            if (snap.byId[id]?.completed === true) seenCompleted.add(id);
+          } else {
+            seenCompleted = detectRoundCompleted(snap, seenCompleted, snap?.current).seen;
           }
           seeded = true;
+          armWorking();
         } catch {
         }
       };
@@ -1015,6 +1065,7 @@
       clearInterval(timer);
       clearInterval(animTimer);
       clearTimeout(wanderTimer);
+      if (workingTimer !== null) clearTimeout(workingTimer);
       if (walkRaf !== null) cancelAnimationFrame(walkRaf);
       if (sessionsUnsub !== null) sessionsUnsub();
       for (const t of bubbleTimers) clearTimeout(t);
