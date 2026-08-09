@@ -69,7 +69,7 @@
   var IDLE_PAUSE_MS = 3500;
   var CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
+  width: 110px; height: 110px; font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
@@ -78,7 +78,7 @@
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* \u72B6\u6001\u5361\uFF1A\u9ED8\u8BA4\u7F6E\u4E8E\u5BA0\u7269\u4E0B\u65B9\uFF0C\u8D34\u8FD1\u672C\u4F53\u4E14\u4E0D\u6491\u5927\u5BBF\u4E3B\u76D2\u3002 */
-[data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
+[data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   width: 128px; max-width: calc(100vw - 24px); padding: 5px 8px;
   background: rgba(27,30,40,.94); backdrop-filter: blur(10px) saturate(1.15);
   border: 1px solid rgba(255,255,255,.10); border-radius: 10px;
@@ -113,8 +113,8 @@
 [data-dsh-pet]:focus-within .pet-status.pet-status-right { transform: translateX(0); }
 /* \u6C14\u6CE1\u6FC0\u6D3B\u6216\u83DC\u5355\u6253\u5F00\u65F6\u72B6\u6001\u5361\u8BA9\u4F4D\u9690\u85CF\uFF08\u6C14\u6CE1/\u83DC\u5355\u4F18\u5148\uFF0C\u89C1\u5171\u5B58\u7B56\u7565\uFF09\u3002 */
 [data-dsh-pet] .pet-status.pet-status-hidden { opacity: 0 !important; visibility: hidden !important; }
-[data-dsh-pet] .pet-menu.open ~ .pet-status { opacity: 0 !important; visibility: hidden !important; }
-[data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
+[data-dsh-pet] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+  width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
@@ -204,7 +204,7 @@
     effects.className = "pet-effects";
     host.append(effects, stage, status, menu);
     const layoutStatus = () => {
-      if (activeBubble !== null || dragging) {
+      if (activeBubble !== null || dragging || menu.classList.contains("open")) {
         status.classList.add("pet-status-hidden");
         return;
       }
@@ -220,6 +220,7 @@
     };
     const onHostEnter = () => layoutStatus();
     const onHostLeave = () => {
+      if (menu.classList.contains("open")) return;
       status.classList.remove("pet-status-left", "pet-status-right", "pet-status-hidden");
     };
     host.addEventListener("mouseenter", onHostEnter);
@@ -230,6 +231,7 @@
     const toggleMenu = (open) => {
       const next = open ?? !menu.classList.contains("open");
       menu.classList.toggle("open", next);
+      status.classList.toggle("pet-status-hidden", next);
       host.setAttribute("aria-expanded", String(next));
       if (next) lastActiveAt = Date.now();
       return next;
@@ -582,6 +584,24 @@
     document.addEventListener("keydown", onKeyDown);
     feedBtn.addEventListener("click", () => interact("feed"));
     playBtn.addEventListener("click", () => interact("play"));
+    const onPetSay = (e) => {
+      if (e.detail && typeof e.detail.text === "string" && e.detail.text.length > 0) showReply(e.detail.text);
+    };
+    const onPetFx = (e) => {
+      if (e.detail?.type === "hearts") spawnHearts();
+    };
+    const onPetStatus = (e) => {
+      if (e.detail && typeof e.detail.text === "string") {
+        const prev = metaNote.textContent;
+        metaNote.textContent = e.detail.text;
+        setTimeout(() => {
+          if (metaNote.textContent === e.detail.text) renderStatus();
+        }, 2500);
+      }
+    };
+    document.addEventListener("dsh-pet:say", onPetSay);
+    document.addEventListener("dsh-pet:fx", onPetFx);
+    document.addEventListener("dsh-pet:status", onPetStatus);
     const stopWalk = () => {
       walking = false;
       if (walkRaf !== null) {
@@ -716,6 +736,9 @@
       document.removeEventListener("pointerdown", onDocPointerDown);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("dsh-pet:say", onPetSay);
+      document.removeEventListener("dsh-pet:fx", onPetFx);
+      document.removeEventListener("dsh-pet:status", onPetStatus);
       host.removeEventListener("mouseenter", onHostEnter);
       host.removeEventListener("mouseleave", onHostLeave);
       window.removeEventListener("resize", onResize);

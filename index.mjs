@@ -18,6 +18,7 @@ import { deriveActivity, mergeCelebrate } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
 import { applyAction, isCrossOrigin } from './src/interact.mjs'
 import { normalizeState, serializeState } from './src/persistence.mjs'
+import { createSignals } from './src/signals.mjs'
 
 export const name = 'dsh-pet'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
@@ -114,6 +115,12 @@ export function apply(ctx) {
   let welcomeUntil = 0
   let celebrateUntil = 0
 
+  // ---- pet 服务信号（开放性窄缝，供其他插件 ctx.pet.onSignal 订阅）----
+  // 账本信号：celebrate（任务完成/升级）、levelUp（升级）、failure（失败）、session（新会话/续接）。
+  // 订阅者回调 (signal, payload)；订阅者异常隔离（不影响宠物本体）。
+  const signals = createSignals()
+  const emitSignal = signals.emit
+
   // 派生活动 + 事件记账（积累）：完成 +XP/称号/回忆；失败计数；工作态累加活跃时长。
   const activity = () => {
     const now = Date.now()
@@ -162,21 +169,32 @@ export function apply(ctx) {
 
   ctx.effect(() => {
     const disposers = [
+      // pet 服务（开放性窄缝）：只读快照 + 信号订阅。其他插件 inject ['pet']
+      // 消费；服务缺席时消费方应容忍（dsh-pet 自己处理 sessions 缺席即先例）。
+      // 不暴露任何写面（账本语义由 dsh-pet 独占，防第三方破坏积累不变量）。
+      ctx.provide('pet', {
+        snapshot: () => ({ pet: state, activity: activity() }),
+        onSignal: (fn) => signals.subscribe(fn),
+      }),
       // 事件驱动记账（F1）：任务终态恰回调一次，与浏览器轮询解耦——
       // GUI 关闭期间完成/失败的任务也入账（此前靠轮询观察 running 翻转，漏记窗口大）。
       // killed（用户取消）中性：不计 XP、不记失败、不写回忆（F4 语义）。
       ctx.tasks.onTaskDone((snapshot) => {
         const now = Date.now()
         if (snapshot.status === 'completed') {
-          state = recordTaskCompleted(state, snapshot.label ?? '未命名任务', now).state
+          const result = recordTaskCompleted(state, snapshot.label ?? '未命名任务', now)
+          state = result.state
           // F3：账本与庆祝同源——记账即开庆祝窗口。页面关闭期间完成任务（轮询缺席、
           // deriveActivity 看不到翻转）时，重开后首次轮询仍能看到本窗口，同样庆祝；
           // 与轮询翻转的 celebrate 取 max 不叠加（CELEBRATE_MS 同 BURST_MS）。
           celebrateUntil = Math.max(celebrateUntil, now + CELEBRATE_MS)
           scheduleSave()
+          emitSignal('celebrate', { label: snapshot.label ?? '未命名任务', level: state.level })
+          if (result.leveledUp) emitSignal('levelUp', { level: state.level })
         } else if (snapshot.status === 'failed') {
           state = recordFailure(state, now).state
           scheduleSave()
+          emitSignal('failure', { level: state.level })
         }
       }),
       ctx.on('agent/request-error', () => {
@@ -195,8 +213,10 @@ export function apply(ctx) {
         if (payload.source === 'startup') {
           state = recordSession(state, now).state
           welcomeUntil = now + WELCOME_MS
+          emitSignal('session', { kind: 'new', level: state.level })
         } else {
           state = recordSessionResume(state, now).state
+          emitSignal('session', { kind: 'resume', level: state.level })
         }
         scheduleSave()
       }),

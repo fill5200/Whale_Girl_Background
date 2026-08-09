@@ -30,7 +30,7 @@ const IDLE_PAUSE_MS = 3500
 
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
+  width: 110px; height: 110px; font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none; }
 [data-dsh-pet] .pet-stage { position: relative; width: 110px; height: 110px; display: grid; place-items: center;
   font-size: 44px; line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
@@ -39,7 +39,7 @@ const CSS = `
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* 状态卡：默认置于宠物下方，贴近本体且不撑大宿主盒。 */
-[data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
+[data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   width: 128px; max-width: calc(100vw - 24px); padding: 5px 8px;
   background: rgba(27,30,40,.94); backdrop-filter: blur(10px) saturate(1.15);
   border: 1px solid rgba(255,255,255,.10); border-radius: 10px;
@@ -74,8 +74,8 @@ const CSS = `
 [data-dsh-pet]:focus-within .pet-status.pet-status-right { transform: translateX(0); }
 /* 气泡激活或菜单打开时状态卡让位隐藏（气泡/菜单优先，见共存策略）。 */
 [data-dsh-pet] .pet-status.pet-status-hidden { opacity: 0 !important; visibility: hidden !important; }
-[data-dsh-pet] .pet-menu.open ~ .pet-status { opacity: 0 !important; visibility: hidden !important; }
-[data-dsh-pet] .pet-menu { display: none; margin-top: 6px; gap: 6px; padding: 6px; border-radius: 8px;
+[data-dsh-pet] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+  width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
@@ -177,7 +177,7 @@ export function apply(ctx = {}) {
   // status 绝对定位锚定宠物下方（始终不覆盖角色）；宠物贴左右缘 → 边缘对齐防横向溢出。
   // 气泡激活（activeBubble）或拖拽中 → 隐藏让位（气泡/移动是主角）。
   const layoutStatus = () => {
-    if (activeBubble !== null || dragging) {
+    if (activeBubble !== null || dragging || menu.classList.contains('open')) {
       status.classList.add('pet-status-hidden')
       return
     }
@@ -194,6 +194,7 @@ export function apply(ctx = {}) {
   }
   const onHostEnter = () => layoutStatus()
   const onHostLeave = () => {
+    if (menu.classList.contains('open')) return
     status.classList.remove('pet-status-left', 'pet-status-right', 'pet-status-hidden')
   }
   host.addEventListener('mouseenter', onHostEnter)
@@ -207,6 +208,7 @@ export function apply(ctx = {}) {
   const toggleMenu = (open) => {
     const next = open ?? !menu.classList.contains('open')
     menu.classList.toggle('open', next)
+    status.classList.toggle('pet-status-hidden', next)
     host.setAttribute('aria-expanded', String(next))
     if (next) lastActiveAt = Date.now() // 键盘/点击打开菜单也算活跃（防睡着）
     return next
@@ -624,6 +626,32 @@ export function apply(ctx = {}) {
   feedBtn.addEventListener('click', () => interact('feed'))
   playBtn.addEventListener('click', () => interact('play'))
 
+  // ---- 开放契约（CustomEvent，第三方插件自建缝驱动显示层）----
+  // 文档化事件（detail 见 docs/architecture-evolution.md 开放性节）：
+  //   dsh-pet:say    { text }          → 气泡说话
+  //   dsh-pet:fx     { type: 'hearts' } → 爱心爆发
+  //   dsh-pet:status { text }          → 状态卡 note 覆盖（临时，2.5s 恢复）
+  // 派发方式：window.dispatchEvent(new CustomEvent('dsh-pet:say', { detail: { text } }))
+  // 零耦合：事件在 document 冒泡，第三方无需依赖 dsh-pet 模块；detail 校验后消费。
+  const onPetSay = (e) => {
+    if (e.detail && typeof e.detail.text === 'string' && e.detail.text.length > 0) showReply(e.detail.text)
+  }
+  const onPetFx = (e) => {
+    if (e.detail?.type === 'hearts') spawnHearts()
+  }
+  const onPetStatus = (e) => {
+    if (e.detail && typeof e.detail.text === 'string') {
+      const prev = metaNote.textContent
+      metaNote.textContent = e.detail.text
+      setTimeout(() => {
+        if (metaNote.textContent === e.detail.text) renderStatus()
+      }, 2500)
+    }
+  }
+  document.addEventListener('dsh-pet:say', onPetSay)
+  document.addEventListener('dsh-pet:fx', onPetFx)
+  document.addEventListener('dsh-pet:status', onPetStatus)
+
   // ---- 游走（walk 行为）：周期性沿视口底部散步 ----
   const stopWalk = () => {
     walking = false
@@ -781,6 +809,9 @@ export function apply(ctx = {}) {
     document.removeEventListener('pointerdown', onDocPointerDown)
     document.removeEventListener('keydown', onKeyDown)
     document.removeEventListener('visibilitychange', onVisibility)
+    document.removeEventListener('dsh-pet:say', onPetSay)
+    document.removeEventListener('dsh-pet:fx', onPetFx)
+    document.removeEventListener('dsh-pet:status', onPetStatus)
     host.removeEventListener('mouseenter', onHostEnter)
     host.removeEventListener('mouseleave', onHostLeave)
     window.removeEventListener('resize', onResize)
