@@ -23,6 +23,7 @@ const GATES = [
   { name: 'verify-prose', group: 'local', args: ['scripts/gates/verify-prose.mjs'] },
   { name: 'check-generated', group: 'local', args: ['scripts/build-client.mjs', '--check'] },
   { name: 'unit-tests', group: 'ci', args: ['--test', 'tests/*.test.mjs'] },
+  { name: 'tool-tests', group: 'ci', runner: 'python3', args: ['tests/slice-sheet.test.py'] },
   { name: 'gate-self-tests', group: 'ci', args: ['--test', 'scripts/gates/*.test.mjs'] },
 ]
 
@@ -46,7 +47,8 @@ if (groupArg !== -1) {
 
 const failed = []
 for (const gate of selected) {
-  const res = spawnSync(process.execPath, gate.args, { cwd: ROOT, stdio: 'inherit', encoding: 'utf8' })
+  const runner = gate.runner ?? process.execPath
+  const res = spawnSync(runner, gate.args, { cwd: ROOT, stdio: 'inherit', encoding: 'utf8' })
   if (res.status !== 0) failed.push(gate.name)
 }
 if (failed.length > 0) {

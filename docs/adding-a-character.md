@@ -103,7 +103,7 @@
 
 1. **定角色**：参考 `originals/鲸鱼娘.png` 锁定画风，出角色设定图
 2. **生图**：按 [sprites-spec.md](sprites-spec.md) 契约（纯绿 #00FF00、256 帧、帧序从左到右）逐状态生图
-3. **切图**：`python3 scripts/slice-sheet.py <网格图> --sheet 3x3 --states <状态名> --frames <每行帧数> --key R,G,B --size 256`（若素材已是单状态图则跳过）
+3. **切图**（工具化，见 [sprites-spec.md](sprites-spec.md) 素材管线）：`python3 scripts/slice-sheet.py <图> <模式> --key R,G,B --out assets/characters/<角色id>/`——网格图用 `--sheet 3x3 --states <状态名> --frames <每行帧数>`，单状态/分栏用 `--single [--columns N --states a,b]`；`--swap-frames 0,2,1` 校正 AI 乱序帧；`--normalize-scale 0.88` 统一内容占比
 4. **投放**：sheet 进 `assets/characters/<id>/`；manifest 加 `characters.<id>`（含 meta + states）
 5. **验证**：`node scripts/gates/verify-assets.mjs`（文件存在/PNG 尺寸/帧序/motion/角色 id 合法性）；`node scripts/verify-client-smoke.mjs <web-url>` 浏览器冒烟
 6. **切换**：设置 localStorage `dsh-pet:character` = 角色 id，或点菜单「🎭 换角色」按钮循环切换

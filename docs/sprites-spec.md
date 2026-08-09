@@ -6,12 +6,22 @@
 
 **零负反馈**：宠物没有饥饿/心情等会衰减、会惩罚冷落的需求；失败只短暂失落（`disappointed` 瞬发），不持续不扣资历。**积累型**：一切向上积累，真实的共同经历（完成任务/会话/陪伴时长）→ 资历等级/称号/回忆。
 
-## 素材管线（3×3 网格生图 → 帧 sheet）
+## 素材管线（AI 生图 → 规范 PNG 资源）
 
 **每张生图 = 3×3 网格**（行 = 状态、列 = 帧；静态姿势 1 帧占 1 格，行内帧横排、格间留白）。帧内一致天然保证（同一张图），状态间一致性靠参考图。已废弃"单张 2K 大图含全部状态"（网格切分对不上、单帧无中间过程）。
 
+**工具**：[scripts/slice-sheet.py](../scripts/slice-sheet.py)——AI 生图 → 规范 PNG 资源的通用工具（PIL+numpy，无第三方依赖）。三种模式 + 规范化参数：
+
+| 模式 | 适用 | 示例 |
+|---|---|---|
+| `--single` | 单状态（单图/左右分栏，如 think|wait） | `--single --columns 2 --states think,wait --key 252,2,249` |
+| `--grid` / `--auto` | 网格图（每格一子图） | `--grid 3x3 --key auto` |
+| `--sheet` | 网格图（行=状态、列=帧，连通域分段） | `--sheet 3x3 --states idle,working --frames 3,3 --key auto` |
+
+**通用参数**：`--key`（抠图：gray/auto/R,G,B）、`--size`（默认 256）、`--normalize-scale`（内容占比目标，默认 0.88 = 角色高度占帧 88%，自动加透明边缘）、`--align`（底对齐默认/居中）、`--swap-frames`（帧序校正，AI 帧序乱时如 `--swap-frames 2,0,1`）、`--out`（输出目录）。
+
 1. **生图**：3×3 网格图（纯色背景，见提示模板），参考 [originals/鲸鱼娘.png](../originals/鲸鱼娘.png) 锁风格。
-2. **切分/归一化**（`scripts/slice-sheet.py`，PIL）：`--sheet 3x3 --states 行状态名 --frames 每行帧数`（更细粒度用 `--regions state@row:colStart-colEnd`）→ 行带连通域分离 → 逐帧裁切 → 质心配准（±2px 钳制）→ 底中对齐 → 帧横排 sheet；纯色底色键 `--key R,G,B`（多色 `|` 分隔）或 `--auto` 取边框色。
+2. **切分/归一化**：`python3 scripts/slice-sheet.py <图> <模式> --key <色> --out assets/characters/<角色id>/` → 行带连通域分离 → 逐帧裁切 → 质心配准（±2px 钳制）→ 底中对齐 → 内容占比 88% → 帧横排 sheet（256 帧）。工具自证测试：`python3 tests/slice-sheet.test.py`（门禁 tool-tests）。
 3. **投放**：sheet 进 `assets/characters/<角色id>/`，`assets/manifest.json` 的角色 `states` 加条目（`frames: N` + 可选 `motion`；`verify-assets` 门禁保证引用存在与多角色遍历）。
 
 ## 生图提示模板（每状态一行，纯色背景）
