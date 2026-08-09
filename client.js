@@ -149,9 +149,7 @@
 [data-dsh-pet] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
   font-size: calc(var(--pet-size, 110px) * 0.4); line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25));
-  /* \u89C6\u89C9\u5C42\u4E0D\u63A5\u6536\u6307\u9488\uFF1Asprite \u6EA2\u51FA\u5E03\u5C40\u76D2\uFF08256 \u903B\u8F91\xD7scale\uFF09\uFF0Cpointer \u7531 hitarea \u72EC\u5360\uFF0C
-     \u6D88\u9664\u5C42\u53E0\u6B67\u4E49\uFF08stage \u53CA\u5B50\u5143\u7D20\u4E0D\u62E6\u622A\u70B9\u51FB\uFF09\u3002 */
-  pointer-events: none; }
+  /* \u89C6\u89C9\u5C42\u4E0E hitarea \u53CC\u547D\u4E2D\uFF1Astage \u4FDD\u6301\u53EF\u6307\u9488\uFF08drag \u515C\u5E95\uFF09\uFF0Chitarea \u505A\u70ED\u533A\u6536\u7A84\u3002 */
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
@@ -763,7 +761,7 @@
       }
     } catch {
     }
-    hitarea.addEventListener("pointerdown", (e) => {
+    stage.addEventListener("pointerdown", (e) => {
       pressed = true;
       dragging = false;
       moved = false;
@@ -775,10 +773,10 @@
       offsetX = e.clientX - host.offsetLeft;
       offsetY = e.clientY - host.offsetTop;
     });
-    hitarea.addEventListener("pointermove", (e) => {
+    stage.addEventListener("pointermove", (e) => {
       if (!pressed) return;
       if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
-        if (!moved) hitarea.setPointerCapture(e.pointerId);
+        if (!moved) stage.setPointerCapture(e.pointerId);
         moved = true;
         dragging = true;
         transient = null;
@@ -801,10 +799,10 @@
       host.style.right = "auto";
       host.style.bottom = "auto";
     });
-    hitarea.addEventListener("pointerup", (e) => {
+    stage.addEventListener("pointerup", (e) => {
       pressed = false;
       dragging = false;
-      if (hitarea.hasPointerCapture(e.pointerId)) hitarea.releasePointerCapture(e.pointerId);
+      if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
       if (moved) {
         savePos();
         dragReleaseUntil = Date.now() + DRAG_RELEASE_MS;
@@ -812,13 +810,13 @@
       layoutStatus();
       if (!moved && !e.target.closest("button")) toggleMenu();
     });
-    hitarea.addEventListener("pointercancel", () => {
+    stage.addEventListener("pointercancel", () => {
       pressed = false;
       dragging = false;
       moved = false;
       layoutStatus();
     });
-    hitarea.addEventListener("lostpointercapture", () => {
+    stage.addEventListener("lostpointercapture", () => {
       pressed = false;
       dragging = false;
       moved = false;
