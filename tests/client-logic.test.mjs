@@ -2,7 +2,7 @@
 // v2：零负反馈——无 hunger/mood 属性状态；情绪只由事件瞬发 + 互动喜悦。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, EMOJI, deriveSessionMood } from '../client/logic.mjs'
+import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, EMOJI, deriveSessionMood, STATE_TABLE } from '../client/logic.mjs'
 
 const IDLE = { activity: { name: 'idle', until: 0 }, dragging: false, transient: null, sleeping: false, joyUntil: 0, now: 1000 }
 
@@ -122,4 +122,26 @@ test('deriveSessionMood：空/未就绪快照与缺字段行安全（服务不�
   for (const p of ['approval', 'plan-review', 'question']) {
     assert.equal(deriveSessionMood({ byId: { s1: { pendingInteraction: p } } }).waiting, true)
   }
+})
+
+test('STATE_TABLE 文法单源：表内状态全部在 EMOJI 表，idle 兜底在末行', () => {
+  const last = STATE_TABLE[STATE_TABLE.length - 1]
+  assert.equal(last.state, 'idle') // 兜底必须最后
+  assert.equal(last.when({}), true) // 恒命中
+  for (const row of STATE_TABLE) {
+    // burst 是动态解析（resolve 到 activity.name），其可能值也须在 EMOJI
+    for (const s of ['welcome', 'celebrate', 'error', 'disappointed']) assert.ok(EMOJI[s])
+    if (row.state !== 'burst') assert.ok(EMOJI[row.state], `STATE_TABLE 状态 ${row.state} 缺 EMOJI 兜底`)
+  }
+})
+
+test('STATE_TABLE 行序即优先级：手动验证关键竞争', () => {
+  // drag 最高：其他条件全命中时仍返回 drag
+  assert.equal(pickState({ ...IDLE, dragging: true, transient: 'eat', sessionWait: true, sleeping: true, walking: true }), 'drag')
+  // burst 高于瞬发：welcome 窗口内点 eat 仍播 welcome
+  assert.equal(pickState({ ...IDLE, activity: { name: 'welcome', until: 5000 }, transient: 'eat' }), 'welcome')
+  // wait > think > working
+  assert.equal(pickState({ ...IDLE, sessionWait: true, sessionThink: true, activity: { name: 'working', until: 0 } }), 'wait')
+  // think > sleep（会话活跃保持清醒）
+  assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true }), 'think')
 })

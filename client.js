@@ -20,19 +20,26 @@
     think: "\u{1F4AD}",
     wait: "\u{1F440}"
   };
-  function pickState({ activity, dragging, walking, transient, sleeping, joyUntil = 0, now = Date.now(), sessionThink = false, sessionWait = false }) {
-    if (dragging) return "drag";
-    if (activity.name !== "idle" && activity.name !== "working" && activity.until > now) {
-      return activity.name;
+  var STATE_TABLE = [
+    { state: "drag", when: (c) => c.dragging },
+    // 事件 burst（welcome/celebrate/error/disappointed）：Node half 窗口级联输出，until 有效期内优先。
+    { state: "burst", when: (c) => c.activity.name !== "idle" && c.activity.name !== "working" && c.activity.until > c.now, resolve: (c) => c.activity.name },
+    { state: "eat", when: (c) => c.transient === "eat" },
+    { state: "play", when: (c) => c.transient === "play" },
+    { state: "wake", when: (c) => c.transient === "wake" },
+    { state: "wait", when: (c) => c.sessionWait },
+    { state: "think", when: (c) => c.sessionThink },
+    { state: "working", when: (c) => c.activity.name === "working" },
+    { state: "joy", when: (c) => c.now < c.joyUntil },
+    { state: "sleep", when: (c) => c.sleeping },
+    { state: "walk", when: (c) => c.walking },
+    { state: "idle", when: () => true }
+  ];
+  function pickState(input) {
+    const ctx = { ...input, now: input.now ?? Date.now(), joyUntil: input.joyUntil ?? 0, sessionThink: input.sessionThink ?? false, sessionWait: input.sessionWait ?? false };
+    for (const row of STATE_TABLE) {
+      if (row.when(ctx)) return row.resolve ? row.resolve(ctx) : row.state;
     }
-    if (transient === "eat" || transient === "play") return transient;
-    if (transient === "wake") return "wake";
-    if (sessionWait) return "wait";
-    if (sessionThink) return "think";
-    if (activity.name === "working") return "working";
-    if (now < joyUntil) return "joy";
-    if (sleeping) return "sleep";
-    if (walking) return "walk";
     return "idle";
   }
   function deriveSessionMood(snapshot) {
