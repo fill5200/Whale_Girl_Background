@@ -154,8 +154,8 @@
   pointer-events: none; }
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
-[data-dsh-pet] .pet-hitarea { position: absolute; cursor: grab; touch-action: none; z-index: 3;
-  border-radius: 8px; }
+[data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+  cursor: grab; touch-action: none; z-index: 3; border-radius: 8px; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* \u72B6\u6001\u5361\uFF1A\u9ED8\u8BA4\u7F6E\u4E8E\u5BA0\u7269\u4E0B\u65B9\uFF0C\u95F4\u8DDD\u8DB3\u591F\uFF08\u89D2\u8272 bob \u6D6E\u52A8 \xB14px \u4E0D\u89E6\u5230\uFF09+ \u8D34\u5E95\u65F6\u7FFB\u4E0A\u65B9\u3002 */
@@ -344,6 +344,7 @@
     let dragReleaseUntil = 0;
     let showingSprite = false;
     let lastActiveAt = Date.now();
+    let idleSince = 0;
     let sleeping = false;
     let wasSleeping = false;
     let animState = null;
@@ -596,7 +597,7 @@
           if ((animState === "idle" || animState === "walk") && cfg2.loop && cfg2.frames > 1) {
             if (frame >= cfg2.frames - 1 || frame <= 0) frameDirection *= -1;
             frame = Math.max(0, Math.min(cfg2.frames - 1, frame));
-            if (animState === "idle" && frame === 0 && frameDirection === 1) {
+            if (animState === "idle" && frame === 0 && frameDirection === -1) {
               idlePausedUntil = now + cfg2.idlePauseMs;
             }
           } else if (frame >= cfg2.frames) {
@@ -709,8 +710,14 @@
         if (act !== null && typeof act === "object" && typeof act.name === "string") {
           activity = act;
         }
-        if (activity.name !== "idle" || activity.until > Date.now()) lastActiveAt = Date.now();
-        sleeping = activity.name === "idle" && Date.now() - lastActiveAt > cfg.sleepAfterMs;
+        const isActive = activity.name !== "idle" || activity.until > Date.now();
+        if (isActive) {
+          lastActiveAt = Date.now();
+          idleSince = 0;
+        } else if (idleSince === 0) {
+          idleSince = Date.now();
+        }
+        sleeping = activity.name === "idle" && idleSince !== 0 && Date.now() - idleSince > cfg.sleepAfterMs;
         if (typeof body?.configRevision === "number" && body.configRevision !== lastConfigRevision) {
           lastConfigRevision = body.configRevision;
           const config = await fetchConfig();

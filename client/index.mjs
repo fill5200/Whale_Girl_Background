@@ -44,8 +44,8 @@ const CSS = `
   pointer-events: none; }
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
-[data-dsh-pet] .pet-hitarea { position: absolute; cursor: grab; touch-action: none; z-index: 3;
-  border-radius: 8px; }
+[data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+  cursor: grab; touch-action: none; z-index: 3; border-radius: 8px; }
 [data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* 状态卡：默认置于宠物下方，间距足够（角色 bob 浮动 ±4px 不触到）+ 贴底时翻上方。 */
@@ -256,6 +256,7 @@ export function apply(ctx = {}) {
   let dragReleaseUntil = 0 // 拖拽放下缓冲：短暂回 idle（1.5s）再进入底层状态
   let showingSprite = false // 当前 animState 是否以 sprite 呈现（迟到加载后换肤）
   let lastActiveAt = Date.now()
+  let idleSince = 0 // 进入 idle 的时刻（sleep 从此刻起算持续空闲）
   let sleeping = false
   let wasSleeping = false // 睡醒过渡（wake 瞬发）触发依据
   let animState = null
@@ -550,7 +551,9 @@ export function apply(ctx = {}) {
         if ((animState === 'idle' || animState === 'walk') && cfg.loop && cfg.frames > 1) {
           if (frame >= cfg.frames - 1 || frame <= 0) frameDirection *= -1
           frame = Math.max(0, Math.min(cfg.frames - 1, frame))
-          if (animState === 'idle' && frame === 0 && frameDirection === 1) {
+          // idle 暂停：往返播放回到帧 0（direction 变 -1 表示折返起点）时停一拍——
+          // 避免「不停循环眨眼」（原判断 frameDirection===1 只在首帧成立，永不暂停）。
+          if (animState === 'idle' && frame === 0 && frameDirection === -1) {
             idlePausedUntil = now + cfg.idlePauseMs
           }
         } else if (frame >= cfg.frames) {
@@ -682,8 +685,16 @@ export function apply(ctx = {}) {
       if (act !== null && typeof act === 'object' && typeof act.name === 'string') {
         activity = act
       }
-      if (activity.name !== 'idle' || activity.until > Date.now()) lastActiveAt = Date.now()
-      sleeping = activity.name === 'idle' && Date.now() - lastActiveAt > cfg.sleepAfterMs
+      // sleep 语义：从「进入 idle 的时刻」起算持续空闲（不是从 lastActiveAt——那会停在
+      // 工作期间导致 agent 停止后立即判睡）。
+      const isActive = activity.name !== 'idle' || activity.until > Date.now()
+      if (isActive) {
+        lastActiveAt = Date.now()
+        idleSince = 0
+      } else if (idleSince === 0) {
+        idleSince = Date.now()
+      }
+      sleeping = activity.name === 'idle' && idleSince !== 0 && Date.now() - idleSince > cfg.sleepAfterMs
       // 配置热更新：/state 的 configRevision 变化 → 拉取 /config 应用（尺寸/透明度/游走/睡眠）。
       if (typeof body?.configRevision === 'number' && body.configRevision !== lastConfigRevision) {
         lastConfigRevision = body.configRevision
