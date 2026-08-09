@@ -96,6 +96,8 @@
 
 > 规则（verify-assets 门禁强制）：**`motion` 只允许配 `frames: 1`**——多帧状态由帧播放器动画，运动配方与帧播放器互斥（单帧状态才用 CSS 运动补充）。**定向例外：仅 `error`（2 帧「正常→惊吓」+ `shake`）**——一次播完僵住后由 CSS 颤抖维持 burst 窗口内的持续表现（见决策记录动画编排修订）。**角色 id 只允许 `[a-z0-9-]`**（URL 路径安全，防注入）。
 
+**角色 meta 可选字段**（[client/character.mjs](../client/character.mjs) 解析）：`stageSize`（舞台尺寸 px，默认 110；未配置时经 `--pet-size` 生效）、`emojiOverrides`（`{ 状态名: emoji }`——缺 sheet 状态的兜底表情定制，贴角色画风；未覆盖状态回退通用 EMOJI 表）。
+
 ## 资历与称号（积累型）
 
 - **XP 来源**：完成任务 +10、新会话（startup）+5、续接/延续（resume/compact/clear）+2；**无任何衰减/惩罚**。
