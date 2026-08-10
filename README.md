@@ -54,6 +54,14 @@ repository-plugins:
 | `think` | 会话思考陪伴 | ![think](docs/preview/think.gif) |
 | `wait` | 等待批准 | ![wait](docs/preview/wait.gif) |
 
+## 作为官方 repository-plugin 参考实现
+
+whale-girl 是官方 repository-plugin（0809 格式）的**完整范本**——开发新插件可对照本仓库：
+
+- **结构**：`.dsh-plugin/`（入口/纯逻辑/client/素材）与 docs/decisions/scripts（仓库元资产）分离，见根 [AGENTS.md](AGENTS.md) 目录布局
+- **规范**：门禁（`scripts/gates/run.mjs`）+ 决策记录 + 素材全量契约——开发规范引导见 plugin-registry 的 [plugin-registry-create skill](https://github.com/dsh-external/plugin-registry/tree/main/skills/plugin-registry-create) 与 [cookbook](https://github.com/dsh-external/plugin-registry/blob/main/docs/cookbook/creating-a-repository-plugin.md)，踩过的坑（官方包未发布/ESM 缓存/宿主覆盖 CSS）见其 [gotchas](https://github.com/dsh-external/plugin-registry/blob/main/skills/plugin-registry-create/references/gotchas.md)
+- **安装示例**：本 README 上方的 config.yaml 方式即 repository 插件安装路径示例
+
 ## 配置
 
 参数（尺寸/透明度/游走/睡眠/窗口时长）经宿主 settings 配置，`<dshHome>/settings.yaml` 的 `whale-girl:` section（或设置 UI）修改后**热生效免重启**：
