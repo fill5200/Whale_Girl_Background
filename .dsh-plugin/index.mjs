@@ -189,7 +189,7 @@ export function apply(ctx) {
 
   // httpServer 可选（headless 无 web 服务器）：有则注册 UI 路由/注入，无则降级为无 UI 工具插件
   // （官方 repository-plugin entry 语义，见迁移决策记录）。
-  const httpServer = ctx.httpServer ?? (typeof ctx.get === 'function' ? ctx.get('httpServer') : undefined)
+  const httpServer = typeof ctx.get === 'function' ? ctx.get('httpServer') : undefined
   ctx.effect(() => {
     const disposers = [
       // pet 服务（开放性窄缝）：只读快照 + 信号订阅。其他插件 inject ['pet']
