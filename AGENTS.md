@@ -11,7 +11,7 @@ whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 +
 ## 目录布局
 
 ```
-.dsh-plugin/index.mjs     Node half 入口：state/interact/assets/ui 路由 + 事件记账 + ctx.pet 服务
+.dsh-plugin/index.mjs     Node half 入口：state/interact/config/assets/ui 路由 + 事件记账 + ctx.pet 服务
 .dsh-plugin/src/          Node half 纯逻辑（账本/活动/assets 守卫/配置/signals，零宿主依赖，可单测）
 .dsh-plugin/client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
 .dsh-plugin/client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
@@ -44,7 +44,7 @@ node scripts/build-client.mjs --check   # 校验 .dsh-plugin/client.js 新鲜度
 | .dsh-plugin/client/ 源码或构建配置 | `node scripts/build-client.mjs --check`，改完跑 `node scripts/build-client.mjs`；验证站 web 运行中跑 `node scripts/verify-client-smoke.mjs <web-url>`（浏览器冒烟：apply 成功 + 宠物渲染，curl 覆盖不到的 client 面）；**client 行为改动**（拖拽/交互/状态序列）加跑 `node scripts/verify-client-behavior.mjs <web-url> [scenario]`（行为回归探针，见 [decisions/implemented/testing/2026-08-10-client-behavior-probe.md](decisions/implemented/testing/2026-08-10-client-behavior-probe.md)） |
 | 文档、决策记录 | `node scripts/gates/run.mjs` |
 | .dsh-plugin/assets/ sheet 或 manifest | `node scripts/gates/verify-assets.mjs` + 重装 + **刷新页面即可，无需重启 web**（assets 路由按请求读磁盘） |
-| .dsh-plugin/index.mjs / .dsh-plugin/src/（Node half，含工具 schema） | `node scripts/gates/run.mjs` + 重装 + **web 重启**（ESM 缓存：同 URL 二次 import 返回旧模块，已挂载过的插件改源码 disable/enable 不生效；仅进程内从未 import 过的插件可首次面板 enable 免重启，见 [decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md](decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md)）；重启后日志须无 `plugin tree failed to load` |
+| .dsh-plugin/index.mjs / .dsh-plugin/src/（Node half） | `node scripts/gates/run.mjs` + 重装 + **web 重启**（ESM 缓存：同 URL 二次 import 返回旧模块，已挂载过的插件改源码 disable/enable 不生效；仅进程内从未 import 过的插件可首次面板 enable 免重启，见 [decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md](decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md)）；重启后日志须无 `plugin tree failed to load` |
 | 门禁本身 | 对应门禁的自证测试（`node --test 'scripts/gates/*.test.mjs'`） |
 
 ## 约定

@@ -19,6 +19,12 @@ whale-girl entry 注册了 3 个 Agent 工具（`pet_feed`/`pet_play`/`pet_statu
 
 **B：只删 pet_feed/pet_play，留 pet_status。** 状态查询对 Agent 有信息价值（会话中了解宠物资历）——但 pet_status 也占用工具面且价值低（宠物资历与 Agent 任务无关）；统一删除，保持「宠物 = GUI 内互动角色，不参与 Agent 工具面」。
 
+## 取代检查
+
+部分取代 [2026-08-10-migrate-to-official-repository-plugin.md](2026-08-10-migrate-to-official-repository-plugin.md)：
+其「目标态/工具可用性/验收核对」中的工具注册与调用陈述由本记录取代（Agent 工具已删除）；
+该记录的架构与分发决策（.dsh-plugin 结构、config.yaml 安装、tapIndex 注入）不受影响。
+
 ## Consequences
 
 - Agent 工具面不再包含宠物动作（会话工具清单干净）；宠物互动完全走 GUI 交互（菜单/拖拽）。

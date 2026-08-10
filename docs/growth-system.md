@@ -18,7 +18,7 @@
 | 完成任务 | +10 | `ctx.tasks.onTaskDone`（completed；页面关闭期也不漏记） |
 | 新会话（startup） | +5 | `agent/session-start`，source='startup' |
 | 续接/延续（resume/compact/clear） | +2 | 同上，其余 source |
-| 活跃陪伴时长 | 累积 | 轮询差分（单次增量封顶 5min，防睡眠一夜刷满） |
+| 活跃陪伴时长 | 累积 | 任务运行中按轮询差分累加；单次增量封顶 5min（防睡眠一夜刷满） |
 
 - 请求错误（`agent/request-error`）**不计数不惩罚**——只触发情绪（见彩蛋）。
 - 失败任务只计数（stats.failures），不扣 XP、不写「失败惩罚」语义。

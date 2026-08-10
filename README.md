@@ -3,7 +3,7 @@
 <p align="center">
   <strong>DSH Web GUI 内的桌面宠物（QQ 宠物形态）</strong><br/>
   右下角悬浮的积累型伙伴：可拖拽、可投喂/玩耍，陪伴你的工作台脉搏——
-  完成任务/会话/陪伴时长积累成资历等级、称号与回忆。
+  完成任务/会话/活跃陪伴时长积累成资历等级、称号与回忆。
 </p>
 
 <p align="center">
@@ -15,15 +15,15 @@
 
 ## 安装
 
-官方 repository-plugin 格式（`.dsh-plugin/` + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（**ref** = 仓库某个提交的完整哈希，如 `f5e6c07bf06c…`——锁定版本；官方机制要求精确 ref，不支持 `latest`/分支）：
+官方 repository-plugin 格式（`.dsh-plugin/` + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（**ref** = 仓库提交的完整哈希，如 `6f6d3f2ec283…`——安装以 ref 锁定，缓存按 ref 不可变，建议用提交哈希而非分支/tag 引用）：
 
 ```yaml
 repository-plugins:
   repositories:
-    - github:dsh-external/whale-girl#f5e6c07bf06c&path:/.dsh-plugin
+    - github:dsh-external/whale-girl#6f6d3f2ec283&path:/.dsh-plugin
 ```
 
-启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；hover 显示状态条（资历等级/任务数/最近共同回忆）。初始配置/欢迎页（onboarding）宠物隐藏。
+启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 喂食 / 🎾 玩耍），拖拽可移动；hover 显示状态条（资历等级/任务数/最近共同回忆）。初始配置/欢迎页（onboarding）宠物隐藏。
 
 更新插件时换成仓库 main 的最新提交哈希（HMR 事务性换代，无需重启）。
 
@@ -32,7 +32,7 @@ repository-plugins:
 | 你做什么 / 发生什么 | 宠物表现 |
 |---|---|
 | 拖拽宠物 | 被斜向拉扯（`drag`） |
-| 点击菜单 🍗 投喂 / 🎾 玩耍 | 啃咬/抛接球（`eat`/`play`）→ 开心（`joy`） |
+| 点击菜单 🍗 喂食 / 🎾 玩耍 | 啃咬/抛接球（`eat`/`play`）→ 开心（`joy`） |
 | 空闲 ≥60s | 打盹（`sleep`）；互动时醒过来（`wake`） |
 | 任务完成 / 升级 / 称号 / 回合完成 | 举手欢呼（`celebrate`） |
 | 任务失败 / 请求出错 | 惊吓（`error`）→ 失落（`disappointed`） |

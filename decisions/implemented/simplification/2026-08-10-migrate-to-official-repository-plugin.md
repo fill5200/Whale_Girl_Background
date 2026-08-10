@@ -105,6 +105,10 @@ repository-plugins:
 - **基线迁移**：官方 repository-plugin 需 0809 基线（`421e96f4` 已拉取，`/tmp/dsh-0809` worktree 已建）；当前验证站是 0808+patch，验证期间两套并存
 - **GUI 兼容**：官方 GUI 注入 `__DSH_BOOT__` 与 registry `__ModuleLoader__` 并存时宠物不得双挂（迁移后旧机制不再加载 whale-girl）
 
+## 取代检查
+
+本记录中的工具注册/验收陈述（「工具可用」「pet_feed 经 agent 调用」）为该提交时点快照，其工具部分**部分取代**于 [2026-08-10-remove-agent-tools.md](2026-08-10-remove-agent-tools.md)（Agent 工具已删除，entry 不再注册工具）；架构、分发与注入决策不受影响。门禁/单测计数同样为该时点快照，现状以 `scripts/gates/run.mjs` 清单为准。
+
 ## 相关信息
 
 - 官方机制：`official-0809-coverage.md`（覆盖度 + UI 自渲染实证）、`2026-07-30-config-only-repository-plugins.md`（config.yaml 安装）、`2026-07-30-static-repository-plugin-format.md`（子目录格式与 containment）、`2026-08-08-trusted-repository-package-code.md`（dsh.entry 可信代码）

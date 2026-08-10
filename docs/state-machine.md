@@ -26,7 +26,7 @@
 | 状态 | 触发事件 | 窗口 | 说明 |
 |---|---|---|---|
 | `welcome` | `agent/session-start`（startup） | 6s（可配） | 新会话欢迎 |
-| `celebrate` | 任务完成/升级/称号 + **回合完成**（session running→completed，含当前会话） | 6s（任务，可配）/ 4s（回合，client 本地） | 任务层双源同窗（事件+轮询）；回合层 client 本地窗口 |
+| `celebrate` | 任务完成/升级/称号 + **回合完成**（session running→false 边沿，含当前会话） | 6s（任务，可配）/ 4s（回合，client 本地） | 任务层双源同窗（事件+轮询）；回合层 client 本地窗口 |
 | `error` | 任务失败/`agent/request-error` | 4s（可配） | 惊吓，负面窗口 |
 | `disappointed` | 失败后尾段 | 6s（可配） | 失落，紧跟 error |
 
@@ -43,7 +43,7 @@
 
 ### 工作陪伴（working ↔ think）
 
-`think` 是思考陪伴的**常态**（任一会话运行中）。`working` 是 client 节奏器**随机插入**的工作插曲：随机触发间隔（12-30s）、随机持续时长（2.5-6s），大部分时间保持 think 沉思，偶尔摆出「认真干活」姿态。插曲决策在纯函数 `nextWorkingRhythm`（注入随机源、可单测）；会话不活跃时插曲撤防。**working 不再是任务指示灯**（不再由 Node `activity.working` 驱动——agent 思考阶段本就无任务，旧时间片交替即由此失真）。
+`think` 是思考陪伴的**常态**（任一会话运行中）。`working` 是 client 节奏器**随机插入**的工作插曲：随机触发间隔（12-30s）、随机持续时长（2.5-6s），大部分时间保持 think 沉思，偶尔摆出「认真干活」姿态。插曲决策在纯函数 `nextWorkingRhythm`（注入随机源、可单测）；会话不活跃时插曲撤防。**working 不是任务指示灯**（不随 Node `activity.working` 驱动——agent 思考阶段本就无任务，由 client 节奏器随机插入）。
 
 ## 优先级（STATE_TABLE 行序，文法单源）
 

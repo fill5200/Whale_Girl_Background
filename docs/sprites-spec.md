@@ -8,7 +8,7 @@
 
 ## 素材管线（AI 生图 → 规范 PNG 资源）
 
-**每张生图 = 3×3 网格**（行 = 状态、列 = 帧；静态姿势 1 帧占 1 格，行内帧横排、格间留白）。帧内一致天然保证（同一张图），状态间一致性靠参考图。已废弃"单张 2K 大图含全部状态"（网格切分对不上、单帧无中间过程）。
+**每张生图 = 3×3 网格**（行 = 状态、列 = 帧；静态姿势 1 帧占 1 格，行内帧横排、格间留白）。帧内一致天然保证（同一张图），状态间一致性靠参考图。不用「单张 2K 大图含全部状态」方式（网格切分对不上、单帧无中间过程）。
 
 **工具**：[scripts/slice-sheet.py](../scripts/slice-sheet.py)——AI 生图 → 规范 PNG 资源的通用工具（PIL+numpy，无第三方依赖）。三种模式 + 规范化参数：
 
@@ -21,7 +21,7 @@
 **通用参数**：`--key`（抠图：gray/auto/R,G,B）、`--size`（默认 256）、`--normalize-scale`（内容占比目标，默认 0.88 = 角色高度占帧 88%，自动加透明边缘）、`--align`（底对齐默认/居中）、`--swap-frames`（帧序校正，AI 帧序乱时如 `--swap-frames 2,0,1`）、`--out`（输出目录）。
 
 1. **生图**：3×3 网格图（纯色背景，见提示模板），参考 [originals/鲸鱼娘.png](../originals/鲸鱼娘.png) 锁风格。
-2. **切分/归一化**：`python3 scripts/slice-sheet.py <图> <模式> --key <色> --out assets/characters/<角色id>/` → 行带连通域分离 → 逐帧裁切 → 质心配准（±2px 钳制）→ 底中对齐 → 内容占比 88% → 帧横排 sheet（256 帧）。工具自证测试：`python3 tests/slice-sheet.test.py`（门禁 tool-tests）。
+2. **切分/归一化**：`python3 scripts/slice-sheet.py <图> <模式> --key <色> --out assets/characters/<角色id>/` → 行带连通域分离 → 逐帧裁切 → 质心配准（±2px 钳制）→ 底中对齐 → 内容占比 88% → 帧横排 sheet（帧 256×256）。工具自证测试：`python3 tests/slice-sheet.test.py`（门禁 tool-tests）。
 3. **投放**：sheet 进 `assets/characters/<角色id>/`，`assets/manifest.json` 的角色 `states` 加条目（`frames: N` + 可选 `motion`；`verify-assets` 门禁保证引用存在与多角色遍历）。
 
 **点击热区（跟随当前状态）**：client 逐状态分析 sheet 不透明像素 bbox（0-1 归一化），热区贴合**当前显示状态**的实际轮廓——状态切换时热区实时收窄/放宽（各状态内容占比 55-88% 差异大：walk 横向仅 55%，若用全部状态并集会被宽幅状态撑大）。素材内容占比 88% 契约给动画留呼吸空间，热区因此比角色轮廓略大属预期（0 边界会破坏帧契约）。
@@ -91,7 +91,7 @@
 
 方向写入点：**walk**（按移动方向）、**drag**（按拖拽位移方向）；静态陪伴态（`idle`/`think`/`wait`）沿用其方向（**动作间朝向连续**，不无谓跳回默认），并**随机转身**（`nextFacingAt`，间隔 10-25s，见 [state-machine.md](state-machine.md)）。
 
-**朝向统一状态**（2026-08-09 审计后逐帧镜像）：walk/eat/drag/joy/play/wake/welcome 已镜像为朝左；余下状态本就朝左。**生图时人物一律朝左**——新状态/新角色不遵守会在审计时暴露（帧内左右比偏离 1 即提示）。
+**朝向统一状态**：walk/eat/drag/joy/play/wake/welcome 素材已统一朝左；其余状态素材本就朝左。**生图时人物一律朝左**——新状态/新角色不遵守会在审计时暴露（帧内左右比偏离 1 即提示）。
 
 优先级（[.dsh-plugin/client/logic.mjs](../.dsh-plugin/client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > 回合完成 `celebrate`（client 本地窗口）> `working`（随机插曲）> `think` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 
@@ -156,4 +156,4 @@ XP/等级/称号/回忆/情绪的完整契约见 [docs/growth-system.md](growth-
 1. 生图产物（3×3 网格，纯色背景）放 `assets/raw/`（gitignored，不入库）。
 2. `python3 scripts/slice-sheet.py assets/raw/<图>.png --sheet 3x3 --states <行状态名> --frames <每行帧数>` → 帧 sheet 写入 `assets/`。
 3. `assets/manifest.json` 加/改条目（`verify-assets` 门禁保证引用与 PNG 尺寸契约，缺文件即红）。
-4. 实况验证：`dsh registry install ./whale-girl` → **刷新页面即可**（assets/ manifest 改动无需重启 web——assets 路由按请求读盘）；改 Node half（.dsh-plugin/index.mjs/src）才需重启 web 且日志须无 `plugin tree failed to load`；改 client 后跑 `node scripts/verify-client-smoke.mjs <web-url>`。
+4. 实况验证：按 [README「安装」](../README.md#安装) 方式重装（`$DSH_HOME/config.yaml` 的 `repository-plugins.repositories`，ref 换成含改动的提交哈希）→ **刷新页面即可**（assets/ manifest 改动无需重启 web——assets 路由按请求读盘）；改 Node half（.dsh-plugin/index.mjs/src）才需重启 web 且日志须无 `plugin tree failed to load`；改 client 后跑 `node scripts/verify-client-smoke.mjs <web-url>`。
