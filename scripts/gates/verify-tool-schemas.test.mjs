@@ -15,7 +15,7 @@ function makeRoot(entry) {
 }
 
 test('toolBlocks 提取 defineTool 块（括号平衡）', () => {
-  const src = "register(defineTool({ name: 'a', output: { schema: { type: 'string' } } }))\nregister(defineTool({ name: 'b' }))"
+  const src = "ctx.tools.register({ name: 'a', output: { schema: { type: 'string' }, render: () => [] } })\nctx.tools.register({ name: 'b', output: { schema: { type: 'string' }, render: () => [] } })"
   const blocks = toolBlocks(src)
   assert.equal(blocks.length, 2)
   assert.match(blocks[0], /name: 'a'/)
@@ -23,20 +23,20 @@ test('toolBlocks 提取 defineTool 块（括号平衡）', () => {
 })
 
 test('接受：标量输出 + 显式 additionalProperties 的 object schema', () => {
-  const entry = "register(defineTool({ name: 'a', output: { schema: { type: 'object', additionalProperties: false, properties: {} } } }))"
+  const entry = "ctx.tools.register({ name: 'a', output: { schema: { type: 'object', additionalProperties: false, properties: {} }, render: () => [] }})"
   const { ok, errors } = check(makeRoot(entry))
   assert.equal(ok, true, errors.join('\n'))
 })
 
 test('拒绝：required 数组', () => {
-  const entry = "register(defineTool({ name: 'a', output: { schema: { type: 'object', required: ['x'], additionalProperties: false } } }))"
+  const entry = "ctx.tools.register({ name: 'a', output: { schema: { type: 'object', required: ['x'], additionalProperties: false }, render: () => [] }})"
   const { ok, errors } = check(makeRoot(entry))
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /required 数组/)
 })
 
 test('拒绝：object schema 未声明 additionalProperties', () => {
-  const entry = "register(defineTool({ name: 'a', output: { schema: { type: 'object', properties: {} } } }))"
+  const entry = "ctx.tools.register({ name: 'a', output: { schema: { type: 'object', properties: {} }, render: () => [] }})"
   const { ok, errors } = check(makeRoot(entry))
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /additionalProperties/)

@@ -10,7 +10,6 @@
 // 事件记账时落盘；disable 时末次落盘）。
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
   INITIAL_STATE, titleName, recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive,
 } from './src/pet-state.mjs'
@@ -243,27 +242,27 @@ export function apply(ctx) {
         }
         scheduleSave()
       }),
-      ctx.tools.register(defineTool({
+      ctx.tools.register({
         name: 'pet_feed',
         description: '投喂桌面宠物（社交娱乐）：纯乐趣互动，宠物会回话，不影响资历。',
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
         execute: async () => applyAction(state, 'feed', configRef.replies).body.reply,
       })),
-      ctx.tools.register(defineTool({
+      ctx.tools.register({
         name: 'pet_play',
         description: '陪桌面宠物玩耍（社交娱乐）：纯乐趣互动，宠物会回话，不影响资历。',
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
         execute: async () => applyAction(state, 'play', configRef.replies).body.reply,
       })),
-      ctx.tools.register(defineTool({
+      ctx.tools.register({
         name: 'pet_status',
         description: '查看桌面宠物的资历（等级/经验/任务数/称号/最近共同回忆）。',
         parameters: {},
         output: {
-          // 注意：value-schema DSL 不支持 required 数组与数组类型；object 必须显式声明
-          // additionalProperties；这里全部扁平化为原始类型字段（见 verify-tool-schemas 门禁）。
+          // 注意：工具 schema 须为合法 JSON Schema——object 必须显式声明 additionalProperties；
+          // 这里全部扁平化为原始类型字段（见 verify-tool-schemas 门禁）。
           schema: {
             type: 'object',
             additionalProperties: false,

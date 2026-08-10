@@ -1,5 +1,5 @@
-// 门禁：defineTool 的 value-schema DSL 兼容性（两个已知拒绝模式）。
-// 拒绝不变量：index.mjs 的 defineTool 块内出现 DSL 不支持的 schema 形态——
+// 门禁：工具注册块的 schema JSON 合法性（两个已知拒绝模式）。
+// 拒绝不变量：index.mjs 的 ctx.tools.register({...}) 块内出现非法 schema 形态——
 // (a) `required: [...]` 数组（DSL 只支持属性级 required: true）；
 // (b) `type: 'object'` 未在附近显式声明 additionalProperties（DSL 要求显式 true/false）。
 // 只读、确定性。局限：窗口启发式（对象字面量不跨 >120 字符窗口），完整校验在宿主
@@ -9,12 +9,12 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const ROOT = resolve(import.meta.dirname, '../..')
-const BLOCK_START = /defineTool\(\{/g
+const BLOCK_START = /tools\.register\(\{/g
 const REQUIRED_ARRAY = /required:\s*\[/
 const OBJECT_TYPE = /type:\s*['"]object['"]/
 const ADDITIONAL_PROPS = /additionalProperties\s*:/
 
-/** 提取 defineTool({...}) 块（括号平衡）。 */
+/** 提取 tools.register({...}) 块（括号平衡）。 */
 export function toolBlocks(source) {
   const blocks = []
   BLOCK_START.lastIndex = 0
@@ -40,7 +40,7 @@ export function check(root = ROOT) {
   const errors = []
   for (const block of toolBlocks(source)) {
     if (REQUIRED_ARRAY.test(block)) {
-      errors.push('defineTool schema 使用了 required 数组——DSL 不支持，用属性级 required: true')
+      errors.push('工具 schema 使用了 required 数组——object 须用 additionalProperties 声明，不用 required')
     }
     // 每个 type: 'object' 的 120 字符窗口内须有 additionalProperties。
     let from = 0
