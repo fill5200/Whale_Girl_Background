@@ -2,7 +2,7 @@
 // v2：零负反馈——无 hunger/mood 属性状态；情绪只由事件瞬发 + 互动喜悦。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, EMOJI, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from '../client/logic.mjs'
+import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, STATE_NAMES, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from '../client/logic.mjs'
 
 const IDLE = { activity: { name: 'idle', until: 0 }, dragging: false, transient: null, sleeping: false, joyUntil: 0, now: 1000 }
 
@@ -68,12 +68,13 @@ test('确定性：显式 now 时相同输入相同输出', () => {
   assert.deepEqual(pickState(IDLE), pickState(IDLE))
 })
 
-test('TRANSIENT_MS/JOY_MS 与 EMOJI 完整性（每个可达状态都有兜底表情）', () => {
+test('TRANSIENT_MS/JOY_MS 与 STATE_NAMES 完整性（15 状态全量契约）', () => {
   assert.equal(TRANSIENT_MS, 1500)
   assert.equal(JOY_MS, 1600)
-  for (const s of ['idle', 'working', 'celebrate', 'error', 'disappointed', 'joy', 'eat', 'play', 'drag', 'walk', 'sleep', 'wake', 'welcome', 'think', 'wait']) {
-    assert.ok(EMOJI[s] !== undefined, `EMOJI 缺 ${s}`)
-  }
+  assert.deepEqual(
+    [...STATE_NAMES].sort(),
+    ['idle', 'working', 'celebrate', 'error', 'disappointed', 'joy', 'eat', 'play', 'drag', 'walk', 'sleep', 'wake', 'welcome', 'think', 'wait'].sort(),
+  )
 })
 
 test('会话感知：等待批准 wait 优先于思考陪伴 think（都需要用户注意）', () => {
@@ -147,14 +148,14 @@ test('deriveSessionMood：空/未就绪快照与缺字段行安全（服务不�
   }
 })
 
-test('STATE_TABLE 文法单源：表内状态全部在 EMOJI 表，idle 兜底在末行', () => {
+test('STATE_TABLE 文法单源：表内状态全部在 STATE_NAMES，idle 兜底在末行', () => {
   const last = STATE_TABLE[STATE_TABLE.length - 1]
   assert.equal(last.state, 'idle') // 兜底必须最后
   assert.equal(last.when({}), true) // 恒命中
   for (const row of STATE_TABLE) {
-    // burst 是动态解析（resolve 到 activity.name），其可能值也须在 EMOJI
-    for (const s of ['welcome', 'celebrate', 'error', 'disappointed']) assert.ok(EMOJI[s])
-    if (row.state !== 'burst') assert.ok(EMOJI[row.state], `STATE_TABLE 状态 ${row.state} 缺 EMOJI 兜底`)
+    // burst 是动态解析（resolve 到 activity.name），其可能值也须在 STATE_NAMES
+    for (const s of ['welcome', 'celebrate', 'error', 'disappointed']) assert.ok(STATE_NAMES.includes(s))
+    if (row.state !== 'burst') assert.ok(STATE_NAMES.includes(row.state), `STATE_TABLE 状态 ${row.state} 不在 STATE_NAMES`)
   }
 })
 

@@ -22,17 +22,20 @@ export const JOY_MS = 1600
 // 回合完成庆祝窗口（client 本地）：session running→completed 翻转后播 celebrate 的时长。
 export const ROUND_CELEBRATE_MS = 4000
 
-export const EMOJI = {
-  idle: '🐣', working: '🤔', celebrate: '🎉', error: '😱', disappointed: '😞',
-  joy: '🐥', eat: '😋', play: '🎾', drag: '😵', walk: '🚶', sleep: '💤', wake: '😪', welcome: '👋',
-  think: '💭', wait: '👀',
-}
+// 状态名权威集合（15 状态，全角色必填素材——缺 sheet 不再 emoji 降级）。
+// 来源：docs/sprites-spec.md 状态总表；verify-spec-states 门禁校验三者一致：
+// spec 总表 ↔ 本集合 ↔ STATE_TABLE 行（含 burst 的 resolve 值）。
+export const STATE_NAMES = Object.freeze([
+  'idle', 'working', 'celebrate', 'error', 'disappointed', 'joy', 'eat', 'play',
+  'drag', 'walk', 'sleep', 'wake', 'welcome', 'think', 'wait',
+])
 
 /**
  * 状态优先级表（文法单源）。行序即优先级：首行命中即返回。
  * - `when`：命中谓词（输入上下文）。
  * - `resolve`：命中时返回的状态名（多数恒等于 state；burst 需取 activity.name）。
- * 注意：状态名必须都在 EMOJI 表（verify-spec-states 门禁校验 spec 总表 ↔ EMOJI）。
+ * 注意：状态名必须都在 STATE_NAMES 权威集合（verify-spec-states 门禁校验
+ * spec 总表 ↔ STATE_NAMES ↔ STATE_TABLE 行序）。
  */
 export const STATE_TABLE = [
   { state: 'drag', when: (c) => c.dragging },

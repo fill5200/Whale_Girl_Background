@@ -3,10 +3,10 @@
 // - manifest 形状（兼容旧读）：顶层 `states` = 单角色 `whale-girl` 简写；
 //   或 `{ characters: { <id>: { meta?, states } }, default }`。
 // - 角色 character = { id, name?, credit?, meta?, states }；states 是「状态名 → 动画集」
-//   的部分映射（缺状态 → emoji 兜底，见 EMOJI 表）。
-// - 动画集 animation set = 现 manifest.states 条目 { sheet, frames, fps, loop, motion }。
+//   的**全量映射**——15 状态必须全部提供 sheet（不再 emoji 降级，verify-assets 门禁强制）。
+// - 动画集 animation set = manifest.states 条目 { sheet, frames, fps, loop, motion }。
 // - 角色 id 限制 [a-z0-9-]（进入 URL 路径，防注入；assets 路由另有路径净化兜底）。
-import { EMOJI } from './logic.mjs'
+import { STATE_NAMES } from './logic.mjs'
 
 export const DEFAULT_ROLE_ID = 'whale-girl'
 /** 角色 id 合法字符集（URL 路径安全；与 verify-assets 门禁一致）。 */
@@ -62,21 +62,15 @@ export function getCharacter(manifest, id) {
   return parseCharacters(manifest).characters[id] ?? null
 }
 
-/** 状态动画集：角色 states 里取；缺 → undefined（emoji 兜底）。 */
+/**
+ * 状态动画集：角色 states 里取；缺 → undefined（调用方渲染占位符+警告——
+ * 不再 emoji 降级；verify-assets 门禁保证 manifest 必含全部 15 状态）。
+ */
 export function stateOf(character, stateName) {
   return character?.states?.[stateName]
 }
 
-/** 状态是否合法（在 EMOJI 兜底表内——新增状态须同步兜底表）。 */
+/** 状态是否合法（在权威状态集合内）。 */
 export function isKnownState(stateName) {
-  return stateName in EMOJI
-}
-
-/** 表情解析：角色 meta.emojiOverrides 优先（换角色后兜底表情贴画风），回退通用 EMOJI。 */
-export function emojiFor(character, stateName) {
-  const overrides = character?.meta?.emojiOverrides
-  if (overrides !== null && typeof overrides === 'object' && typeof overrides[stateName] === 'string') {
-    return overrides[stateName]
-  }
-  return EMOJI[stateName] ?? '🐣'
+  return STATE_NAMES.includes(stateName)
 }

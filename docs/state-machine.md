@@ -7,7 +7,7 @@
 - **文法单源**：状态优先级由 `STATE_TABLE` 声明（行序即优先级，首个命中即返回），不散落 if 链。加状态/调优先级只改此表。
 - **分工**：Node half 输出**事实窗口**（`{ name, until }`，welcome/celebrate/error/disappointed 的 burst）；client 做**本地交互选择**（drag/transient/joy/session/working 交替）。
 - **零负反馈**：失败只触发情绪状态（error→disappointed），不惩罚、不持续。
-- **降级**：角色缺某状态 sheet → emoji 兜底（`emojiFor`），行为不变。
+- **降级（仅运行时）**：sheet 加载失败/迟到 → 舞台占位 + 控制台警告（manifest 门禁保证投放前不会缺，此处只防运行时异常）。
 
 ## 状态清单与触发
 
@@ -63,20 +63,20 @@ drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
 ## 扩展指引（给新角色/新状态）
 
 ### 加一个新状态（行为级，平台变更）
-1. `client/logic.mjs` `STATE_TABLE` 加行（`{ state, when, resolve? }`），位置决定优先级
-2. `client/logic.mjs` `EMOJI` 加兜底表情
-3. `assets/manifest.json` 角色 `states` 加条目（可选 sheet；缺则 emoji 兜底）
-4. `docs/sprites-spec.md` 状态总表同步（verify-spec-states 门禁强制 spec ↔ EMOJI）
-5. 决策记录（行为文法变更）
+1. `client/logic.mjs` `STATE_NAMES` 加状态名 + `STATE_TABLE` 加行（`{ state, when, resolve? }`），位置决定优先级
+2. `assets/manifest.json` 每个角色 `states` 加条目（**必填 sheet**——素材全量契约）
+3. `docs/sprites-spec.md` 状态总表同步（verify-spec-states 门禁强制 spec ↔ STATE_NAMES ↔ STATE_TABLE）
+4. 决策记录（行为文法变更）
 
 ### 加角色（不新增状态）
-- 角色只用**现有状态**（`characters.<id>.states` 部分映射），缺的 emoji 兜底
+- 角色必须提供**全部 15 状态**的 sheet（`characters.<id>.states` 全量映射，缺一即门禁拒收——不再 emoji 降级）
 - 帧数/fps/motion 角色可选（表现层）；触发/优先级全角色共通（行为层）
 - **完整操作指南（事件→动作映射、动作槽位、动手步骤）见 [adding-a-character.md](adding-a-character.md)**
 - 详见 [character-manifest 决策](../decisions/implemented/feature/2026-08-09-character-manifest.md)
 
-### 新角色的「核心状态集」建议（低成本下限）
-`idle / walk / working / celebrate / error / sleep / joy` 必做（有 sheet），其余（eat/play/drag/wake/welcome/think/wait）可选 emoji 兜底。
+### 新角色的素材要求（全量契约）
+
+角色必须提供**全部 15 状态**的 sheet（`idle/walk/working/celebrate/error/disappointed/joy/eat/play/drag/sleep/wake/welcome/think/wait`）——`verify-assets` 门禁强制，缺一即拒收。不再有「核心状态集 + 可选 emoji 兜底」：素材必须全。
 
 ## 触发源（Node half → client）
 

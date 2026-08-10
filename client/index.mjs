@@ -5,13 +5,13 @@
 // 绑定插件 fiber，disable 时清理。零平台模块依赖：CSS 内联注入，动画/拖拽/菜单全部自建。
 //
 // 视觉：sprite sheet 帧播放器（assets/manifest.json 声明 状态→sheet/frames/fps/loop，
-// 每状态一张横排帧图，透明背景）；sheet 缺失/未加载时用 emoji 兜底，增量替换。
+// 每状态一张横排帧图，透明背景）；sheet 缺失/未加载时显示占位（不再 emoji 降级）。
 // 状态选择与表情映射是纯函数（client/logic.mjs，可单测）；本文件只做 DOM 与计时。
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
 import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from './logic.mjs'
-import { parseCharacters, getCharacter, stateOf, listCharacters, emojiFor } from './character.mjs'
+import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
 const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
@@ -331,13 +331,12 @@ export function apply(ctx = {}) {
     }
   }
 
-  const showEmoji = (name) => {
-    // 舞台只承载一个视觉节点；互动 props/气泡放在 effects，不能残留在状态层。
+  // 缺素材占位（v5：不再 emoji 降级——manifest 门禁保证投放前 15 状态全有 sheet；
+  // 仅运行时异常路径（sheet 加载失败/迟到）到此，显示透明占位 + 控制台警告便于发现）。
+  const showPlaceholder = (name) => {
     sprite.classList.remove('ready')
-    const emoji = document.createElement('span')
-    emoji.className = 'pet-emoji'
-    emoji.textContent = emojiFor(character, name) // 角色 emojiOverrides 优先，回退通用表
-    stage.replaceChildren(emoji)
+    stage.replaceChildren(sprite)
+    console.warn(`[dsh-pet] 状态 ${name} 缺少可用 sheet（manifest 应含全部 15 状态；若已声明则素材加载失败）`)
   }
 
   // sheet 缓存键：含角色 id 命名空间（防切角色显示旧图）。
@@ -352,10 +351,10 @@ export function apply(ctx = {}) {
     const key = sheetKey(anim.sheet)
     const size = sheetSize.get(key)
     if (!size || size.w <= 0 || size.h <= 0) {
-      showEmoji(name) // 未声明尺寸的 SVG（naturalWidth=0）→ 兜底，避免除零白屏
+      showPlaceholder(name) // 尺寸未知（加载失败/未完成）→ 占位，避免除零白屏
       return
     }
-    // 清掉前一状态的 emoji/sprite，确保 eat/play 不会在状态结束后残留。
+    // 清掉前一状态的占位/sprite，确保 eat/play 不会在状态结束后残留。
     stage.replaceChildren(sprite)
     const frameW = size.w / anim.frames
     // 目标尺寸用宿主实际盒（--pet-size/配置 size 生效后的真实值），而非状态集里的
@@ -400,7 +399,7 @@ export function apply(ctx = {}) {
     idleBlinking = false
     facingAt = 0 // 重进静态态时重新排随机转身
     lastFrameAt = 0
-    // 运动配方：manifest.motion → 舞台类（emoji 与 sprite 路径都生效；无 motion 时清类）。
+    // 运动配方：manifest.motion → 舞台类（sprite 与占位路径都生效；无 motion 时清类）。
     // 快照迭代再删：活 DOMTokenList 边遍历边删可能跳项（当前单类无碍，加固免踩）。
     for (const cls of [...stage.classList]) if (cls.startsWith('pet-motion-')) stage.classList.remove(cls)
     const cfg = stateOf(character, name)
@@ -410,7 +409,7 @@ export function apply(ctx = {}) {
       showSprite(name, cfg)
       showingSprite = true
     } else {
-      showEmoji(name)
+      showPlaceholder(name) // 素材缺失/未加载 → 占位（不再 emoji 降级）
       showingSprite = false
     }
     // 状态切换淡入：快速过渡掩盖姿势硬切（sprite 有 opacity transition）。
@@ -500,7 +499,7 @@ export function apply(ctx = {}) {
       const res = await fetch(MANIFEST_URL)
       if (!res.ok) return
       const next = await res.json()
-      // 结构守卫：manifest 必须是对象且可解析出角色（坏 manifest 不赋值 → 全 emoji 兜底）。
+      // 结构守卫：manifest 必须是对象且可解析出角色（坏 manifest 不赋值 → 保持当前角色）。
       if (next === null || typeof next !== 'object') return
       manifest = next
       resetContentBox() // 新角色轮廓：重置内容 bbox（preload 逐步合并）
@@ -518,12 +517,12 @@ export function apply(ctx = {}) {
       }
       await Promise.all(Object.entries(character.states).map(([n, cfg]) => preload(n, cfg)))
     } catch {
-      // manifest 不可用 → 全 emoji 兜底
+      // manifest 不可用 → 保持当前角色（素材缺失路径由 showPlaceholder 提示）
     }
   }
 
   // 换角色：预加载目标角色全部 sheet → 原子替换（清旧缓存、换 id、复位状态）。
-  // 缺 sheet 状态走 emoji 兜底（现有降级机制）；失败时保留当前角色。
+  // 换角色失败 → 保留当前角色（素材缺失路径由 showPlaceholder 提示）。
   const switchCharacter = async (id) => {
     const target = getCharacter(manifest, id)
     if (target === null || id === characterId) return
@@ -600,7 +599,7 @@ export function apply(ctx = {}) {
       const size = sheetSize.get(sheetKey(cfg.sheet))
       const frameW = size.w / cfg.frames
       if (!showingSprite) {
-        // sprite 迟到加载完成：当前状态仍以 emoji 显示 → 换肤。
+        // sprite 迟到加载完成：当前状态仍显示占位 → 换肤。
         showSprite(animState, cfg)
         showingSprite = true
         frame = 0

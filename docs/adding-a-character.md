@@ -34,7 +34,7 @@
 | 周期游走（18-40s） | client `walking` | `walk` | ❌ |
 | 兜底 | — | `idle` | ❌ |
 
-**结论**：**所有触发信号都由代码产生（Node half 事件处理 + client 本地交互），角色无权新增或修改触发。** 角色能做的只有：为某个动作提供资源（sheet），或选择不提供（该动作 emoji 兜底）。
+**结论**：**所有触发信号都由代码产生（Node half 事件处理 + client 本地交互），角色无权新增或修改触发。** 角色必须为**全部 15 个动作**提供 sheet（素材全量契约，缺一即门禁拒收）——不再有「选择不提供」的选项。
 
 ## 二、动作槽位（角色为每个动作填什么）
 
@@ -47,13 +47,12 @@
       "name": "猫猫",
       "credit": "作者名",
       "meta": {                 // ← 视觉参数槽
-        "stageSize": 96,        //   舞台尺寸 px（默认 110）
-        "emojiOverrides": { "idle": "🐱" }  // 兜底表情定制（可选）
+        "stageSize": 96         //   舞台尺寸 px（默认 110）
       },
-      "states": {               // ← 动作槽位表（部分映射，缺的 emoji 兜底）
+      "states": {               // ← 动作槽位表（全量映射——15 状态必须有 sheet）
         "idle":      { "sheet": "idle.png",      "frames": 3, "fps": 2,  "loop": true },
         "working":   { "sheet": "working.png",   "frames": 3, "fps": 3,  "loop": true },
-        // 可选：celebrate/error/disappointed/joy/eat/play/drag/walk/sleep/wake/welcome/think/wait
+        // 必须填满 15 状态：celebrate/error/disappointed/joy/eat/play/drag/walk/sleep/wake/welcome/think/wait
         // 单帧动作可加 motion 配方（bob/wiggle/squash/shake/sigh/hop/tilt/float/wave）
       }
     }
@@ -77,27 +76,24 @@
 | 字段 | 必填 | 含义 | 默认 |
 |---|---|---|---|
 | `stageSize` | ✗ | 舞台尺寸 px | 110（未配置时） |
-| `emojiOverrides` | ✗ | 状态→兜底表情定制 | 通用 EMOJI 表 |
 
 ## 三、角色能扩展什么 / 不能扩展什么
 
 ### ✅ 角色可以（资源级，零代码）
-1. **提供动作资源**：为任意现有动作填 sheet（部分映射，缺的 emoji 兜底）
-2. **调表现参数**：每动作 frames/fps/loop/motion；角色 stageSize/emojiOverrides
-3. **决定「核心状态」下限**：建议至少提供 `idle/walk/working/celebrate/error/sleep/joy`（其余可选）
+1. **提供动作资源**：为全部 15 状态填 sheet（全量映射，缺一即门禁拒收）
+2. **调表现参数**：每动作 frames/fps/loop/motion；角色 stageSize
 
 ### ❌ 角色不能（行为级，需平台变更）
-1. **新增动作**（如「猫的舔毛」）——那是加状态 = 改 STATE_TABLE + EMOJI + spec + 门禁
+1. **新增动作**（如「猫的舔毛」）——那是加状态 = 改 STATE_TABLE + STATE_NAMES + spec + 门禁
 2. **改触发条件**（如「失败时跳三下」）——触发是行为文法，全角色共通
 3. **改优先级**（如「让 walk 优先于 think」）——STATE_TABLE 行序是全局的
 4. **改 XP/称号**（成长语义，见 growth-system.md 边界）
 
-### ⚠️ 新动作（平台级）需要什么（5 步）
-1. `client/logic.mjs` STATE_TABLE 加行（含 when/resolve）
-2. `client/logic.mjs` EMOJI 加兜底表情
-3. `assets/manifest.json` 角色 states 加条目（可选 sheet）
-4. `docs/sprites-spec.md` 状态总表同步（门禁强制 spec↔EMOJI）
-5. 决策记录（行为文法变更）
+### ⚠️ 新动作（平台级）需要什么（4 步）
+1. `client/logic.mjs` STATE_NAMES 加状态名 + STATE_TABLE 加行（含 when/resolve）
+2. `assets/manifest.json` 每个角色 states 加条目（**必填 sheet**）
+3. `docs/sprites-spec.md` 状态总表同步（门禁强制 spec↔STATE_NAMES↔STATE_TABLE）
+4. 决策记录（行为文法变更）
 
 ## 四、动手步骤（加一个角色）
 
@@ -112,6 +108,6 @@
 
 | 门禁 | 校验 |
 |---|---|
-| `verify-assets` | sheet 存在/扩展名白名单/frames 正整数/PNG 宽=帧数×高/motion 白名单 + frames:1/角色 id `[a-z0-9-]`/default 指向存在角色 |
-| `verify-spec-states` | 状态总表 ↔ EMOJI 表一致（15 状态封闭集合） |
+| `verify-assets` | **15 状态全量齐备**/sheet 存在/扩展名白名单/frames 正整数/PNG 宽=帧数×高/motion 白名单 + frames:1/角色 id `[a-z0-9-]`/default 指向存在角色 |
+| `verify-spec-states` | 状态总表 ↔ STATE_NAMES ↔ STATE_TABLE 一致（15 状态封闭集合） |
 | `verify-client-smoke` | 浏览器渲染 + transform 合法 |

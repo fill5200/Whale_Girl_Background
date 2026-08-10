@@ -17,7 +17,7 @@
 ## 一、角色/外观扩展性（subagent：skin）
 
 ### 抽象分层
-- **行为层（共通，不可替换）**：15 状态语义、pickState 优先级、过渡语义、EMOJI 兜底、motion 白名单、
+- **行为层（共通，不可替换）**：15 状态语义、pickState 优先级、过渡语义、motion 白名单、
   帧播放器、拖拽/菜单/状态卡/sessions 订阅/wander——任何角色共享。
 - **角色 character（可替换单元）**：`{ id, name, credit?, meta{ stageSize, maxSprite, anchor }, states: {状态→动画集} }`
 - **动画集 animation set（最小替换单元）**：现 manifest.states 条目 `{ sheet, frames, fps, loop, motion }`，原样保留。
@@ -36,18 +36,17 @@
 ### 关键改造点（client 三处参数化）
 | 现硬编码 | 改为 |
 |---|---|
-| `manifest.states[name]` | `stateOf(character, name)` → undefined 即 emoji 兜底 |
+| `manifest.states[name]` | `stateOf(character, name)` → undefined 即占位（素材全量契约，门禁保证不会缺） |
 | `ASSETS_URL/${sheet}` | `assetUrlFor(characterId, sheet)` |
 | `loaded`/`sheetSize` 以裸 sheet 名为 key | key 加 `${characterId}:${sheet}` 前缀（防切角色串图） |
 | `SPRITE_MAX=110` + CSS 110px | 角色 `meta.stageSize/maxSprite` → CSS 变量 `--pet-stage-size` |
 
 ### 降级（现成机制显式化）
-缺 sheet 状态 → EMOJI 全量兜底 + 超时复位（think/wait 已是活例子）；建议在 sprites-spec 定义
-**核心状态集**（idle/walk/working/celebrate/error/sleep/wake/joy 必做）与可选状态集。
+素材全量契约：角色必须提供全部 15 状态 sheet（verify-assets 门禁强制，缺一即拒）；运行时 sheet 加载失败 → 占位 + 警告。
 
 ### 演进路径
 - **P1 角色清单化**：✅ 已完成（manifest 角色索引 + client/character.mjs + 门禁多角色，见 [character-manifest](../decisions/implemented/feature/2026-08-09-character-manifest.md)）。
-- **P2 切换 UX**：✅ 已完成（菜单「换角色」+ localStorage 偏好 + emojiOverrides + stageSize 接入 --pet-size）。
+- **P2 切换 UX**：✅ 已完成（菜单「换角色」+ localStorage 偏好 + stageSize 接入 --pet-size）。
 - **P4 外部角色包——留档边界（当前不做）**：
   - **是什么**：第三方开发者独立发布「角色皮肤包」插件，用户安装后宠物可换用该角色——像游戏 MOD/皮肤市场。角色从「随 dsh-pet 内置」升级为「独立分发单元」。
   - **为什么需要 plugin-registry**：registry 是生态里「独立分发一个包」的唯一机制（`dsh plugin install <dir|tgz>`，每插件独立安装/启用/卸载 + 信任模型）；dsh-pet 是单插件，无法自造「安装另一个独立包」的能力，重复造轮子还会破坏统一生命周期与信任模型。
@@ -61,7 +60,7 @@
 |---|---|---|
 | A1 | 回话文本池（工具回话+气泡模板+菜单/状态卡文案） | ✅ v1 开 |
 | A2 | 行为/计时常量（burst 窗口、睡眠/游走阈值） | ✅ v1 开 |
-| A3 | EMOJI 兜底表 | ✅ v1 开（门禁同步） |
+| A3 | ~~EMOJI 兜底表~~（v5 删除：素材全量契约） | — |
 | B1 | 互动动作表（泛化 feed/play） | ⏸ v1.5 |
 | B2 | 称号文案与解锁阈值 | ⚠️ 只开文案+阈值，不开 XP/曲线 |
 | C1/D1 | 触发规则 / 自定义互动语义 | 🔒 封闭（账本/状态机核心） |

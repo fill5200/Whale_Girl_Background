@@ -1,16 +1,17 @@
 // 门禁：assets manifest 引用一致性。
-// 拒绝不变量：assets/manifest.json 里每个 state 的 sheet 引用的文件必须真实存在、
+// 拒绝不变量：assets/manifest.json 里每个角色必须含全部 15 状态（缺一个即拒——
+// 素材必须全量提供，不再 emoji 降级）；每个 state 的 sheet 引用的文件必须真实存在、
 // 扩展名在 MIME 白名单内（与 src/assets.mjs 一致）、frames/fps/loop 字段合法、
 // motion 配方（若声明）在白名单内且 frames 必须为 1（帧播放器与运动配方互斥；
 // 定向例外：error 是唯一允许多帧+运动叠加的状态——2 帧「正常→惊吓」播完僵住，
 // 叠加 shake 让 burst 窗口内持续颤抖不静止，见 decisions 动画编排修订记录）、
 // PNG 多帧 sheet 必须满足宽度 = frames × 高度（横排帧图契约——单姿势图配 frames>1
-// 会把姿势劈成两半）、且状态名必须在 client EMOJI 兜底表内（新增状态无 sheet 时能兜底）。
+// 会把姿势劈成两半）、且状态名必须在 client STATE_NAMES 权威集合内。
 // 只读、确定性。
 import { readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { EMOJI } from '../../client/logic.mjs'
+import { STATE_NAMES } from '../../client/logic.mjs'
 import { ROLE_ID_RE } from '../../client/character.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../..')
@@ -35,9 +36,16 @@ function pngSize(file) {
 function checkStates(states, roleId, errors, root) {
   const dir = roleId === null ? join(root, 'assets') : join(root, 'assets', 'characters', roleId)
   const label = roleId === null ? 'states' : `characters.${roleId}.states`
+  // 必备集：全部 15 状态必须声明（素材全量契约——不再 emoji 降级）。
+  const declared = new Set(Object.keys(states))
+  for (const name of STATE_NAMES) {
+    if (!declared.has(name)) {
+      errors.push(`${label}: 缺必备状态 ${name}（素材必须全量提供 15 状态，不再 emoji 降级）`)
+    }
+  }
   for (const [name, cfg] of Object.entries(states)) {
-    if (!(name in EMOJI)) {
-      errors.push(`${label}.${name}: 状态不在 client EMOJI 兜底表（新增状态须同步 client/logic.mjs）`)
+    if (!STATE_NAMES.includes(name)) {
+      errors.push(`${label}.${name}: 状态不在 client STATE_NAMES 权威集合（须同步 client/logic.mjs 与 spec）`)
     }
     if (cfg === null || typeof cfg !== 'object' || typeof cfg.sheet !== 'string' || cfg.sheet === '') {
       errors.push(`${label}.${name}: 缺 sheet 字段`)

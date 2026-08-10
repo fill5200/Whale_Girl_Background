@@ -4,23 +4,23 @@
   var WAKE_MS = 3e3;
   var JOY_MS = 1600;
   var ROUND_CELEBRATE_MS = 4e3;
-  var EMOJI = {
-    idle: "\u{1F423}",
-    working: "\u{1F914}",
-    celebrate: "\u{1F389}",
-    error: "\u{1F631}",
-    disappointed: "\u{1F61E}",
-    joy: "\u{1F425}",
-    eat: "\u{1F60B}",
-    play: "\u{1F3BE}",
-    drag: "\u{1F635}",
-    walk: "\u{1F6B6}",
-    sleep: "\u{1F4A4}",
-    wake: "\u{1F62A}",
-    welcome: "\u{1F44B}",
-    think: "\u{1F4AD}",
-    wait: "\u{1F440}"
-  };
+  var STATE_NAMES = Object.freeze([
+    "idle",
+    "working",
+    "celebrate",
+    "error",
+    "disappointed",
+    "joy",
+    "eat",
+    "play",
+    "drag",
+    "walk",
+    "sleep",
+    "wake",
+    "welcome",
+    "think",
+    "wait"
+  ]);
   var STATE_TABLE = [
     { state: "drag", when: (c) => c.dragging },
     // 拖拽放下缓冲：drag 结束短暂回 idle（1.5s），再进入底层状态——避免放下即跳 think/working 的生硬切换。
@@ -159,13 +159,6 @@
   }
   function stateOf(character, stateName) {
     return character?.states?.[stateName];
-  }
-  function emojiFor(character, stateName) {
-    const overrides = character?.meta?.emojiOverrides;
-    if (overrides !== null && typeof overrides === "object" && typeof overrides[stateName] === "string") {
-      return overrides[stateName];
-    }
-    return EMOJI[stateName] ?? "\u{1F423}";
   }
 
   // client/index.mjs
@@ -441,12 +434,10 @@
         metaNote.textContent = last ?? (pet.titles.length > 0 ? `\u79F0\u53F7\u300C${pet.titles.join("\u300D\u300C")}\u300D` : "\u2026");
       }
     };
-    const showEmoji = (name) => {
+    const showPlaceholder = (name) => {
       sprite.classList.remove("ready");
-      const emoji = document.createElement("span");
-      emoji.className = "pet-emoji";
-      emoji.textContent = emojiFor(character, name);
-      stage.replaceChildren(emoji);
+      stage.replaceChildren(sprite);
+      console.warn(`[dsh-pet] \u72B6\u6001 ${name} \u7F3A\u5C11\u53EF\u7528 sheet\uFF08manifest \u5E94\u542B\u5168\u90E8 15 \u72B6\u6001\uFF1B\u82E5\u5DF2\u58F0\u660E\u5219\u7D20\u6750\u52A0\u8F7D\u5931\u8D25\uFF09`);
     };
     const sheetKey = (sheet) => `${characterId}:${sheet}`;
     const sheetUrl = (sheet) => `${ASSETS_URL}/characters/${characterId}/${sheet}`;
@@ -454,7 +445,7 @@
       const key = sheetKey(anim.sheet);
       const size = sheetSize.get(key);
       if (!size || size.w <= 0 || size.h <= 0) {
-        showEmoji(name);
+        showPlaceholder(name);
         return;
       }
       stage.replaceChildren(sprite);
@@ -500,7 +491,7 @@
         showSprite(name, cfg2);
         showingSprite = true;
       } else {
-        showEmoji(name);
+        showPlaceholder(name);
         showingSprite = false;
       }
       stage.style.opacity = "0";

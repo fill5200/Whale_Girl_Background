@@ -1,9 +1,10 @@
 // client/character.mjs 单测（node:test）。归属：角色清单解析改动跑本文件。
+// v5：删 emoji 降级——stateOf 缺状态返回 undefined（调用方占位），isKnownState 基于 STATE_NAMES。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   DEFAULT_ROLE_ID, ROLE_ID_RE, parseCharacters, listCharacters, defaultCharacter,
-  getCharacter, stateOf, isKnownState, emojiFor,
+  getCharacter, stateOf, isKnownState,
 } from '../client/character.mjs'
 
 const OLD_MANIFEST = {
@@ -50,14 +51,14 @@ test('listCharacters / defaultCharacter / getCharacter', () => {
   assert.equal(getCharacter(NEW_MANIFEST, 'nope'), null)
 })
 
-test('stateOf：缺状态返回 undefined（emoji 兜底）', () => {
+test('stateOf：缺状态返回 undefined（调用方占位，不再 emoji 降级）', () => {
   const cat = getCharacter(NEW_MANIFEST, 'cat')
   assert.ok(stateOf(cat, 'walk'))
   assert.equal(stateOf(cat, 'idle'), undefined) // cat 只有 walk
   assert.equal(stateOf(null, 'walk'), undefined)
 })
 
-test('isKnownState：EMOJI 表成员为真，未知为假', () => {
+test('isKnownState：STATE_NAMES 权威集合成员为真，未知为假', () => {
   assert.equal(isKnownState('idle'), true)
   assert.equal(isKnownState('teleport'), false)
 })
@@ -69,13 +70,4 @@ test('ROLE_ID_RE：合法 id 通过，非法拒绝（URL 注入面）', () => {
   assert.ok(!ROLE_ID_RE.test('..'))
   assert.ok(!ROLE_ID_RE.test('a b'))
   assert.ok(!ROLE_ID_RE.test(''))
-})
-
-test('emojiFor：角色 emojiOverrides 优先，回退通用 EMOJI', () => {
-  const withOverride = { meta: { emojiOverrides: { idle: '🐱' } }, states: {} }
-  assert.equal(emojiFor(withOverride, 'idle'), '🐱')
-  assert.equal(emojiFor(withOverride, 'walk'), '🚶') // 未覆盖 → 通用表
-  assert.equal(emojiFor({ meta: {}, states: {} }, 'idle'), '🐣')
-  assert.equal(emojiFor(null, 'idle'), '🐣')
-  assert.equal(emojiFor({ meta: { emojiOverrides: { idle: 42 } }, states: {} }, 'idle'), '🐣') // 非字符串忽略
 })

@@ -1,6 +1,6 @@
 # Sprite 素材规格（生图契约）
 
-本文是 dsh-pet 动画素材的**唯一权威规格**：状态清单、生图契约、运动配方、投放流程。README 只链接本文件；改动本清单必须同时改 [client/logic.mjs](../client/logic.mjs) 的状态选择、[client/index.mjs](../client/index.mjs) 的运动类与 `assets/manifest.json`（新增状态无 sheet 时以 emoji 兜底，可增量投放）。
+本文是 dsh-pet 动画素材的**唯一权威规格**：状态清单、生图契约、运动配方、投放流程。README 只链接本文件；改动本清单必须同时改 [client/logic.mjs](../client/logic.mjs) 的状态选择、[client/index.mjs](../client/index.mjs) 的运动类与 `assets/manifest.json`（素材全量契约：每个角色必须含全部 15 状态，缺一即被门禁拒收）。
 
 ## 机制原则（积累型伙伴）
 
@@ -82,7 +82,7 @@
 
 ## manifest 模板（角色索引；whale-girl 13 个有 sheet 状态）
 
-`think`/`wait` 已有 sheet（`think.png`/`wait.png`，1 帧 + 运动配方）；缺 sheet 的状态仍由 EMOJI 兜底（`verify-assets` 要求 manifest 状态 ∈ EMOJI 表，反向不必）。角色索引格式：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）；`default` 指定默认角色；顶层 `states` 为旧格式兼容简写（单角色、sheet 平铺 `assets/`），`verify-assets` 两种格式都校验。
+`verify-assets` 要求每个角色 manifest 含全部 15 状态（素材全量契约——缺 sheet 不再 emoji 降级，门禁拒收）。角色索引格式：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）；`default` 指定默认角色；顶层 `states` 为旧格式兼容简写（单角色、sheet 平铺 `assets/`），`verify-assets` 两种格式都校验。
 
 ```json
 {
@@ -116,7 +116,7 @@
 
 > 规则（verify-assets 门禁强制）：**`motion` 只允许配 `frames: 1`**——多帧状态由帧播放器动画，运动配方与帧播放器互斥（单帧状态才用 CSS 运动补充）。**定向例外：仅 `error`（2 帧「正常→惊吓」+ `shake`）**——一次播完僵住后由 CSS 颤抖维持 burst 窗口内的持续表现（见决策记录动画编排修订）。**角色 id 只允许 `[a-z0-9-]`**（URL 路径安全，防注入）。
 
-**角色 meta 可选字段**（[client/character.mjs](../client/character.mjs) 解析）：`stageSize`（舞台尺寸 px，默认 110；未配置时经 `--pet-size` 生效）、`emojiOverrides`（`{ 状态名: emoji }`——缺 sheet 状态的兜底表情定制，贴角色画风；未覆盖状态回退通用 EMOJI 表）。
+**角色 meta 可选字段**（[client/character.mjs](../client/character.mjs) 解析）：`stageSize`（舞台尺寸 px，默认 110；未配置时经 `--pet-size` 生效）。
 
 ## 资历与称号（积累型）
 

@@ -24,7 +24,7 @@ Status: implemented
 
 ## Consequences
 
-- 换角色 = 纯加资源（`assets/characters/<新id>/` + manifest 条目 + 改 default 或 localStorage 偏好），零改代码；缺 sheet 状态 emoji 兜底。
+- 换角色 = 纯加资源（`assets/characters/<新id>/` + manifest 条目 + 改 default 或 localStorage 偏好），零改代码；~~缺 sheet 状态 emoji 兜底~~（已废止：素材全量契约要求 15 状态全有 sheet，见 [asset-full-contract](2026-08-09-asset-full-contract.md)）。
 - 缓存 key 含角色 id（防串图）；sheet URL 角色目录化（Node half assets 路由零改动，天然支持子目录）。
 - 已知边界：localStorage 偏好由用户手动设置（无 UI，P2 加菜单「换角色」）；角色 meta.stageSize 尚未接入 CSS 变量（P2 尺寸参数化，配置系统已铺 --pet-size）；think/wait 仍 emoji 兜底。
 - 关联：docs/architecture-evolution.md 角色扩展节；架构演进第 2 项。
