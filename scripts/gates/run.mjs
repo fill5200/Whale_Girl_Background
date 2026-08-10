@@ -15,7 +15,6 @@ const GATES = [
   { name: 'verify-decisions', group: 'local', args: ['scripts/gates/verify-decisions.mjs'] },
   { name: 'verify-assets', group: 'local', args: ['scripts/gates/verify-assets.mjs'] },
   { name: 'verify-spec-states', group: 'local', args: ['scripts/gates/verify-spec-states.mjs'] },
-  { name: 'verify-contributes', group: 'local', args: ['scripts/gates/verify-contributes.mjs'] },
   { name: 'verify-tool-schemas', group: 'local', args: ['scripts/gates/verify-tool-schemas.mjs'] },
   { name: 'verify-config-sync', group: 'local', args: ['scripts/gates/verify-config-sync.mjs'] },
   { name: 'verify-routes-sync', group: 'local', args: ['scripts/gates/verify-routes-sync.mjs'] },

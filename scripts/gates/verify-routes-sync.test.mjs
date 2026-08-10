@@ -20,10 +20,10 @@ function makeTree({ routes = ROUTES_SRC, client = OK.client, node = OK.node, ass
     mkdirSync(dirname(p), { recursive: true })
     writeFileSync(p, content)
   }
-  mk('src/routes.mjs', routes)
-  mk('client/index.mjs', client)
-  mk('index.mjs', node)
-  mk('src/assets.mjs', assets)
+  mk('.dsh-plugin/src/routes.mjs', routes)
+  mk('.dsh-plugin/client/index.mjs', client)
+  mk('.dsh-plugin/index.mjs', node)
+  mk('.dsh-plugin/src/assets.mjs', assets)
   return root
 }
 

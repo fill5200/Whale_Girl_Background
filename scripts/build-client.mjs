@@ -1,5 +1,5 @@
-// 生成器：client/index.mjs → client.js（bundle 产物，随插件分发）。
-// 契约：--check 模式在内存生成后与已提交 client.js 逐字节比对，不一致非零退出——
+// 生成器：.dsh-plugin/client/index.mjs → .dsh-plugin/client.js（bundle 产物，随插件分发）。
+// 契约：--check 模式在内存生成后与已提交 .dsh-plugin/client.js 逐字节比对，不一致非零退出——
 // 手改生成物禁止（改 client/index.mjs，勿改 client.js）。
 // esbuild 经 .bin CLI 调用（pnpm 布局下 require.resolve 不可靠）；解析顺序：
 // 本地 node_modules/.bin → $DSH_CHECKOUT/node_modules/.bin → /tmp/dsh-0808/node_modules/.bin；
@@ -11,6 +11,8 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const ROOT = resolve(import.meta.dirname, '..')
+const ENTRY = '.dsh-plugin/client/index.mjs'
+const OUTPUT = join(ROOT, '.dsh-plugin', 'client.js')
 
 function resolveEsbuildBin() {
   const candidates = [
@@ -34,32 +36,9 @@ export function esbuildAvailable() {
 }
 
 /**
- * bundle 激活契约断言：产物必须调用 window.__ModuleLoader__.load 且 id 等于插件 id
- * （loader 的 arrive() 对未注册 id 的 bundle 抛 "loaded without registering"）。
- */
-export function assertBundleContract(code, pluginId) {
-  const text = Buffer.isBuffer(code) ? code.toString('utf8') : String(code)
-  const errors = []
-  if (!text.includes('__ModuleLoader__.load')) {
-    errors.push('bundle 缺少 window.__ModuleLoader__.load(...) 调用（client half 激活契约）')
-  }
-  if (!text.includes(`"${pluginId}"`) && !text.includes(`'${pluginId}'`)) {
-    errors.push(`bundle 未以 id "${pluginId}" 注册（id 必须等于插件 id）`)
-  }
-  return errors
-}
-
-/** 读 dsh.plugin.json 的插件 id。 */
-export function readPluginId(root = ROOT) {
-  try {
-    return JSON.parse(readFileSync(join(root, 'dsh.plugin.json'), 'utf8')).id
-  } catch {
-    return null
-  }
-}
-
-/**
- * 生成 client.js。
+ * 生成 client.js（自执行 UI 脚本 bundle——官方 repository-plugin 形态，无 __ModuleLoader__
+ * 契约；页面加载由 entry 的 UI 路由 + 注入缝驱动，见决策记录
+ * 2026-08-10-migrate-to-official-repository-plugin.md）。
  * @param {{ check?: boolean, root?: string }} opts
  * @returns {{ ok: boolean, errors?: string[], skipped?: string }}
  */
@@ -73,7 +52,7 @@ export function generate({ check = false, root = ROOT } = {}) {
   const res = spawnSync(
     esbuildBin,
     [
-      'client/index.mjs',
+      ENTRY,
       '--bundle',
       '--format=iife',
       '--platform=browser',
@@ -86,19 +65,16 @@ export function generate({ check = false, root = ROOT } = {}) {
     return { ok: false, errors: [`esbuild 失败：${res.stderr.trim()}`] }
   }
   const code = readFileSync(tmpOut)
-  const contractErrors = assertBundleContract(code, readPluginId(root) ?? '')
-  if (contractErrors.length > 0) {
-    return { ok: false, errors: contractErrors }
-  }
+  const outputPath = join(root, '.dsh-plugin', 'client.js')
   if (!check) {
-    writeFileSync(join(root, 'client.js'), code)
+    writeFileSync(outputPath, code)
     return { ok: true }
   }
   let committed = null
   try {
-    committed = readFileSync(join(root, 'client.js'))
+    committed = readFileSync(outputPath)
   } catch {
-    return { ok: false, errors: [`${join(root, 'client.js')} 不存在：运行 node scripts/build-client.mjs 生成`] }
+    return { ok: false, errors: [`${outputPath} 不存在：运行 node scripts/build-client.mjs 生成`] }
   }
   if (Buffer.compare(committed, code) !== 0) {
     return { ok: false, errors: ['client.js 与生成器输出不一致：运行 node scripts/build-client.mjs 重新生成（手改生成物禁止）'] }

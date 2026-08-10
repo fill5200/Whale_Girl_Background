@@ -3,13 +3,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { toolBlocks, check } from './verify-tool-schemas.mjs'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 function makeRoot(entry) {
   const root = mkdtempSync(join(tmpdir(), 'vts-'))
-  writeFileSync(join(root, 'index.mjs'), entry)
+  mkdirSync(join(root, '.dsh-plugin'), { recursive: true })
+  writeFileSync(join(root, '.dsh-plugin', 'index.mjs'), entry)
   return root
 }
 

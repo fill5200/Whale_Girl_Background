@@ -24,7 +24,7 @@ whale-girl:
   sleepAfterMs: 60000
 ```
 
-完整配置项清单与语义层（XP/称号）封闭说明见 `src/config.mjs`。**语义层不可配**（改 XP/称号阈值会破坏积累账本一致性，见决策记录）。
+完整配置项清单与语义层（XP/称号）封闭说明见 `.dsh-plugin/src/config.mjs`。**语义层不可配**（改 XP/称号阈值会破坏积累账本一致性，见决策记录）。
 
 ## 角色（换角色零改代码）
 
@@ -35,11 +35,11 @@ whale-girl:
 ```sh
 node scripts/gates/run.mjs          # 本地门禁组（链接/决策格式/assets manifest/工具 schema/生成物新鲜度）
 node --test 'tests/*.test.mjs'      # Node half 单测
-node scripts/build-client.mjs       # 改 client/ 源码后重新生成 client.js（勿手改产物）
+node scripts/build-client.mjs       # 改 .dsh-plugin/client/ 源码后重新生成 .dsh-plugin/client.js（勿手改产物）
 dsh registry uninstall vlln/whale-girl && dsh registry install ./whale-girl && dsh registry enable vlln/whale-girl
 ```
 
-**进程边界（易错）**：`dsh registry enable` 在 CLI 进程注册，**已运行的 web 不感知**——disable/enable 对运行中实例无效。改 `index.mjs`（Node half，含工具 schema）后需 **web 重启**（并检查日志无 `plugin tree failed to load`）；改 `client/` 或 `assets/` 后重装（上例把新 `client.js`/sheet 复制进安装目录）+ **刷新页面**即可（`serveBundle` 按请求读磁盘，页面刷新即取新文件）。
+**进程边界（易错）**：`dsh registry enable` 在 CLI 进程注册，**已运行的 web 不感知**——disable/enable 对运行中实例无效。改 `.dsh-plugin/index.mjs`（Node half，含工具 schema）后需 **web 重启**（并检查日志无 `plugin tree failed to load`）；改 `.dsh-plugin/client/` 或 `assets/` 后重装（上例把新 `.dsh-plugin/client.js`/sheet 复制进安装目录）+ **刷新页面**即可（`serveBundle` 按请求读磁盘，页面刷新即取新文件）。
 
 ## 素材（sprite sheet）契约
 
@@ -53,18 +53,18 @@ dsh registry uninstall vlln/whale-girl && dsh registry install ./whale-girl && d
 
 | 路径 | 作用 |
 |---|---|
-| `index.mjs` | Node half：`pet_feed`/`pet_play`/`pet_status` 工具 + 状态/互动/assets/config 路由 + 事件记账（积累）+ `ctx.pet` 服务 |
-| `src/pet-state.mjs` | 积累账本（等级/称号/回忆，零衰减零惩罚，纯函数） |
-| `src/activity.mjs` | 任务活动推导（working/celebrate/error + 翻转任务 id，纯函数） |
-| `src/persistence.mjs` | 账本持久化归一化（纯函数） |
-| `src/assets.mjs` | assets 路由守卫（路径净化 + MIME，纯函数） |
-| `src/config.mjs` | 体验层配置 schema + DEFAULTS（单一来源，settings 注册用） |
-| `src/signals.mjs` | pet 服务信号器（订阅/广播/异常隔离，纯函数） |
+| `.dsh-plugin/index.mjs` | Node half：`pet_feed`/`pet_play`/`pet_status` 工具 + 状态/互动/assets/config 路由 + 事件记账（积累）+ `ctx.pet` 服务 |
+| `.dsh-plugin/src/pet-state.mjs` | 积累账本（等级/称号/回忆，零衰减零惩罚，纯函数） |
+| `.dsh-plugin/src/activity.mjs` | 任务活动推导（working/celebrate/error + 翻转任务 id，纯函数） |
+| `.dsh-plugin/src/persistence.mjs` | 账本持久化归一化（纯函数） |
+| `.dsh-plugin/src/assets.mjs` | assets 路由守卫（路径净化 + MIME，纯函数） |
+| `.dsh-plugin/src/config.mjs` | 体验层配置 schema + DEFAULTS（单一来源，settings 注册用） |
+| `.dsh-plugin/src/signals.mjs` | pet 服务信号器（订阅/广播/异常隔离，纯函数） |
 | `assets/characters/` | 角色 sheet（每角色一目录）+ manifest 角色索引（静态服务） |
 | `originals/` | 生图参考原图（不参与服务） |
-| `client/index.mjs` | client bundle 源码（构建产物 `client.js` 勿手改） |
-| `client/logic.mjs` | 状态选择纯函数（STATE_TABLE 声明式状态表 + EMOJI 兜底） |
-| `client/character.mjs` | 角色清单解析（纯函数） |
+| `.dsh-plugin/client/.dsh-plugin/index.mjs` | client bundle 源码（构建产物 `.dsh-plugin/client.js` 勿手改） |
+| `.dsh-plugin/client/logic.mjs` | 状态选择纯函数（STATE_TABLE 声明式状态表 + EMOJI 兜底） |
+| `.dsh-plugin/client/character.mjs` | 角色清单解析（纯函数） |
 | `decisions/` | 决策记录；事件模型见 [implemented/feature/2026-08-08-accumulation-pet-model.md](decisions/implemented/feature/2026-08-08-accumulation-pet-model.md) |
 
 ## 边界

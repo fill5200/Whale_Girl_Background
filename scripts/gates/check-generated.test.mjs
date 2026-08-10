@@ -8,21 +8,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { generate, esbuildAvailable } from '../build-client.mjs'
 
-const ENTRY = `window.__ModuleLoader__.load({ id: 'vlln/whale-girl', factory: () => ({ name: 'x', inject: [], apply() {} }) })`
-const PLUGIN_JSON = JSON.stringify({ id: 'vlln/whale-girl', main: './index.mjs', contributes: { tools: [], skills: [] } }, null, 2)
+const ENTRY = `export function apply() {}\n`
 
 function makeRoot({ entry = ENTRY } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'gen-'))
-  mkdirSync(join(root, 'client'))
-  writeFileSync(join(root, 'client/index.mjs'), entry)
-  writeFileSync(join(root, 'dsh.plugin.json'), PLUGIN_JSON)
+  mkdirSync(join(root, '.dsh-plugin', 'client'), { recursive: true })
+  writeFileSync(join(root, '.dsh-plugin', 'client', 'index.mjs'), entry)
   return root
 }
 
 test('拒绝：client.js 与生成器输出不一致（含修复提示）', { skip: !esbuildAvailable() }, async () => {
   const root = makeRoot()
   await generate({ check: false, root })
-  writeFileSync(join(root, 'client.js'), readFileSync(join(root, 'client.js'), 'utf8') + '\n// tampered')
+  writeFileSync(join(root, '.dsh-plugin', 'client.js'), readFileSync(join(root, '.dsh-plugin', 'client.js'), 'utf8') + '\n// tampered')
   const result = await generate({ check: true, root })
   assert.equal(result.ok, false)
   assert.match(result.errors.join('\n'), /不一致/)
@@ -41,18 +39,4 @@ test('拒绝：client.js 缺失', { skip: !esbuildAvailable() }, async () => {
   const result = await generate({ check: true, root })
   assert.equal(result.ok, false)
   assert.match(result.errors.join('\n'), /不存在/)
-})
-
-test('拒绝：bundle 缺 __ModuleLoader__.load 契约', { skip: !esbuildAvailable() }, async () => {
-  const root = makeRoot({ entry: 'export function apply() {}\n' })
-  const result = await generate({ check: false, root })
-  assert.equal(result.ok, false)
-  assert.match(result.errors.join('\n'), /__ModuleLoader__\.load/)
-})
-
-test('拒绝：bundle 注册 id 与插件 id 不一致', { skip: !esbuildAvailable() }, async () => {
-  const root = makeRoot({ entry: ENTRY.replace("'vlln/whale-girl'", "'vlln/other'") })
-  const result = await generate({ check: false, root })
-  assert.equal(result.ok, false)
-  assert.match(result.errors.join('\n'), /id 必须等于插件 id/)
 })

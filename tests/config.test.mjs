@@ -3,7 +3,7 @@
 // 通过 NODE_PATH 或安装目录保证可解析（见 AGENTS.md 验证纪律）。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { DEFAULTS, buildSchema, validateConfig, NAMESPACE } from '../src/config.mjs'
+import { DEFAULTS, buildSchema, validateConfig, NAMESPACE } from '../.dsh-plugin/src/config.mjs'
 
 test('NAMESPACE 与 DEFAULTS 完整性', () => {
   assert.equal(NAMESPACE, 'whale-girl')

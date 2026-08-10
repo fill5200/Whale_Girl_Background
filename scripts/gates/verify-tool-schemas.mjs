@@ -36,7 +36,7 @@ export function toolBlocks(source) {
 
 /** 校验 defineTool 块的 schema DSL 兼容性。返回 { ok, errors }。 */
 export function check(root = ROOT) {
-  const source = readFileSync(join(root, 'index.mjs'), 'utf8')
+  const source = readFileSync(join(root, '.dsh-plugin', 'index.mjs'), 'utf8')
   const errors = []
   for (const block of toolBlocks(source)) {
     if (REQUIRED_ARRAY.test(block)) {

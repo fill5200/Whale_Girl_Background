@@ -21,8 +21,8 @@ function makeTree(configSrc, clientSrc) {
     mkdirSync(dirname(p), { recursive: true })
     writeFileSync(p, content)
   }
-  mk('src/config.mjs', configSrc)
-  mk('client/index.mjs', clientSrc)
+  mk('.dsh-plugin/src/config.mjs', configSrc)
+  mk('.dsh-plugin/client/index.mjs', clientSrc)
   return root
 }
 

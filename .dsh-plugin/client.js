@@ -1,5 +1,5 @@
 (() => {
-  // client/logic.mjs
+  // .dsh-plugin/client/logic.mjs
   var TRANSIENT_MS = 1500;
   var WAKE_MS = 3e3;
   var JOY_MS = 1600;
@@ -129,7 +129,7 @@
     return { sleeping: false, wake: sleeping === true };
   }
 
-  // client/character.mjs
+  // .dsh-plugin/client/character.mjs
   var DEFAULT_ROLE_ID = "whale-girl";
   function parseCharacters(manifest) {
     const raw = manifest?.characters;
@@ -171,14 +171,14 @@
     return character?.states?.[stateName];
   }
 
-  // src/routes.mjs
+  // .dsh-plugin/src/routes.mjs
   var ROUTE_PREFIX = "/plugins/vlln/whale-girl";
   var STATE_PATH = `${ROUTE_PREFIX}/state`;
   var INTERACT_PATH = `${ROUTE_PREFIX}/interact`;
   var CONFIG_PATH = `${ROUTE_PREFIX}/config`;
   var ASSETS_PATH = `${ROUTE_PREFIX}/assets`;
 
-  // client/index.mjs
+  // .dsh-plugin/client/index.mjs
   var ASSETS_URL = ASSETS_PATH;
   var MANIFEST_URL = `${ASSETS_URL}/manifest.json`;
   var CFG_DEFAULTS = {

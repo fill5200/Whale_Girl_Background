@@ -17,13 +17,13 @@ const IMPORT_RE = /from\s+['"][^'"]*routes\.mjs['"]/
 export function check(root = ROOT) {
   const errors = []
   const consumers = [
-    { file: 'client/index.mjs', label: 'client/index.mjs' },
-    { file: 'index.mjs', label: 'index.mjs' },
-    { file: 'src/assets.mjs', label: 'src/assets.mjs' },
+    { file: '.dsh-plugin/client/index.mjs', label: 'client/index.mjs' },
+    { file: '.dsh-plugin/index.mjs', label: 'index.mjs' },
+    { file: '.dsh-plugin/src/assets.mjs', label: 'src/assets.mjs' },
   ]
-  const routesSrc = readFileSync(join(root, 'src', 'routes.mjs'), 'utf8')
+  const routesSrc = readFileSync(join(root, '.dsh-plugin', 'src', 'routes.mjs'), 'utf8')
   if (!/\bROUTE_PREFIX\s*=/.test(routesSrc)) {
-    errors.push('src/routes.mjs 未定义 ROUTE_PREFIX（路由单一来源缺失）')
+    errors.push('.dsh-plugin/src/routes.mjs 未定义 ROUTE_PREFIX（路由单一来源缺失）')
   }
   for (const { file, label } of consumers) {
     const src = readFileSync(join(root, file), 'utf8')

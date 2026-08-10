@@ -2,7 +2,7 @@
 
 <!-- 常驻层：每个 session 都必须进入上下文的规则。每条 1–3 行、自包含、链接它的家。不放故事、示例、情境流程、任何从被链接的家里复述来的内容。 -->
 
-whale-girl 是一个 plugin-registry 插件：在 DSH Web GUI 内悬浮的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。架构决策见 [decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md](decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md)；插件机制契约（contributes 同步、bundle id、client.inject 语义）见该记录与 plugin-registry 文档；文档规范见 [docs/AGENTS.md](docs/AGENTS.md)。
+whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`，见 [decisions/proposed/2026-08-10-migrate-to-official-repository-plugin.md](decisions/proposed/2026-08-10-migrate-to-official-repository-plugin.md)）：在 DSH Web GUI 内悬浮的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。架构决策见 [decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md](decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md)；文档规范见 [docs/AGENTS.md](docs/AGENTS.md)。
 
 ## 当前阶段取舍
 
@@ -11,10 +11,10 @@ whale-girl 是一个 plugin-registry 插件：在 DSH Web GUI 内悬浮的桌面
 ## 目录布局
 
 ```
-src/          Node half 纯逻辑（宠物状态机/活动推导/assets 守卫，零宿主依赖，可单测）
-client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
-client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
-assets/       sprite sheet + manifest.json（静态服务；manifest↔文件由 verify-assets 门禁守护）
+.dsh-plugin/src/          Node half 纯逻辑（宠物状态机/活动推导/assets 守卫，零宿主依赖，可单测）
+.dsh-plugin/client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
+.dsh-plugin/client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
+.dsh-plugin/assets/  sprite sheet + manifest.json（静态服务；manifest↔文件由 verify-assets 门禁守护）
 originals/    生图参考原图（不参与服务）
 scripts/      门禁编排器与生成器；门禁清单的权威在 scripts/gates/run.mjs
 tests/        Node half 单测（node:test）
@@ -28,8 +28,8 @@ decisions/    决策记录；契约见 decisions/README.md
 node scripts/gates/run.mjs              # 本地精选门禁组
 node scripts/gates/run.mjs --group ci   # CI 全量组（含单测）
 node --test 'tests/*.test.mjs'          # Node half 单测
-node scripts/build-client.mjs           # 生成 client.js
-node scripts/build-client.mjs --check   # 校验 client.js 新鲜度（只读）
+node scripts/build-client.mjs           # 生成 .dsh-plugin/client.js
+node scripts/build-client.mjs --check   # 校验 .dsh-plugin/client.js 新鲜度（只读）
 ```
 
 ### 按改动面选检查
@@ -38,19 +38,19 @@ node scripts/build-client.mjs --check   # 校验 client.js 新鲜度（只读）
 
 | 改动触达 | 跑什么 |
 |---------|--------|
-| src/ 状态机行为 | `node --test 'tests/pet-state.test.mjs'` |
-| client/ 源码或构建配置 | `node scripts/build-client.mjs --check`，改完跑 `node scripts/build-client.mjs`；验证站 web 运行中跑 `node scripts/verify-client-smoke.mjs <web-url>`（浏览器冒烟：apply 成功 + 宠物渲染，curl 覆盖不到的 client 面）；**client 行为改动**（拖拽/交互/状态序列）加跑 `node scripts/verify-client-behavior.mjs <web-url> [scenario]`（行为回归探针，见 [decisions/implemented/testing/2026-08-10-client-behavior-probe.md](decisions/implemented/testing/2026-08-10-client-behavior-probe.md)） |
+| .dsh-plugin/src/ 状态机行为 | `node --test 'tests/pet-state.test.mjs'` |
+| .dsh-plugin/client/ 源码或构建配置 | `node scripts/build-client.mjs --check`，改完跑 `node scripts/build-client.mjs`；验证站 web 运行中跑 `node scripts/verify-client-smoke.mjs <web-url>`（浏览器冒烟：apply 成功 + 宠物渲染，curl 覆盖不到的 client 面）；**client 行为改动**（拖拽/交互/状态序列）加跑 `node scripts/verify-client-behavior.mjs <web-url> [scenario]`（行为回归探针，见 [decisions/implemented/testing/2026-08-10-client-behavior-probe.md](decisions/implemented/testing/2026-08-10-client-behavior-probe.md)） |
 | 文档、决策记录 | `node scripts/gates/run.mjs` |
-| assets/ sheet 或 manifest | `node scripts/gates/verify-assets.mjs` + 重装 + **刷新页面即可，无需重启 web**（assets 路由按请求读磁盘） |
-| index.mjs / src/（Node half，含工具 schema） | `node scripts/gates/run.mjs` + 重装 + **web 重启**（ESM 缓存：同 URL 二次 import 返回旧模块，已挂载过的插件改源码 disable/enable 不生效；仅进程内从未 import 过的插件可首次面板 enable 免重启，见 [decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md](decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md)）；重启后日志须无 `plugin tree failed to load` |
+| .dsh-plugin/assets/ sheet 或 manifest | `node scripts/gates/verify-assets.mjs` + 重装 + **刷新页面即可，无需重启 web**（assets 路由按请求读磁盘） |
+| .dsh-plugin/index.mjs / .dsh-plugin/src/（Node half，含工具 schema） | `node scripts/gates/run.mjs` + 重装 + **web 重启**（ESM 缓存：同 URL 二次 import 返回旧模块，已挂载过的插件改源码 disable/enable 不生效；仅进程内从未 import 过的插件可首次面板 enable 免重启，见 [decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md](decisions/implemented/bug-fix/2026-08-08-tool-schema-dsl-compat.md)）；重启后日志须无 `plugin tree failed to load` |
 | 门禁本身 | 对应门禁的自证测试（`node --test 'scripts/gates/*.test.mjs'`） |
 
 ## 约定
 
 - **每个非平凡改动必须在同一 PR 内新增或更新至少一条决策记录**；豁免与格式见 [decisions/README.md](decisions/README.md)。
 - **约定必须有门禁。** 机械可查的约定写成只拒绝一条不变量的程序；每个门禁有用非法样例证明它会拒绝的测试。门禁清单的权威是 [scripts/gates/run.mjs](scripts/gates/run.mjs)，本文件不手抄。
-- **生成物一律不手改**：`client.js` 由 [scripts/build-client.mjs](scripts/build-client.mjs) 生成，改 [client/index.mjs](client/index.mjs)；新鲜度由 `--check` 守护。
-- **插件机制契约**：`contributes.tools` 与入口注册的工具**逐名一致**（缺失即启用失败回滚）；bundle 的 `id` 必须等于插件 id（`vlln/whale-girl`）；`client.inject` 只是图元数据，fiber 实际依赖由 bundle 自导出决定。
+- **生成物一律不手改**：`.dsh-plugin/client.js` 由 [scripts/build-client.mjs](scripts/build-client.mjs) 生成，改 [.dsh-plugin/client/index.mjs](.dsh-plugin/client/index.mjs)；新鲜度由 `--check` 守护。
+- **官方插件契约**：`.dsh-plugin/package.json` 的 `dsh.entry` 指向完整 Cordis 插件（`index.mjs`：`name`/`inject`/`apply`）；`prepack` 必须调用 `dsh-plugin-prepare`（devDep `@deepseek-ai/dsh-repository-plugin`）；`dsh` 字段只允许 `skills`/`mcpServers`/`entry`（官方 schema strict）。
 - **注释与文档写契约，不写推理转录**：行为、时序、异常、后果、所有权、安全使用条件保留；实现叙述、测试走查、评审史、代码复述删除。只写当前态。
 - **一个 PR 一种性质** + 对应标签（feature / bug-fix / doc / testing / cleanup）；独立改动拆开；缺陷在引入它的那个 PR 上修，不往下游打补丁。**PR 性质标签与决策分类是两套词汇**：决策分类是封闭集合（feature/bug-fix/simplification/architecture/process/testing，见 [decisions/README.md](decisions/README.md)）——cleanup 改动进 `simplification/` 目录，doc 改动通常无决策记录（纯文档豁免）。
 - **宿主/平台环境性行为首次复现即沉淀**：如「宿主会清理/覆盖 CSS 注入样式」这类环境事实，第 1 次踩坑就写 bug-fix 决策记录并标注「环境事实」，不等到第 N 次再固化（教训见 hitarea/menu/effects 系列记录）。
