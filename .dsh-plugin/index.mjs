@@ -296,6 +296,8 @@ export function apply(ctx) {
           memory: state.memory.join('\n') || '还没有共同回忆',
         }),
       })),
+      // httpServer 服务存在时（web 模式）：注册 state/interact/config/assets/ui 路由 + 页面注入。
+      ...(httpServer !== undefined ? [
       httpServer.register({
         kind: 'exact',
         path: STATE_PATH,
@@ -402,8 +404,6 @@ export function apply(ctx) {
           }
         },
       }),
-      // httpServer 服务存在时（web 模式）：注册 state/interact/config/assets/ui 路由 + 页面注入。
-      ...(httpServer !== undefined ? [
       // ---- UI 路由 + 页面注入（官方 repository-plugin 形态）----
       // client 是自执行脚本（build 产物 client.js，无 __ModuleLoader__）；entry 把它作为
       // /whale-girl/ui.js 提供，并经官方 httpServer.tapIndex 注入 index.html——
