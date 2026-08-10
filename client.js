@@ -223,9 +223,9 @@
 [data-dsh-pet] .pet-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 [data-dsh-pet] .pet-lv { background: rgba(86,134,254,.16); color: #B7C8FE; border-radius: 5px;
   padding: 2px 6px; font-size: 10px; font-weight: 600; line-height: 16px; white-space: nowrap; }
-[data-dsh-pet] .pet-stats { color: #AEB6C4; font-size: 11px; line-height: 16px;
+[data-dsh-pet] .pet-stats { color: #E8EBF2; font-size: 11px; line-height: 16px;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
-[data-dsh-pet] .pet-note { color: #AEB6C4; font-size: 11px; line-height: 15px;
+[data-dsh-pet] .pet-note { color: #E8EBF2; font-size: 11px; line-height: 15px;
   text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
 [data-dsh-pet] .pet-status::after { /* \u8FDE\u63A5\u5C3E\uFF1A\u547D\u4E2D\u533A\u8986\u76D6\u5BA0\u7269\u2194\u5361\u7247\u95F4\u9699\uFF0Chover \u8FDE\u7EED\u4E0D\u95EA\u65AD\uFF08main \u5B9A\u4F4D\u7531 JS \u5185\u8054\uFF09 */
   content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
@@ -237,12 +237,12 @@
   width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
 [data-dsh-pet] .pet-bubble { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
-  background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 8px;
+  background: rgba(24,28,38,.94); color: #E8EBF2; font-size: 11px; padding: 4px 8px; border-radius: 10px;
   white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
   z-index: 3; }
 [data-dsh-pet] .pet-menu.open { display: flex; }
 [data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
-  font-size: 12px; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; }
+  font-size: 11px; cursor: pointer; background: rgba(255,255,255,.14); color: #E8EBF2; }
 [data-dsh-pet] .pet-menu button:hover { background: rgba(255,255,255,.28); }
 [data-dsh-pet] .pet-heart { position: absolute; font-size: 20px; pointer-events: none;
   animation: dsh-pet-float 1.8s ease-out forwards; }
@@ -298,8 +298,6 @@
       // 边框色（solid 变体用）
       text: "#E8EBF2",
       // 主文字
-      sub: "#AEB6C4",
-      // 次级文字
       radius: "10px",
       // 圆角（统一）
       font: "11px",
@@ -359,22 +357,22 @@
     status.innerHTML = `
     <div class="pet-meta" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
       <span class="pet-lv" style="background:rgba(86,134,254,.16); color:#B7C8FE; border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; line-height:16px; white-space:nowrap;">Lv.1</span>
-      <span class="pet-stats" style="color:#AEB6C4; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;">0 \u4EFB\u52A1</span>
+      <span class="pet-stats" style="color:#E8EBF2; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;">0 \u4EFB\u52A1</span>
     </div>
-    <div class="pet-note" style="color:#AEB6C4; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">\u2026</div>`;
+    <div class="pet-note" style="color:#E8EBF2; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">\u2026</div>`;
     const metaLv = status.querySelector(".pet-lv");
     const metaStats = status.querySelector(".pet-stats");
     const metaNote = status.querySelector(".pet-note");
     metaLv.style.cssText = "background:rgba(86,134,254,.16); color:#B7C8FE; border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; line-height:16px; white-space:nowrap;";
-    metaStats.style.cssText = "color:#AEB6C4; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;";
-    metaNote.style.cssText = "color:#AEB6C4; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;";
+    metaStats.style.cssText = "color:#E8EBF2; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;";
+    metaNote.style.cssText = "color:#E8EBF2; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;";
     const menu = createPanel({ anchor: "below", variant: "plain", offsetY: 12, zIndex: "4", display: "none" }).el;
     menu.className = "pet-menu";
     menu.style.gap = "6px";
     menu.style.padding = "6px";
     menu.style.display = "none";
     menu.style.pointerEvents = "auto";
-    const BTN_STYLE = "flex:1; border:0; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; background:rgba(255,255,255,.14); color:#fff; font-family:system-ui,sans-serif;";
+    const BTN_STYLE = "flex:1; border:0; border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer; background:rgba(255,255,255,.14); color:#E8EBF2; font-family:system-ui,sans-serif;";
     const feedBtn = document.createElement("button");
     feedBtn.textContent = "\u{1F357} \u5582\u98DF";
     feedBtn.style.cssText = BTN_STYLE;

@@ -16,6 +16,7 @@ Status: implemented
 - **三面板改用 createPanel**：状态卡（solid/below/offset 18/z 1，含子元素与贴边变体）、菜单（plain/below/z 4，按钮子元素）、气泡（plain/above/offset 8/z 3，Web Animations 动画）。
 - **状态卡贴边/翻转改内联**：`layoutStatus` 内联设置 left/right/top/bottom/transform（原 CSS 类 left/right/above/hidden 删除——类无法覆盖内联定位，且可能被宿主清理）；`pet-status-above` 类仅保留控制 `::after` 连接尾方向（伪元素无法内联）。
 - **状态卡始终居中**（v6 修订）：去掉左右贴边逻辑——状态卡恒 `left:50% + translateX(-50%)` 以角色中心对齐（用户确认：宠物在视口边缘时卡轻微溢出可接受，max-width 缓解）；仅保留「贴底翻转」（宠物贴视口底部时卡翻上方，防底部溢出/被裁）。
+- **子元素样式全面统一**（v6 修订）：所有面板内文字统一主色 `#E8EBF2` + 字体 11px——菜单按钮从 12px/纯白改 11px/#E8EBF2；状态卡 stats/note 从次级灰 #AEB6C4 改主色；仅保留 lv 徽章蓝高亮（功能性区分等级）。PANEL_THEME 移除 sub（不再有次级文字）。
 - **状态卡显隐加 `statusForcedHidden` 标志**：气泡/拖拽/菜单打开时 true（hover 不显示），替代原 `pet-status-hidden` 类判断——修复「hover 状态卡不显示」回归（初始 hidden 状态下旧判断恒假）。
 
 ## Alternatives considered
