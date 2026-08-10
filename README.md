@@ -1,22 +1,22 @@
-# dsh-pet
+# whale-girl
 
 DSH Web GUI 内的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。**积累型伙伴（Harness Pet）**：右下角悬浮、可拖拽、可投喂/玩耍；宠物不模拟饥饿/心情（零负反馈——不会因被冷落而难受），它的"生命"= 工作台脉搏——完成任务/会话/陪伴时长积累成**资历等级、称号与回忆**（完整成长系统见 [docs/growth-system.md](docs/growth-system.md)）。
 
 ## 安装与启用
 
 ```sh
-dsh registry install ./dsh-pet   # 安装（默认禁用——信任边界）
-dsh registry enable vlln/dsh-pet # 启用（实时挂载；浏览器端需刷新页面）
+dsh registry install ./whale-girl   # 安装（默认禁用——信任边界）
+dsh registry enable vlln/whale-girl # 启用（实时挂载；浏览器端需刷新页面）
 ```
 
 启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；状态条显示资历（等级/任务数）与最近共同回忆（hover 宠物显示），每 3s 轮询刷新。任务完成时宠物庆祝（页面关闭期间完成的任务重开后也会庆祝）、失败时短暂失落（`error`→`disappointed` 瞬发）、新会话时挥手欢迎；任一会话运行/思考时宠物沉思陪伴（`think`），等待批准时抬眼期待（`wait`）。初始配置/欢迎页（onboarding）宠物隐藏。
 
 ## 配置（体验层）
 
-体验层参数（尺寸/透明度/游走/睡眠/窗口时长）经宿主 settings 配置，`<dshHome>/settings.yaml` 的 `dsh-pet:` section（或设置 UI）修改后**热生效免重启**：
+体验层参数（尺寸/透明度/游走/睡眠/窗口时长）经宿主 settings 配置，`<dshHome>/settings.yaml` 的 `whale-girl:` section（或设置 UI）修改后**热生效免重启**：
 
 ```yaml
-dsh-pet:
+whale-girl:
   size: 110          # 宠物尺寸 px（64–160）
   opacity: 1         # 常态透明度（0.2–1）
   walk:
@@ -28,7 +28,7 @@ dsh-pet:
 
 ## 角色（换角色零改代码）
 
-`assets/manifest.json` 是角色索引：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）+ `default`。换角色 = 新增角色目录 + manifest 条目 + 设置 localStorage `dsh-pet:character`（或点菜单「🎭 换角色」按钮循环切换）；每个角色必须提供**全部 15 状态**的 sheet（素材全量契约，缺一即门禁拒收）。**完整开发指南（事件→动作映射、动作槽位、扩展边界、动手步骤）见 [docs/adding-a-character.md](docs/adding-a-character.md)**。旧格式顶层 `states`（sheet 平铺 `assets/`）兼容。
+`assets/manifest.json` 是角色索引：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）+ `default`。换角色 = 新增角色目录 + manifest 条目 + 设置 localStorage `whale-girl:character`（或点菜单「🎭 换角色」按钮循环切换）；每个角色必须提供**全部 15 状态**的 sheet（素材全量契约，缺一即门禁拒收）。**完整开发指南（事件→动作映射、动作槽位、扩展边界、动手步骤）见 [docs/adding-a-character.md](docs/adding-a-character.md)**。旧格式顶层 `states`（sheet 平铺 `assets/`）兼容。
 
 ## 开发循环
 
@@ -36,7 +36,7 @@ dsh-pet:
 node scripts/gates/run.mjs          # 本地门禁组（链接/决策格式/assets manifest/工具 schema/生成物新鲜度）
 node --test 'tests/*.test.mjs'      # Node half 单测
 node scripts/build-client.mjs       # 改 client/ 源码后重新生成 client.js（勿手改产物）
-dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh registry enable vlln/dsh-pet
+dsh registry uninstall vlln/whale-girl && dsh registry install ./whale-girl && dsh registry enable vlln/whale-girl
 ```
 
 **进程边界（易错）**：`dsh registry enable` 在 CLI 进程注册，**已运行的 web 不感知**——disable/enable 对运行中实例无效。改 `index.mjs`（Node half，含工具 schema）后需 **web 重启**（并检查日志无 `plugin tree failed to load`）；改 `client/` 或 `assets/` 后重装（上例把新 `client.js`/sheet 复制进安装目录）+ **刷新页面**即可（`serveBundle` 按请求读磁盘，页面刷新即取新文件）。

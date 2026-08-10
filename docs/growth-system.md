@@ -1,6 +1,6 @@
 # 成长系统（唯一权威）
 
-本文是 dsh-pet **成长系统**的权威现状文档：经验、成就、回忆、情绪/彩蛋的完整契约。README 与决策记录只链接本文件，不重复事实。代码实现见 [src/pet-state.mjs](../src/pet-state.mjs)（账本纯函数）与 [index.mjs](../index.mjs)（事件接线）。
+本文是 whale-girl **成长系统**的权威现状文档：经验、成就、回忆、情绪/彩蛋的完整契约。README 与决策记录只链接本文件，不重复事实。代码实现见 [src/pet-state.mjs](../src/pet-state.mjs)（账本纯函数）与 [index.mjs](../index.mjs)（事件接线）。
 
 ## 设计原则（积累型伙伴）
 

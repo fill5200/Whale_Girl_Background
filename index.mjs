@@ -1,4 +1,4 @@
-// dsh-pet Node half：积累型账本宿主 + assets 静态服务 + 活动/事件推导 + 状态持久化。
+// whale-girl Node half：积累型账本宿主 + assets 静态服务 + 活动/事件推导 + 状态持久化。
 // 契约：contributes.tools 与下方注册的工具逐名一致（verify-contributes 门禁守护）；
 // 路由路径与 client bundle 一致（见 client/index.mjs 的 STATE_PATH/INTERACT_PATH/ASSETS_URL）；
 // activity 是派生字段，不写入账本（账本保持纯函数积累，见 src/pet-state.mjs）。
@@ -6,7 +6,7 @@
 // error(4s) → disappointed(6s) 瞬发（任务失败与请求错误同一负面窗口，总 10s）；新会话 → welcome；
 // 工作态累加活跃时长。
 // 安全：/interact 校验跨源（CSRF）；body 上限 1KB；assets 路径净化拒绝 `\` 段（Windows 穿越）。
-// 持久化：状态存 <dshHome>/data/dsh-pet/state.json（.tmp + rename 原子写，1s 防抖，
+// 持久化：状态存 <dshHome>/data/whale-girl/state.json（.tmp + rename 原子写，1s 防抖，
 // 事件记账时落盘；disable 时末次落盘）。
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
@@ -21,12 +21,12 @@ import { normalizeState, serializeState } from './src/persistence.mjs'
 import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 
-export const name = 'dsh-pet'
+export const name = 'whale-girl'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
 
-export const STATE_PATH = '/plugins/vlln/dsh-pet/state'
-export const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
-export const CONFIG_PATH = '/plugins/vlln/dsh-pet/config'
+export const STATE_PATH = '/plugins/vlln/whale-girl/state'
+export const INTERACT_PATH = '/plugins/vlln/whale-girl/interact'
+export const CONFIG_PATH = '/plugins/vlln/whale-girl/config'
 
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
@@ -36,9 +36,9 @@ export const BODY_LIMIT = 1024
 // 默认值：error 4s → disappointed 6s（总负面 10s，任务失败与请求错误统一）；欢迎 6s；庆祝 6s
 // （与 deriveActivity 的 BURST_MS 同长：事件路径与轮询路径取 max 不叠加延长）。
 
-/** 状态文件：<dshHome>/data/dsh-pet/state.json（不放插件目录——uninstall 会删）。 */
+/** 状态文件：<dshHome>/data/whale-girl/state.json（不放插件目录——uninstall 会删）。 */
 const DSH_HOME = process.env.DSH_HOME ?? resolve(import.meta.dirname, '../../..')
-const STATE_FILE = join(DSH_HOME, 'data', 'dsh-pet', 'state.json')
+const STATE_FILE = join(DSH_HOME, 'data', 'whale-girl', 'state.json')
 
 /** 读取并归一化已保存状态；缺失/损坏返回 null。 */
 function loadState() {
@@ -189,8 +189,8 @@ export function apply(ctx) {
   ctx.effect(() => {
     const disposers = [
       // pet 服务（开放性窄缝）：只读快照 + 信号订阅。其他插件 inject ['pet']
-      // 消费；服务缺席时消费方应容忍（dsh-pet 自己处理 sessions 缺席即先例）。
-      // 不暴露任何写面（账本语义由 dsh-pet 独占，防第三方破坏积累不变量）。
+      // 消费；服务缺席时消费方应容忍（whale-girl 自己处理 sessions 缺席即先例）。
+      // 不暴露任何写面（账本语义由 whale-girl 独占，防第三方破坏积累不变量）。
       ctx.provide('pet', {
         snapshot: () => ({ pet: state, activity: activity() }),
         onSignal: (fn) => signals.subscribe(fn),
@@ -404,5 +404,5 @@ export function apply(ctx) {
       saveState(state) // 末次落盘：disable/卸载前保留最终状态
       for (const dispose of disposers) dispose()
     }
-  }, 'dsh-pet: tools + state/interact routes + assets')
+  }, 'whale-girl: tools + state/interact routes + assets')
 }

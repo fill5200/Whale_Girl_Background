@@ -68,7 +68,7 @@ export function generate({ check = false, root = ROOT } = {}) {
   if (esbuildBin === null) {
     return { ok: true, skipped: 'esbuild 不可用：设置 DSH_CHECKOUT 指向 dsh checkout，或在仓库内安装 devDependencies' }
   }
-  const tmpDir = mkdtempSync(join(tmpdir(), 'dsh-pet-'))
+  const tmpDir = mkdtempSync(join(tmpdir(), 'whale-girl-'))
   const tmpOut = join(tmpDir, 'client.js')
   const res = spawnSync(
     esbuildBin,

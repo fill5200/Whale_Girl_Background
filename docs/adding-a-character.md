@@ -1,6 +1,6 @@
 # 新角色/新动作开发指南（事件 · 动作 · 槽位）
 
-本文面向**想给 dsh-pet 加角色或加动作的开发者**，说明机制契约：事件如何触发动作、动作有哪些槽位、哪些能扩展哪些不能。素材生图规格见 [sprites-spec.md](sprites-spec.md)，状态机优先级见 [state-machine.md](state-machine.md)，架构分层见 [architecture-evolution.md](architecture-evolution.md)——本文不重复这些事实，只串起「怎么做」。
+本文面向**想给 whale-girl 加角色或加动作的开发者**，说明机制契约：事件如何触发动作、动作有哪些槽位、哪些能扩展哪些不能。素材生图规格见 [sprites-spec.md](sprites-spec.md)，状态机优先级见 [state-machine.md](state-machine.md)，架构分层见 [architecture-evolution.md](architecture-evolution.md)——本文不重复这些事实，只串起「怎么做」。
 
 ## 贡献角色速览（只看契约，不看代码）
 
@@ -112,7 +112,7 @@
 3. **切图**（工具化，见 [sprites-spec.md](sprites-spec.md) 素材管线）：`python3 scripts/slice-sheet.py <图> <模式> --key R,G,B --out assets/characters/<角色id>/`——网格图用 `--sheet 3x3 --states <状态名> --frames <每行帧数>`，单状态/分栏用 `--single [--columns N --states a,b]`；`--swap-frames 0,2,1` 校正 AI 乱序帧；`--normalize-scale 0.88` 统一内容占比
 4. **投放**：sheet 进 `assets/characters/<id>/`；manifest 加 `characters.<id>`（含 meta + states）
 5. **验证**：`node scripts/gates/verify-assets.mjs`（文件存在/PNG 尺寸/帧序/motion/角色 id 合法性）；`node scripts/verify-client-smoke.mjs <web-url>` 浏览器冒烟
-6. **切换**：设置 localStorage `dsh-pet:character` = 角色 id，或点菜单「🎭 换角色」按钮循环切换
+6. **切换**：设置 localStorage `whale-girl:character` = 角色 id，或点菜单「🎭 换角色」按钮循环切换
 
 ## 五、验证门禁（角色必须通过）
 

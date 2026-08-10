@@ -1,6 +1,6 @@
 # 状态机（唯一权威）
 
-本文是 dsh-pet **动画状态机**的权威现状文档：状态清单、触发条件、优先级、转换语义、扩展指引。实现见 [client/logic.mjs](../client/logic.mjs)（`STATE_TABLE`，文法单源）与 [index.mjs](../index.mjs)（Node half 事件→窗口）。角色素材规格见 [sprites-spec.md](sprites-spec.md)，成长系统见 [growth-system.md](growth-system.md)。
+本文是 whale-girl **动画状态机**的权威现状文档：状态清单、触发条件、优先级、转换语义、扩展指引。实现见 [client/logic.mjs](../client/logic.mjs)（`STATE_TABLE`，文法单源）与 [index.mjs](../index.mjs)（Node half 事件→窗口）。角色素材规格见 [sprites-spec.md](sprites-spec.md)，成长系统见 [growth-system.md](growth-system.md)。
 
 ## 设计原则
 

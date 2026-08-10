@@ -1,4 +1,4 @@
-// dsh-pet 浏览器 half：纯 DOM 自渲染宠物层（A 模式——GUI 内悬浮宠物）。
+// whale-girl 浏览器 half：纯 DOM 自渲染宠物层（A 模式——GUI 内悬浮宠物）。
 // 契约：bundle 顶层调用 window.__ModuleLoader__.load({ id, factory })——id 必须等于插件 id
 // （dsh.plugin.json 的 id），否则 loader 的 arrive() 抛 "loaded without registering"；
 // factory(require) 返回 Cordis 插件导出面（name/inject/apply）；apply 返回 disposer，
@@ -13,10 +13,10 @@
 import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
 
-const STATE_PATH = '/plugins/vlln/dsh-pet/state'
-const INTERACT_PATH = '/plugins/vlln/dsh-pet/interact'
-const CONFIG_PATH = '/plugins/vlln/dsh-pet/config'
-const ASSETS_URL = '/plugins/vlln/dsh-pet/assets'
+const STATE_PATH = '/plugins/vlln/whale-girl/state'
+const INTERACT_PATH = '/plugins/vlln/whale-girl/interact'
+const CONFIG_PATH = '/plugins/vlln/whale-girl/config'
+const ASSETS_URL = '/plugins/vlln/whale-girl/assets'
 const MANIFEST_URL = `${ASSETS_URL}/manifest.json`
 // 客户端运行参数：默认值与 Node half 的 src/config.mjs DEFAULTS 一致（单一来源——
 // 消费端不写第二份默认值，见 verify-config-sync 门禁）。/state 的 configRevision
@@ -32,22 +32,22 @@ const TICK_MS = 50
 const DRAG_RELEASE_MS = 1500
 
 const CSS = `
-[data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
+[data-whale-girl] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   font-family: system-ui, sans-serif; user-select: none; touch-action: none;
   opacity: var(--pet-opacity, 1); }
-[data-dsh-pet] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
+[data-whale-girl] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
   font-size: calc(var(--pet-size, 110px) * 0.4); line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25));
   pointer-events: none; /* 视觉层不拦事件——交互统一由 hitarea（贴合内容 bbox）承载，四周透明不可点 */
-[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+[data-whale-girl] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
-[data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+[data-whale-girl] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   cursor: grab; touch-action: none; z-index: 3; border-radius: 8px; }
-[data-dsh-pet] .pet-sprite { pointer-events: none; /* 视觉层：定位/尺寸/transform 由 JS 内联（宿主可能覆盖 CSS 注入） */ }
-[data-dsh-pet] .pet-sprite.ready { display: block; }
+[data-whale-girl] .pet-sprite { pointer-events: none; /* 视觉层：定位/尺寸/transform 由 JS 内联（宿主可能覆盖 CSS 注入） */ }
+[data-whale-girl] .pet-sprite.ready { display: block; }
 /* 状态卡：默认置于宠物下方，间距足够（角色 bob 浮动 ±4px 不触到）+ 贴底时翻上方。 */
-[data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
+[data-whale-girl] .pet-status { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
   width: max-content; min-width: 96px; max-width: calc(100vw - 24px); padding: 5px 8px;
   background: rgba(27,30,40,.94); backdrop-filter: blur(10px) saturate(1.15);
   border: 1px solid rgba(255,255,255,.10); border-radius: 10px;
@@ -55,84 +55,84 @@ const CSS = `
   color: #E8EBF2; font-size: 11px; display: grid; gap: 4px; z-index: 1;
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity .15s ease-out, transform .15s ease-out, visibility 0s linear .2s; }
-[data-dsh-pet] .pet-status::after { /* 连接尾：命中区覆盖宠物↔卡片间隙，hover 连续不闪断 */
+[data-whale-girl] .pet-status::after { /* 连接尾：命中区覆盖宠物↔卡片间隙，hover 连续不闪断 */
   content: ''; position: absolute; left: 50%; top: -5px; width: 10px; height: 10px;
   transform: translateX(-50%) rotate(45deg); background: rgba(27,30,40,.94);
   border-top: 1px solid rgba(255,255,255,.10); border-left: 1px solid rgba(255,255,255,.10);
   border-top-left-radius: 3px; pointer-events: auto; }
-[data-dsh-pet]:hover .pet-status,
-[data-dsh-pet]:focus-within .pet-status {
+[data-whale-girl]:hover .pet-status,
+[data-whale-girl]:focus-within .pet-status {
   opacity: 1; visibility: visible; pointer-events: auto;
   transform: translateX(-50%) translateY(0);
   transition: opacity .2s cubic-bezier(.16,1,.3,1), transform .2s cubic-bezier(.16,1,.3,1), visibility 0s;
   transition-delay: .06s; }
-[data-dsh-pet] .pet-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-[data-dsh-pet] .pet-lv { background: rgba(86,134,254,.16); color: #B7C8FE; border-radius: 5px;
+[data-whale-girl] .pet-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+[data-whale-girl] .pet-lv { background: rgba(86,134,254,.16); color: #B7C8FE; border-radius: 5px;
   padding: 2px 6px; font-size: 10px; font-weight: 600; line-height: 16px; white-space: nowrap; }
-[data-dsh-pet] .pet-stats { color: #E8EBF2; font-size: 11px; line-height: 16px;
+[data-whale-girl] .pet-stats { color: #E8EBF2; font-size: 11px; line-height: 16px;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
-[data-dsh-pet] .pet-note { color: #E8EBF2; font-size: 11px; line-height: 15px;
+[data-whale-girl] .pet-note { color: #E8EBF2; font-size: 11px; line-height: 15px;
   text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-[data-dsh-pet] .pet-status::after { /* 连接尾：命中区覆盖宠物↔卡片间隙，hover 连续不闪断（main 定位由 JS 内联） */
+[data-whale-girl] .pet-status::after { /* 连接尾：命中区覆盖宠物↔卡片间隙，hover 连续不闪断（main 定位由 JS 内联） */
   content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
   transform: translateX(-50%) rotate(45deg); background: rgba(24,28,38,.94);
   border-top: 1px solid rgba(255,255,255,.10); border-left: 1px solid rgba(255,255,255,.10);
   border-top-left-radius: 3px; pointer-events: auto; }
-[data-dsh-pet] .pet-status.pet-status-above::after { top: auto; bottom: auto; top: -5px; } /* 贴底翻转：卡在上方，连接尾朝下指向角色 */
-[data-dsh-pet] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+[data-whale-girl] .pet-status.pet-status-above::after { top: auto; bottom: auto; top: -5px; } /* 贴底翻转：卡在上方，连接尾朝下指向角色 */
+[data-whale-girl] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
-[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+[data-whale-girl] .pet-bubble { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   background: rgba(24,28,38,.94); color: #E8EBF2; font-size: 11px; padding: 4px 8px; border-radius: 10px;
-  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
+  white-space: nowrap; pointer-events: none; animation: whale-girl-pop .25s ease-out;
   z-index: 3; }
-[data-dsh-pet] .pet-menu.open { display: flex; }
-[data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
+[data-whale-girl] .pet-menu.open { display: flex; }
+[data-whale-girl] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 11px; cursor: pointer; background: rgba(255,255,255,.14); color: #E8EBF2; }
-[data-dsh-pet] .pet-menu button:hover { background: rgba(255,255,255,.28); }
-[data-dsh-pet] .pet-heart { position: absolute; font-size: 20px; pointer-events: none;
-  animation: dsh-pet-float 1.8s ease-out forwards; }
+[data-whale-girl] .pet-menu button:hover { background: rgba(255,255,255,.28); }
+[data-whale-girl] .pet-heart { position: absolute; font-size: 20px; pointer-events: none;
+  animation: whale-girl-float 1.8s ease-out forwards; }
 /* 状态运动配方（manifest.motion → 舞台 CSS 类；frames>1 走帧播放器，frames=1 走此动画）。
    动画作用于舞台（无内联 transform），与 sprite 的内联 scale 不冲突。
    幅度克制（±2~6px/deg）+ 中间关键帧（0→1/4→1/2→3/4→1）：无突变的往复。 */
-[data-dsh-pet] .pet-stage.pet-motion-bob { animation: dsh-pet-m-bob 2.4s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-wiggle { animation: dsh-pet-m-wiggle .9s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-squash { animation: dsh-pet-m-squash .7s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-shake { animation: dsh-pet-m-shake .3s linear infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-sigh { animation: dsh-pet-m-sigh 1.6s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-hop { animation: dsh-pet-m-hop .6s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-tilt { animation: dsh-pet-m-tilt 1.2s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-float { animation: dsh-pet-m-float 3.2s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-wave { animation: dsh-pet-m-wave 1s ease-in-out infinite; }
-@keyframes dsh-pet-m-bob { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-3px); } 60% { transform: translateY(-4px); } }
-@keyframes dsh-pet-m-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
-@keyframes dsh-pet-m-squash { 0%,100% { transform: scale(1,1); } 25% { transform: scale(1.06,.94); } 50% { transform: scale(.96,1.04); } 75% { transform: scale(1.03,.97); } }
-@keyframes dsh-pet-m-shake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-2px); } 60% { transform: translateX(2px); } 80% { transform: translateX(-1px); } }
-@keyframes dsh-pet-m-sigh { 0%,100% { transform: translateY(0) scale(1,1); } 40% { transform: translateY(1.5px) scale(1,.98); } }
-@keyframes dsh-pet-m-hop { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } 70% { transform: translateY(0); } }
-@keyframes dsh-pet-m-tilt { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
-@keyframes dsh-pet-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-@keyframes dsh-pet-m-wave { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } }
-@keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
+[data-whale-girl] .pet-stage.pet-motion-bob { animation: whale-girl-m-bob 2.4s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-wiggle { animation: whale-girl-m-wiggle .9s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-squash { animation: whale-girl-m-squash .7s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-shake { animation: whale-girl-m-shake .3s linear infinite; }
+[data-whale-girl] .pet-stage.pet-motion-sigh { animation: whale-girl-m-sigh 1.6s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-hop { animation: whale-girl-m-hop .6s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-tilt { animation: whale-girl-m-tilt 1.2s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-float { animation: whale-girl-m-float 3.2s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-wave { animation: whale-girl-m-wave 1s ease-in-out infinite; }
+@keyframes whale-girl-m-bob { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-3px); } 60% { transform: translateY(-4px); } }
+@keyframes whale-girl-m-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+@keyframes whale-girl-m-squash { 0%,100% { transform: scale(1,1); } 25% { transform: scale(1.06,.94); } 50% { transform: scale(.96,1.04); } 75% { transform: scale(1.03,.97); } }
+@keyframes whale-girl-m-shake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-2px); } 60% { transform: translateX(2px); } 80% { transform: translateX(-1px); } }
+@keyframes whale-girl-m-sigh { 0%,100% { transform: translateY(0) scale(1,1); } 40% { transform: translateY(1.5px) scale(1,.98); } }
+@keyframes whale-girl-m-hop { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } 70% { transform: translateY(0); } }
+@keyframes whale-girl-m-tilt { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
+@keyframes whale-girl-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes whale-girl-m-wave { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } }
+@keyframes whale-girl-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   70% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-72px) scale(1.25); } }
-@keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
-[data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
-[data-dsh-pet][data-dsh-pet-hidden] { display: none; }
-[data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
+@keyframes whale-girl-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+[data-whale-girl][data-whale-girl-inert] { opacity: .25; pointer-events: none; }
+[data-whale-girl][data-whale-girl-hidden] { display: none; }
+[data-whale-girl] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) {
-  [data-dsh-pet] .pet-stage { animation: none !important; }
-  [data-dsh-pet] .pet-sprite { animation: none !important; }
-  [data-dsh-pet] .pet-heart { animation: none; opacity: 0; }
-  [data-dsh-pet] .pet-bubble { animation: none; }
-  [data-dsh-pet] .pet-status { transition: none !important; }
+  [data-whale-girl] .pet-stage { animation: none !important; }
+  [data-whale-girl] .pet-sprite { animation: none !important; }
+  [data-whale-girl] .pet-heart { animation: none; opacity: 0; }
+  [data-whale-girl] .pet-bubble { animation: none; }
+  [data-whale-girl] .pet-status { transition: none !important; }
 }
 `
 
 export function apply(ctx = {}) {
   // 幂等守卫：bundle 重复执行（dev/HMR 重建、loader 重跑）时不双宠物双 style。
-  if (document.querySelector('[data-dsh-pet]') !== null) {
-    console.warn('[dsh-pet] apply 已存在实例，跳过重复挂载')
+  if (document.querySelector('[data-whale-girl]') !== null) {
+    console.warn('[whale-girl] apply 已存在实例，跳过重复挂载')
     return () => {}
   }
   const style = document.createElement('style')
@@ -186,7 +186,7 @@ export function apply(ctx = {}) {
   }
 
   const host = document.createElement('div')
-  host.setAttribute('data-dsh-pet', '')
+  host.setAttribute('data-whale-girl', '')
   host.setAttribute('role', 'group')
   host.setAttribute('aria-label', '桌面宠物')
   host.setAttribute('aria-expanded', 'false')
@@ -406,7 +406,7 @@ export function apply(ctx = {}) {
   const showPlaceholder = (name) => {
     sprite.classList.remove('ready')
     stage.replaceChildren(sprite)
-    console.warn(`[dsh-pet] 状态 ${name} 缺少可用 sheet（manifest 应含全部 15 状态；若已声明则素材加载失败）`)
+    console.warn(`[whale-girl] 状态 ${name} 缺少可用 sheet（manifest 应含全部 15 状态；若已声明则素材加载失败）`)
   }
 
   // sheet 缓存键：含角色 id 命名空间（防切角色显示旧图）。
@@ -574,7 +574,7 @@ export function apply(ctx = {}) {
       manifest = next
       resetContentBox() // 新角色轮廓：重置内容 bbox（preload 逐步合并）
       // 角色解析：默认角色 + 当前角色（localStorage 偏好，ROLE_ID_RE 已由 parseCharacters 过滤）。
-      const pref = (() => { try { return localStorage.getItem('dsh-pet:character') ?? null } catch { return null } })()
+      const pref = (() => { try { return localStorage.getItem('whale-girl:character') ?? null } catch { return null } })()
       const roles = parseCharacters(manifest)
       const nextId = pref !== null && pref in roles.characters ? pref : roles.defaultId
       characterId = nextId
@@ -625,7 +625,7 @@ export function apply(ctx = {}) {
       if (typeof stageSize === 'number' && lastConfigRevision === 0) {
         host.style.setProperty('--pet-size', `${stageSize}px`)
       }
-      try { localStorage.setItem('dsh-pet:character', id) } catch { /* 隐私模式忽略 */ }
+      try { localStorage.setItem('whale-girl:character', id) } catch { /* 隐私模式忽略 */ }
       transient = null
       transientUntil = 0
       joyUntil = 0
@@ -668,7 +668,7 @@ export function apply(ctx = {}) {
     if (cfg && loaded.has(sheetKey(cfg.sheet))) {
       // playback 合法性自检：门禁保证仓库内 manifest 合法，此处防发布物被改坏时静默僵住。
       if (cfg.playback !== undefined && !['loop', 'pingpong', 'once', 'blink'].includes(cfg.playback)) {
-        console.warn(`[dsh-pet] 状态 ${animState} playback "${cfg.playback}" 非法，按 loop 播放`)
+        console.warn(`[whale-girl] 状态 ${animState} playback "${cfg.playback}" 非法，按 loop 播放`)
       }
       const size = sheetSize.get(sheetKey(cfg.sheet))
       const frameW = size.w / cfg.frames
@@ -768,7 +768,7 @@ export function apply(ctx = {}) {
       `
       effects.appendChild(heart)
       // 动画用 Web Animations API（不依赖 CSS 注入的 keyframes——宿主可能清理 style 标签，
-      // 此前 dsh-pet-float keyframes 失效导致爱心静态）。上浮 + 放大 + 淡出。
+      // 此前 whale-girl-float keyframes 失效导致爱心静态）。上浮 + 放大 + 淡出。
       if (typeof heart.animate === 'function') {
         heart.animate(
           [
@@ -937,7 +937,7 @@ export function apply(ctx = {}) {
   let offsetY = 0
 
   // 位置持久化（localStorage；损坏数据忽略，回退默认右下角）。
-  const POS_KEY = 'dsh-pet:pos'
+  const POS_KEY = 'whale-girl:pos'
   const savePos = () => {
     try {
       if (host.style.left && host.style.top) {
@@ -1065,11 +1065,11 @@ export function apply(ctx = {}) {
 
   // ---- 开放契约（CustomEvent，第三方插件自建缝驱动显示层）----
   // 文档化事件（detail 见 docs/architecture-evolution.md 开放性节）：
-  //   dsh-pet:say    { text }          → 气泡说话
-  //   dsh-pet:fx     { type: 'hearts' } → 爱心爆发
-  //   dsh-pet:status { text }          → 状态卡 note 覆盖（临时，2.5s 恢复）
-  // 派发方式：window.dispatchEvent(new CustomEvent('dsh-pet:say', { detail: { text } }))
-  // 零耦合：事件在 document 冒泡，第三方无需依赖 dsh-pet 模块；detail 校验后消费。
+  //   whale-girl:say    { text }          → 气泡说话
+  //   whale-girl:fx     { type: 'hearts' } → 爱心爆发
+  //   whale-girl:status { text }          → 状态卡 note 覆盖（临时，2.5s 恢复）
+  // 派发方式：window.dispatchEvent(new CustomEvent('whale-girl:say', { detail: { text } }))
+  // 零耦合：事件在 document 冒泡，第三方无需依赖 whale-girl 模块；detail 校验后消费。
   const onPetSay = (e) => {
     if (e.detail && typeof e.detail.text === 'string' && e.detail.text.length > 0) showReply(e.detail.text)
   }
@@ -1085,9 +1085,9 @@ export function apply(ctx = {}) {
       }, 2500)
     }
   }
-  document.addEventListener('dsh-pet:say', onPetSay)
-  document.addEventListener('dsh-pet:fx', onPetFx)
-  document.addEventListener('dsh-pet:status', onPetStatus)
+  document.addEventListener('whale-girl:say', onPetSay)
+  document.addEventListener('whale-girl:fx', onPetFx)
+  document.addEventListener('whale-girl:status', onPetStatus)
 
   // ---- 游走（walk 行为）：周期性沿视口底部散步 ----
   const stopWalk = () => {
@@ -1246,19 +1246,19 @@ export function apply(ctx = {}) {
     if (next !== pageHidden) {
       pageHidden = next
       if (next === 'onboarding') {
-        host.setAttribute('data-dsh-pet-hidden', '')
-        host.removeAttribute('data-dsh-pet-inert')
+        host.setAttribute('data-whale-girl-hidden', '')
+        host.removeAttribute('data-whale-girl-inert')
         // 内联是权威（CSS 规则可能被宿主清理——属性设了但视觉不变）。
         host.style.display = 'none'
         host.style.opacity = ''
       } else if (next === 'dialog') {
-        host.removeAttribute('data-dsh-pet-hidden')
+        host.removeAttribute('data-whale-girl-hidden')
         host.style.display = ''
-        host.setAttribute('data-dsh-pet-inert', '')
+        host.setAttribute('data-whale-girl-inert', '')
         host.style.opacity = '.25' // inert 半透明（CSS 规则可能被宿主清理）
       } else {
-        host.removeAttribute('data-dsh-pet-inert')
-        host.removeAttribute('data-dsh-pet-hidden')
+        host.removeAttribute('data-whale-girl-inert')
+        host.removeAttribute('data-whale-girl-hidden')
         host.style.display = ''
         host.style.opacity = ''
       }
@@ -1282,9 +1282,9 @@ export function apply(ctx = {}) {
     document.removeEventListener('pointerdown', onDocPointerDown)
     document.removeEventListener('keydown', onKeyDown)
     document.removeEventListener('visibilitychange', onVisibility)
-    document.removeEventListener('dsh-pet:say', onPetSay)
-    document.removeEventListener('dsh-pet:fx', onPetFx)
-    document.removeEventListener('dsh-pet:status', onPetStatus)
+    document.removeEventListener('whale-girl:say', onPetSay)
+    document.removeEventListener('whale-girl:fx', onPetFx)
+    document.removeEventListener('whale-girl:status', onPetStatus)
     host.removeEventListener('mouseenter', onHostEnter)
     host.removeEventListener('mouseleave', onHostLeave)
     window.removeEventListener('resize', onResize)
@@ -1296,9 +1296,9 @@ export function apply(ctx = {}) {
 // 加载器契约：id 必须等于插件 id（dsh.plugin.json 的 id）；factory 返回插件导出面。
 // inject 声明浏览器 fiber 等待的服务（sessions：会话感知——思考陪伴/等待批准/回合完成提示）。
 window.__ModuleLoader__.load({
-  id: 'vlln/dsh-pet',
+  id: 'vlln/whale-girl',
   factory: (require) => ({
-    name: 'dsh-pet-client',
+    name: 'whale-girl-client',
     inject: ['sessions'],
     apply,
   }),

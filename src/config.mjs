@@ -12,7 +12,7 @@
 // 配置面不得读取/覆盖它们（引用门禁守护）。
 import z from 'schemastery'
 
-export const NAMESPACE = 'dsh-pet'
+export const NAMESPACE = 'whale-girl'
 
 /** 体验层默认值（消费端唯一权威）。数值已 clamp 到安全域。 */
 export const DEFAULTS = Object.freeze({

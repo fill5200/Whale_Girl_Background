@@ -172,10 +172,10 @@
   }
 
   // client/index.mjs
-  var STATE_PATH = "/plugins/vlln/dsh-pet/state";
-  var INTERACT_PATH = "/plugins/vlln/dsh-pet/interact";
-  var CONFIG_PATH = "/plugins/vlln/dsh-pet/config";
-  var ASSETS_URL = "/plugins/vlln/dsh-pet/assets";
+  var STATE_PATH = "/plugins/vlln/whale-girl/state";
+  var INTERACT_PATH = "/plugins/vlln/whale-girl/interact";
+  var CONFIG_PATH = "/plugins/vlln/whale-girl/config";
+  var ASSETS_URL = "/plugins/vlln/whale-girl/assets";
   var MANIFEST_URL = `${ASSETS_URL}/manifest.json`;
   var CFG_DEFAULTS = {
     size: 110,
@@ -189,22 +189,22 @@
   var TICK_MS = 50;
   var DRAG_RELEASE_MS = 1500;
   var CSS = `
-[data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
+[data-whale-girl] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   font-family: system-ui, sans-serif; user-select: none; touch-action: none;
   opacity: var(--pet-opacity, 1); }
-[data-dsh-pet] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
+[data-whale-girl] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
   font-size: calc(var(--pet-size, 110px) * 0.4); line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25));
   pointer-events: none; /* \u89C6\u89C9\u5C42\u4E0D\u62E6\u4E8B\u4EF6\u2014\u2014\u4EA4\u4E92\u7EDF\u4E00\u7531 hitarea\uFF08\u8D34\u5408\u5185\u5BB9 bbox\uFF09\u627F\u8F7D\uFF0C\u56DB\u5468\u900F\u660E\u4E0D\u53EF\u70B9 */
-[data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+[data-whale-girl] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
-[data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+[data-whale-girl] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   cursor: grab; touch-action: none; z-index: 3; border-radius: 8px; }
-[data-dsh-pet] .pet-sprite { pointer-events: none; /* \u89C6\u89C9\u5C42\uFF1A\u5B9A\u4F4D/\u5C3A\u5BF8/transform \u7531 JS \u5185\u8054\uFF08\u5BBF\u4E3B\u53EF\u80FD\u8986\u76D6 CSS \u6CE8\u5165\uFF09 */ }
-[data-dsh-pet] .pet-sprite.ready { display: block; }
+[data-whale-girl] .pet-sprite { pointer-events: none; /* \u89C6\u89C9\u5C42\uFF1A\u5B9A\u4F4D/\u5C3A\u5BF8/transform \u7531 JS \u5185\u8054\uFF08\u5BBF\u4E3B\u53EF\u80FD\u8986\u76D6 CSS \u6CE8\u5165\uFF09 */ }
+[data-whale-girl] .pet-sprite.ready { display: block; }
 /* \u72B6\u6001\u5361\uFF1A\u9ED8\u8BA4\u7F6E\u4E8E\u5BA0\u7269\u4E0B\u65B9\uFF0C\u95F4\u8DDD\u8DB3\u591F\uFF08\u89D2\u8272 bob \u6D6E\u52A8 \xB14px \u4E0D\u89E6\u5230\uFF09+ \u8D34\u5E95\u65F6\u7FFB\u4E0A\u65B9\u3002 */
-[data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
+[data-whale-girl] .pet-status { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
   width: max-content; min-width: 96px; max-width: calc(100vw - 24px); padding: 5px 8px;
   background: rgba(27,30,40,.94); backdrop-filter: blur(10px) saturate(1.15);
   border: 1px solid rgba(255,255,255,.10); border-radius: 10px;
@@ -212,82 +212,82 @@
   color: #E8EBF2; font-size: 11px; display: grid; gap: 4px; z-index: 1;
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity .15s ease-out, transform .15s ease-out, visibility 0s linear .2s; }
-[data-dsh-pet] .pet-status::after { /* \u8FDE\u63A5\u5C3E\uFF1A\u547D\u4E2D\u533A\u8986\u76D6\u5BA0\u7269\u2194\u5361\u7247\u95F4\u9699\uFF0Chover \u8FDE\u7EED\u4E0D\u95EA\u65AD */
+[data-whale-girl] .pet-status::after { /* \u8FDE\u63A5\u5C3E\uFF1A\u547D\u4E2D\u533A\u8986\u76D6\u5BA0\u7269\u2194\u5361\u7247\u95F4\u9699\uFF0Chover \u8FDE\u7EED\u4E0D\u95EA\u65AD */
   content: ''; position: absolute; left: 50%; top: -5px; width: 10px; height: 10px;
   transform: translateX(-50%) rotate(45deg); background: rgba(27,30,40,.94);
   border-top: 1px solid rgba(255,255,255,.10); border-left: 1px solid rgba(255,255,255,.10);
   border-top-left-radius: 3px; pointer-events: auto; }
-[data-dsh-pet]:hover .pet-status,
-[data-dsh-pet]:focus-within .pet-status {
+[data-whale-girl]:hover .pet-status,
+[data-whale-girl]:focus-within .pet-status {
   opacity: 1; visibility: visible; pointer-events: auto;
   transform: translateX(-50%) translateY(0);
   transition: opacity .2s cubic-bezier(.16,1,.3,1), transform .2s cubic-bezier(.16,1,.3,1), visibility 0s;
   transition-delay: .06s; }
-[data-dsh-pet] .pet-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-[data-dsh-pet] .pet-lv { background: rgba(86,134,254,.16); color: #B7C8FE; border-radius: 5px;
+[data-whale-girl] .pet-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+[data-whale-girl] .pet-lv { background: rgba(86,134,254,.16); color: #B7C8FE; border-radius: 5px;
   padding: 2px 6px; font-size: 10px; font-weight: 600; line-height: 16px; white-space: nowrap; }
-[data-dsh-pet] .pet-stats { color: #E8EBF2; font-size: 11px; line-height: 16px;
+[data-whale-girl] .pet-stats { color: #E8EBF2; font-size: 11px; line-height: 16px;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
-[data-dsh-pet] .pet-note { color: #E8EBF2; font-size: 11px; line-height: 15px;
+[data-whale-girl] .pet-note { color: #E8EBF2; font-size: 11px; line-height: 15px;
   text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-[data-dsh-pet] .pet-status::after { /* \u8FDE\u63A5\u5C3E\uFF1A\u547D\u4E2D\u533A\u8986\u76D6\u5BA0\u7269\u2194\u5361\u7247\u95F4\u9699\uFF0Chover \u8FDE\u7EED\u4E0D\u95EA\u65AD\uFF08main \u5B9A\u4F4D\u7531 JS \u5185\u8054\uFF09 */
+[data-whale-girl] .pet-status::after { /* \u8FDE\u63A5\u5C3E\uFF1A\u547D\u4E2D\u533A\u8986\u76D6\u5BA0\u7269\u2194\u5361\u7247\u95F4\u9699\uFF0Chover \u8FDE\u7EED\u4E0D\u95EA\u65AD\uFF08main \u5B9A\u4F4D\u7531 JS \u5185\u8054\uFF09 */
   content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
   transform: translateX(-50%) rotate(45deg); background: rgba(24,28,38,.94);
   border-top: 1px solid rgba(255,255,255,.10); border-left: 1px solid rgba(255,255,255,.10);
   border-top-left-radius: 3px; pointer-events: auto; }
-[data-dsh-pet] .pet-status.pet-status-above::after { top: auto; bottom: auto; top: -5px; } /* \u8D34\u5E95\u7FFB\u8F6C\uFF1A\u5361\u5728\u4E0A\u65B9\uFF0C\u8FDE\u63A5\u5C3E\u671D\u4E0B\u6307\u5411\u89D2\u8272 */
-[data-dsh-pet] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+[data-whale-girl] .pet-status.pet-status-above::after { top: auto; bottom: auto; top: -5px; } /* \u8D34\u5E95\u7FFB\u8F6C\uFF1A\u5361\u5728\u4E0A\u65B9\uFF0C\u8FDE\u63A5\u5C3E\u671D\u4E0B\u6307\u5411\u89D2\u8272 */
+[data-whale-girl] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
-[data-dsh-pet] .pet-bubble { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+[data-whale-girl] .pet-bubble { position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   background: rgba(24,28,38,.94); color: #E8EBF2; font-size: 11px; padding: 4px 8px; border-radius: 10px;
-  white-space: nowrap; pointer-events: none; animation: dsh-pet-pop .25s ease-out;
+  white-space: nowrap; pointer-events: none; animation: whale-girl-pop .25s ease-out;
   z-index: 3; }
-[data-dsh-pet] .pet-menu.open { display: flex; }
-[data-dsh-pet] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
+[data-whale-girl] .pet-menu.open { display: flex; }
+[data-whale-girl] .pet-menu button { flex: 1; border: 0; border-radius: 6px; padding: 4px 8px;
   font-size: 11px; cursor: pointer; background: rgba(255,255,255,.14); color: #E8EBF2; }
-[data-dsh-pet] .pet-menu button:hover { background: rgba(255,255,255,.28); }
-[data-dsh-pet] .pet-heart { position: absolute; font-size: 20px; pointer-events: none;
-  animation: dsh-pet-float 1.8s ease-out forwards; }
+[data-whale-girl] .pet-menu button:hover { background: rgba(255,255,255,.28); }
+[data-whale-girl] .pet-heart { position: absolute; font-size: 20px; pointer-events: none;
+  animation: whale-girl-float 1.8s ease-out forwards; }
 /* \u72B6\u6001\u8FD0\u52A8\u914D\u65B9\uFF08manifest.motion \u2192 \u821E\u53F0 CSS \u7C7B\uFF1Bframes>1 \u8D70\u5E27\u64AD\u653E\u5668\uFF0Cframes=1 \u8D70\u6B64\u52A8\u753B\uFF09\u3002
    \u52A8\u753B\u4F5C\u7528\u4E8E\u821E\u53F0\uFF08\u65E0\u5185\u8054 transform\uFF09\uFF0C\u4E0E sprite \u7684\u5185\u8054 scale \u4E0D\u51B2\u7A81\u3002
    \u5E45\u5EA6\u514B\u5236\uFF08\xB12~6px/deg\uFF09+ \u4E2D\u95F4\u5173\u952E\u5E27\uFF080\u21921/4\u21921/2\u21923/4\u21921\uFF09\uFF1A\u65E0\u7A81\u53D8\u7684\u5F80\u590D\u3002 */
-[data-dsh-pet] .pet-stage.pet-motion-bob { animation: dsh-pet-m-bob 2.4s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-wiggle { animation: dsh-pet-m-wiggle .9s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-squash { animation: dsh-pet-m-squash .7s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-shake { animation: dsh-pet-m-shake .3s linear infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-sigh { animation: dsh-pet-m-sigh 1.6s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-hop { animation: dsh-pet-m-hop .6s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-tilt { animation: dsh-pet-m-tilt 1.2s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-float { animation: dsh-pet-m-float 3.2s ease-in-out infinite; }
-[data-dsh-pet] .pet-stage.pet-motion-wave { animation: dsh-pet-m-wave 1s ease-in-out infinite; }
-@keyframes dsh-pet-m-bob { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-3px); } 60% { transform: translateY(-4px); } }
-@keyframes dsh-pet-m-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
-@keyframes dsh-pet-m-squash { 0%,100% { transform: scale(1,1); } 25% { transform: scale(1.06,.94); } 50% { transform: scale(.96,1.04); } 75% { transform: scale(1.03,.97); } }
-@keyframes dsh-pet-m-shake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-2px); } 60% { transform: translateX(2px); } 80% { transform: translateX(-1px); } }
-@keyframes dsh-pet-m-sigh { 0%,100% { transform: translateY(0) scale(1,1); } 40% { transform: translateY(1.5px) scale(1,.98); } }
-@keyframes dsh-pet-m-hop { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } 70% { transform: translateY(0); } }
-@keyframes dsh-pet-m-tilt { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
-@keyframes dsh-pet-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-@keyframes dsh-pet-m-wave { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } }
-@keyframes dsh-pet-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
+[data-whale-girl] .pet-stage.pet-motion-bob { animation: whale-girl-m-bob 2.4s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-wiggle { animation: whale-girl-m-wiggle .9s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-squash { animation: whale-girl-m-squash .7s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-shake { animation: whale-girl-m-shake .3s linear infinite; }
+[data-whale-girl] .pet-stage.pet-motion-sigh { animation: whale-girl-m-sigh 1.6s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-hop { animation: whale-girl-m-hop .6s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-tilt { animation: whale-girl-m-tilt 1.2s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-float { animation: whale-girl-m-float 3.2s ease-in-out infinite; }
+[data-whale-girl] .pet-stage.pet-motion-wave { animation: whale-girl-m-wave 1s ease-in-out infinite; }
+@keyframes whale-girl-m-bob { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-3px); } 60% { transform: translateY(-4px); } }
+@keyframes whale-girl-m-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+@keyframes whale-girl-m-squash { 0%,100% { transform: scale(1,1); } 25% { transform: scale(1.06,.94); } 50% { transform: scale(.96,1.04); } 75% { transform: scale(1.03,.97); } }
+@keyframes whale-girl-m-shake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-2px); } 60% { transform: translateX(2px); } 80% { transform: translateX(-1px); } }
+@keyframes whale-girl-m-sigh { 0%,100% { transform: translateY(0) scale(1,1); } 40% { transform: translateY(1.5px) scale(1,.98); } }
+@keyframes whale-girl-m-hop { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } 70% { transform: translateY(0); } }
+@keyframes whale-girl-m-tilt { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
+@keyframes whale-girl-m-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes whale-girl-m-wave { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } }
+@keyframes whale-girl-float { 0% { opacity: 1; transform: translateY(0) scale(.7); }
   70% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-72px) scale(1.25); } }
-@keyframes dsh-pet-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
-[data-dsh-pet][data-dsh-pet-inert] { opacity: .25; pointer-events: none; }
-[data-dsh-pet][data-dsh-pet-hidden] { display: none; }
-[data-dsh-pet] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
+@keyframes whale-girl-pop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+[data-whale-girl][data-whale-girl-inert] { opacity: .25; pointer-events: none; }
+[data-whale-girl][data-whale-girl-hidden] { display: none; }
+[data-whale-girl] .pet-stage:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) {
-  [data-dsh-pet] .pet-stage { animation: none !important; }
-  [data-dsh-pet] .pet-sprite { animation: none !important; }
-  [data-dsh-pet] .pet-heart { animation: none; opacity: 0; }
-  [data-dsh-pet] .pet-bubble { animation: none; }
-  [data-dsh-pet] .pet-status { transition: none !important; }
+  [data-whale-girl] .pet-stage { animation: none !important; }
+  [data-whale-girl] .pet-sprite { animation: none !important; }
+  [data-whale-girl] .pet-heart { animation: none; opacity: 0; }
+  [data-whale-girl] .pet-bubble { animation: none; }
+  [data-whale-girl] .pet-status { transition: none !important; }
 }
 `;
   function apply(ctx = {}) {
-    if (document.querySelector("[data-dsh-pet]") !== null) {
-      console.warn("[dsh-pet] apply \u5DF2\u5B58\u5728\u5B9E\u4F8B\uFF0C\u8DF3\u8FC7\u91CD\u590D\u6302\u8F7D");
+    if (document.querySelector("[data-whale-girl]") !== null) {
+      console.warn("[whale-girl] apply \u5DF2\u5B58\u5728\u5B9E\u4F8B\uFF0C\u8DF3\u8FC7\u91CD\u590D\u6302\u8F7D");
       return () => {
       };
     }
@@ -332,7 +332,7 @@
       };
     };
     const host = document.createElement("div");
-    host.setAttribute("data-dsh-pet", "");
+    host.setAttribute("data-whale-girl", "");
     host.setAttribute("role", "group");
     host.setAttribute("aria-label", "\u684C\u9762\u5BA0\u7269");
     host.setAttribute("aria-expanded", "false");
@@ -497,7 +497,7 @@
     const showPlaceholder = (name) => {
       sprite.classList.remove("ready");
       stage.replaceChildren(sprite);
-      console.warn(`[dsh-pet] \u72B6\u6001 ${name} \u7F3A\u5C11\u53EF\u7528 sheet\uFF08manifest \u5E94\u542B\u5168\u90E8 15 \u72B6\u6001\uFF1B\u82E5\u5DF2\u58F0\u660E\u5219\u7D20\u6750\u52A0\u8F7D\u5931\u8D25\uFF09`);
+      console.warn(`[whale-girl] \u72B6\u6001 ${name} \u7F3A\u5C11\u53EF\u7528 sheet\uFF08manifest \u5E94\u542B\u5168\u90E8 15 \u72B6\u6001\uFF1B\u82E5\u5DF2\u58F0\u660E\u5219\u7D20\u6750\u52A0\u8F7D\u5931\u8D25\uFF09`);
     };
     const sheetKey = (sheet) => `${characterId}:${sheet}`;
     const sheetUrl = (sheet) => `${ASSETS_URL}/characters/${characterId}/${sheet}`;
@@ -631,7 +631,7 @@
         resetContentBox();
         const pref = (() => {
           try {
-            return localStorage.getItem("dsh-pet:character") ?? null;
+            return localStorage.getItem("whale-girl:character") ?? null;
           } catch {
             return null;
           }
@@ -679,7 +679,7 @@
           host.style.setProperty("--pet-size", `${stageSize}px`);
         }
         try {
-          localStorage.setItem("dsh-pet:character", id);
+          localStorage.setItem("whale-girl:character", id);
         } catch {
         }
         transient = null;
@@ -713,7 +713,7 @@
       const cfg2 = stateOf(character, animState);
       if (cfg2 && loaded.has(sheetKey(cfg2.sheet))) {
         if (cfg2.playback !== void 0 && !["loop", "pingpong", "once", "blink"].includes(cfg2.playback)) {
-          console.warn(`[dsh-pet] \u72B6\u6001 ${animState} playback "${cfg2.playback}" \u975E\u6CD5\uFF0C\u6309 loop \u64AD\u653E`);
+          console.warn(`[whale-girl] \u72B6\u6001 ${animState} playback "${cfg2.playback}" \u975E\u6CD5\uFF0C\u6309 loop \u64AD\u653E`);
         }
         const size = sheetSize.get(sheetKey(cfg2.sheet));
         const frameW = size.w / cfg2.frames;
@@ -931,7 +931,7 @@
     let lastPointerX = 0;
     let offsetX = 0;
     let offsetY = 0;
-    const POS_KEY = "dsh-pet:pos";
+    const POS_KEY = "whale-girl:pos";
     const savePos = () => {
       try {
         if (host.style.left && host.style.top) {
@@ -1055,9 +1055,9 @@
         }, 2500);
       }
     };
-    document.addEventListener("dsh-pet:say", onPetSay);
-    document.addEventListener("dsh-pet:fx", onPetFx);
-    document.addEventListener("dsh-pet:status", onPetStatus);
+    document.addEventListener("whale-girl:say", onPetSay);
+    document.addEventListener("whale-girl:fx", onPetFx);
+    document.addEventListener("whale-girl:status", onPetStatus);
     const stopWalk = () => {
       walking = false;
       if (walkRaf !== null) {
@@ -1182,18 +1182,18 @@
       if (next !== pageHidden) {
         pageHidden = next;
         if (next === "onboarding") {
-          host.setAttribute("data-dsh-pet-hidden", "");
-          host.removeAttribute("data-dsh-pet-inert");
+          host.setAttribute("data-whale-girl-hidden", "");
+          host.removeAttribute("data-whale-girl-inert");
           host.style.display = "none";
           host.style.opacity = "";
         } else if (next === "dialog") {
-          host.removeAttribute("data-dsh-pet-hidden");
+          host.removeAttribute("data-whale-girl-hidden");
           host.style.display = "";
-          host.setAttribute("data-dsh-pet-inert", "");
+          host.setAttribute("data-whale-girl-inert", "");
           host.style.opacity = ".25";
         } else {
-          host.removeAttribute("data-dsh-pet-inert");
-          host.removeAttribute("data-dsh-pet-hidden");
+          host.removeAttribute("data-whale-girl-inert");
+          host.removeAttribute("data-whale-girl-hidden");
           host.style.display = "";
           host.style.opacity = "";
         }
@@ -1216,9 +1216,9 @@
       document.removeEventListener("pointerdown", onDocPointerDown);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibility);
-      document.removeEventListener("dsh-pet:say", onPetSay);
-      document.removeEventListener("dsh-pet:fx", onPetFx);
-      document.removeEventListener("dsh-pet:status", onPetStatus);
+      document.removeEventListener("whale-girl:say", onPetSay);
+      document.removeEventListener("whale-girl:fx", onPetFx);
+      document.removeEventListener("whale-girl:status", onPetStatus);
       host.removeEventListener("mouseenter", onHostEnter);
       host.removeEventListener("mouseleave", onHostLeave);
       window.removeEventListener("resize", onResize);
@@ -1227,9 +1227,9 @@
     };
   }
   window.__ModuleLoader__.load({
-    id: "vlln/dsh-pet",
+    id: "vlln/whale-girl",
     factory: (require2) => ({
-      name: "dsh-pet-client",
+      name: "whale-girl-client",
       inject: ["sessions"],
       apply
     })

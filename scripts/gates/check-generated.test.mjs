@@ -8,8 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { generate, esbuildAvailable } from '../build-client.mjs'
 
-const ENTRY = `window.__ModuleLoader__.load({ id: 'vlln/dsh-pet', factory: () => ({ name: 'x', inject: [], apply() {} }) })`
-const PLUGIN_JSON = JSON.stringify({ id: 'vlln/dsh-pet', main: './index.mjs', contributes: { tools: [], skills: [] } }, null, 2)
+const ENTRY = `window.__ModuleLoader__.load({ id: 'vlln/whale-girl', factory: () => ({ name: 'x', inject: [], apply() {} }) })`
+const PLUGIN_JSON = JSON.stringify({ id: 'vlln/whale-girl', main: './index.mjs', contributes: { tools: [], skills: [] } }, null, 2)
 
 function makeRoot({ entry = ENTRY } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'gen-'))
@@ -51,7 +51,7 @@ test('拒绝：bundle 缺 __ModuleLoader__.load 契约', { skip: !esbuildAvailab
 })
 
 test('拒绝：bundle 注册 id 与插件 id 不一致', { skip: !esbuildAvailable() }, async () => {
-  const root = makeRoot({ entry: ENTRY.replace("'vlln/dsh-pet'", "'vlln/other'") })
+  const root = makeRoot({ entry: ENTRY.replace("'vlln/whale-girl'", "'vlln/other'") })
   const result = await generate({ check: false, root })
   assert.equal(result.ok, false)
   assert.match(result.errors.join('\n'), /id 必须等于插件 id/)

@@ -1,6 +1,6 @@
 # Sprite 素材规格（生图契约）
 
-本文是 dsh-pet 动画素材的**唯一权威规格**：状态清单、生图契约、运动配方、投放流程。README 只链接本文件；改动本清单必须同时改 [client/logic.mjs](../client/logic.mjs) 的状态选择、[client/index.mjs](../client/index.mjs) 的运动类与 `assets/manifest.json`（素材全量契约：每个角色必须含全部 15 状态，缺一即被门禁拒收）。
+本文是 whale-girl 动画素材的**唯一权威规格**：状态清单、生图契约、运动配方、投放流程。README 只链接本文件；改动本清单必须同时改 [client/logic.mjs](../client/logic.mjs) 的状态选择、[client/index.mjs](../client/index.mjs) 的运动类与 `assets/manifest.json`（素材全量契约：每个角色必须含全部 15 状态，缺一即被门禁拒收）。
 
 ## 机制原则（积累型伙伴）
 
@@ -156,4 +156,4 @@ XP/等级/称号/回忆/情绪的完整契约见 [docs/growth-system.md](growth-
 1. 生图产物（3×3 网格，纯色背景）放 `assets/raw/`（gitignored，不入库）。
 2. `python3 scripts/slice-sheet.py assets/raw/<图>.png --sheet 3x3 --states <行状态名> --frames <每行帧数>` → 帧 sheet 写入 `assets/`。
 3. `assets/manifest.json` 加/改条目（`verify-assets` 门禁保证引用与 PNG 尺寸契约，缺文件即红）。
-4. 实况验证：`dsh registry install ./dsh-pet` → **刷新页面即可**（assets/ manifest 改动无需重启 web——assets 路由按请求读盘）；改 Node half（index.mjs/src）才需重启 web 且日志须无 `plugin tree failed to load`；改 client 后跑 `node scripts/verify-client-smoke.mjs <web-url>`。
+4. 实况验证：`dsh registry install ./whale-girl` → **刷新页面即可**（assets/ manifest 改动无需重启 web——assets 路由按请求读盘）；改 Node half（index.mjs/src）才需重启 web 且日志须无 `plugin tree failed to load`；改 client 后跑 `node scripts/verify-client-smoke.mjs <web-url>`。

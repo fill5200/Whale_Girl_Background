@@ -1,4 +1,4 @@
-# dsh-pet 架构演进设计（subagent 评审综合）
+# whale-girl 架构演进设计（subagent 评审综合）
 
 > 本文件综合 4 个独立 subagent 的架构评审（角色扩展性 / 开放性 / 配置系统 / 第一性原理），
 > 输出支撑「换角色、用户自定义、可配置」三目标的架构设计。评审基于代码实况（2026-08-09）。
@@ -49,9 +49,9 @@
 - **P1 角色清单化**：✅ 已完成（manifest 角色索引 + client/character.mjs + 门禁多角色，见 [character-manifest](../decisions/implemented/feature/2026-08-09-character-manifest.md)）。
 - **P2 切换 UX**：✅ 已完成（菜单「换角色」+ localStorage 偏好 + stageSize 接入 --pet-size）。
 - **P4 外部角色包——留档边界（当前不做）**：
-  - **是什么**：第三方开发者独立发布「角色皮肤包」插件，用户安装后宠物可换用该角色——像游戏 MOD/皮肤市场。角色从「随 dsh-pet 内置」升级为「独立分发单元」。
-  - **为什么需要 plugin-registry**：registry 是生态里「独立分发一个包」的唯一机制（`dsh plugin install <dir|tgz>`，每插件独立安装/启用/卸载 + 信任模型）；dsh-pet 是单插件，无法自造「安装另一个独立包」的能力，重复造轮子还会破坏统一生命周期与信任模型。
-  - **需要的机制改动（触发时做）**：① registry `contributes` 开放角色包声明（当前封闭集合仅 tools/skills）；② registry 暴露「按插件 id 读静态资源」通道（dsh-pet 的 assets 路由只读自己目录）；③ dsh-pet 角色清单双来源（内置 + 外部角色包扫描）、资源 URL 跨包；④ 角色包协议文档（character.json + 素材规格，复用 sprites-spec 纯绿/帧契约）。
+  - **是什么**：第三方开发者独立发布「角色皮肤包」插件，用户安装后宠物可换用该角色——像游戏 MOD/皮肤市场。角色从「随 whale-girl 内置」升级为「独立分发单元」。
+  - **为什么需要 plugin-registry**：registry 是生态里「独立分发一个包」的唯一机制（`dsh plugin install <dir|tgz>`，每插件独立安装/启用/卸载 + 信任模型）；whale-girl 是单插件，无法自造「安装另一个独立包」的能力，重复造轮子还会破坏统一生命周期与信任模型。
+  - **需要的机制改动（触发时做）**：① registry `contributes` 开放角色包声明（当前封闭集合仅 tools/skills）；② registry 暴露「按插件 id 读静态资源」通道（whale-girl 的 assets 路由只读自己目录）；③ whale-girl 角色清单双来源（内置 + 外部角色包扫描）、资源 URL 跨包；④ 角色包协议文档（character.json + 素材规格，复用 sprites-spec 纯绿/帧契约）。
   - **触发条件**：出现真实第三方角色包需求（有第二个角色、有人要发包）——需求为零时做平台级能力是过度设计；自然演进是先有第二个**内置**角色（验证多角色系统），再启动 P4。
 
 ## 二、开放性（subagent：open）
@@ -69,16 +69,16 @@
 **原则：表现层开放、语义层封闭、安全面封闭。** 开放判据 = 改坏了是否伤及账本不变量或宿主安全。
 
 ### 接口形态
-- **JSON 配置**为主形态（`<dshHome>/data/dsh-pet/pet.config.json`，按请求读盘 + mtime 缓存，改配置免重启）。
+- **JSON 配置**为主形态（`<dshHome>/data/whale-girl/pet.config.json`，按请求读盘 + mtime 缓存，改配置免重启）。
 - **工具只读**：加 `pet_config` 查看工具；**禁止写入工具**（防 Agent 自我改写回话/称号）。
 - **不引入脚本 DSL**：规则面用声明式谓词（`{ field, op, value }`，op 白名单枚举）。
 - **第三方插件**：Node half `ctx.provide('pet', service)` 只读服务（账本快照+信号订阅）+
-  client half 文档化 CustomEvent（`dsh-pet:say`/`dsh-pet:fx`）——生态原生机制，v1 不做「平台」承诺。
+  client half 文档化 CustomEvent（`whale-girl:say`/`whale-girl:fx`）——生态原生机制，v1 不做「平台」承诺。
 
 ## 三、配置系统（subagent：config）
 
 ### 三层归属
-- **L1 体验层（用户可配）**：宿主 settings namespace `dsh-pet`——尺寸/透明度/游走/睡眠/轮询/气泡/
+- **L1 体验层（用户可配）**：宿主 settings namespace `whale-girl`——尺寸/透明度/游走/睡眠/轮询/气泡/
   回话文案池 + Node 侧 burst 窗口。
 - **L2 语义层（代码级）**：XP/等级曲线/称号阈值/MEMORY_MAX/ACTIVE_CAP/XP_CAP——**进不得配置**（
   理由：normalizeState 以 xp 重算 level，配置化即跨设备漂移；称号阈值可配即语义崩塌）。

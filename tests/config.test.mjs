@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { DEFAULTS, buildSchema, validateConfig, NAMESPACE } from '../src/config.mjs'
 
 test('NAMESPACE 与 DEFAULTS 完整性', () => {
-  assert.equal(NAMESPACE, 'dsh-pet')
+  assert.equal(NAMESPACE, 'whale-girl')
   assert.equal(typeof DEFAULTS.size, 'number')
   assert.equal(DEFAULTS.size, 110)
   assert.equal(DEFAULTS.walk.enabled, true)

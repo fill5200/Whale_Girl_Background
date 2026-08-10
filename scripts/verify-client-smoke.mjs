@@ -1,7 +1,7 @@
 // 浏览器级冒烟：验证 client half 在真实浏览器里 apply 成功且宠物真的渲染。
 // 用法：node scripts/verify-client-smoke.mjs <web-url>
 // 前置：验证站 web 运行中；本机有 Chrome（CHROME_BIN 可覆盖路径）。
-// 断言：无 "Failed to load plugins"（client apply 未抛错）；[data-dsh-pet] 存在；
+// 断言：无 "Failed to load plugins"（client apply 未抛错）；[data-whale-girl] 存在；
 //       舞台有可见内容（.pet-sprite.ready 或 emoji 文本）。
 // 这是 curl 覆盖不到的 client-apply 验证（P6 缺口实操面）——改 client/ 后跑一次。
 // 非门禁（依赖 Chrome 与运行中的 web）：人工验证步骤，见 AGENTS.md 按改动面选检查。
@@ -26,8 +26,8 @@ function analyze(html) {
   if (html.includes('Failed to load plugins') || html.includes('plugin tree failed to load')) {
     errors.push('页面出现 harness/插件树加载失败（client apply 失败）')
   }
-  // 元素 vs CSS：host 元素是 <div data-dsh-pet=""（属性带 =），CSS 是 [data-dsh-pet]。
-  if (!/<div data-dsh-pet[=> ]/.test(html)) errors.push('未找到 [data-dsh-pet] 元素（client half 未 apply）')
+  // 元素 vs CSS：host 元素是 <div data-whale-girl=""（属性带 =），CSS 是 [data-whale-girl]。
+  if (!/<div data-whale-girl[=> ]/.test(html)) errors.push('未找到 [data-whale-girl] 元素（client half 未 apply）')
   if (!/<span class="pet-lv"/.test(html)) errors.push('状态条未渲染（apply 可能中途抛错）')
   // 舞台：sprite 元素（含 background-image）或非空 emoji 文本。
   const stageHasSprite = /<div class="pet-stage[^"]*"[^>]*>\s*<div class="pet-sprite[^>]*background-image/.test(html)
