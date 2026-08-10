@@ -1125,10 +1125,14 @@
     let pageHidden = false;
     const syncInert = () => {
       const dialog = document.querySelector('[role="dialog"]') !== null;
-      const next = dialog ? "dialog" : null;
+      const onboarding = document.getElementById("deepseek-onboarding-title") !== null || document.querySelector('[aria-labelledby="deepseek-onboarding-title"]') !== null;
+      const next = onboarding ? "onboarding" : dialog ? "dialog" : null;
       if (next !== pageHidden) {
         pageHidden = next;
-        if (next === "dialog") {
+        if (next === "onboarding") {
+          host.setAttribute("data-dsh-pet-hidden", "");
+          host.removeAttribute("data-dsh-pet-inert");
+        } else if (next === "dialog") {
           host.removeAttribute("data-dsh-pet-hidden");
           host.setAttribute("data-dsh-pet-inert", "");
         } else {

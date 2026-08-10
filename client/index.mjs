@@ -1166,16 +1166,22 @@ export function apply(ctx = {}) {
   }
   window.addEventListener('resize', onResize)
 
-  // 页面状态感知：DSH 打开 dialog 时宠物降为 inert（半透明、不挡点击）。
-  // 注：不检测 onboarding（[class*="onboarding"] 子串会误伤无会话的测试/隔离站——
-  // 它们显示欢迎页 UI 但宠物应可交互；宠物在右下角与向导实际不冲突）。
+  // 页面状态感知：DSH onboarding 向导激活时宠物隐藏（display:none，不挡向导）；
+  // dialog 打开时降为 inert（半透明、不挡点击）。
+  // onboarding 判定：deepseek-onboarding-title（DSH 向导页面标题，精确标识——
+  // 不用宽泛的 [class*="onboarding"] 子串，避免误伤类名含 onboarding 的其它元素）。
   let pageHidden = false
   const syncInert = () => {
     const dialog = document.querySelector('[role="dialog"]') !== null
-    const next = dialog ? 'dialog' : null
+    const onboarding = document.getElementById('deepseek-onboarding-title') !== null
+      || document.querySelector('[aria-labelledby="deepseek-onboarding-title"]') !== null
+    const next = onboarding ? 'onboarding' : dialog ? 'dialog' : null
     if (next !== pageHidden) {
       pageHidden = next
-      if (next === 'dialog') {
+      if (next === 'onboarding') {
+        host.setAttribute('data-dsh-pet-hidden', '')
+        host.removeAttribute('data-dsh-pet-inert')
+      } else if (next === 'dialog') {
         host.removeAttribute('data-dsh-pet-hidden')
         host.setAttribute('data-dsh-pet-inert', '')
       } else {
