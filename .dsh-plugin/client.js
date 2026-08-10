@@ -1241,12 +1241,5 @@
       style.remove();
     };
   }
-  window.__ModuleLoader__.load({
-    id: "vlln/whale-girl",
-    factory: (require2) => ({
-      name: "whale-girl-client",
-      inject: ["sessions"],
-      apply
-    })
-  });
+  apply({});
 })();

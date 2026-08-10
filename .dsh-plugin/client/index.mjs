@@ -1311,13 +1311,7 @@ export function apply(ctx = {}) {
   }
 }
 
-// 加载器契约：id 必须等于插件 id（dsh.plugin.json 的 id）；factory 返回插件导出面。
-// inject 声明浏览器 fiber 等待的服务（sessions：会话感知——思考陪伴/等待批准/回合完成提示）。
-window.__ModuleLoader__.load({
-  id: 'vlln/whale-girl',
-  factory: (require) => ({
-    name: 'whale-girl-client',
-    inject: ['sessions'],
-    apply,
-  }),
-})
+// 官方 repository-plugin 形态：自执行 UI 脚本——经 entry 的 UI 路由 /whale-girl/ui.js
+// 与官方 httpServer.tapIndex 注入，由页面 <script> 直接加载执行（无 __ModuleLoader__/
+// fiber 注入）。ctx 仅消费 sessions（会话感知）；缺席时降级——宠物照常跑，无思考陪伴。
+apply({})

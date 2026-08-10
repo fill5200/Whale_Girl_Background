@@ -24,7 +24,9 @@ import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.m
 export const name = 'whale-girl'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
-export { STATE_PATH, INTERACT_PATH, CONFIG_PATH } from './src/routes.mjs'
+export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX } from './src/routes.mjs'
+// client 自执行脚本（build 产物，同目录 client.js；由 UI 路由 /whale-girl/ui.js 服务）。
+const UI_SCRIPT = readFileSync(new URL('./client.js', import.meta.url))
 
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
@@ -396,11 +398,32 @@ export function apply(ctx) {
           }
         },
       }),
+      // ---- UI 路由 + 页面注入（官方 repository-plugin 形态）----
+      // client 是自执行脚本（build 产物 client.js，无 __ModuleLoader__）；entry 把它作为
+      // /whale-girl/ui.js 提供，并经官方 httpServer.tapIndex 注入 index.html——
+      // 每次页面响应都带上 <script>，宠物自动出现（官方注入面，非自造 patch）。
+      // 防重复：index 已含该 script 时跳过（tap 幂等）。
+      ctx.httpServer.register({
+        kind: 'exact',
+        path: `${ROUTE_PREFIX}/ui.js`,
+        handler: async (req, res) => {
+          if (req.method !== 'GET' && req.method !== 'HEAD') {
+            res.writeHead(405)
+            res.end()
+            return
+          }
+          res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
+          res.end(UI_SCRIPT)
+        },
+      }),
+      ctx.httpServer.tapIndex((html) =>
+        html.includes(`${ROUTE_PREFIX}/ui.js`) ? html : html.replace('</body>', `<script src="${ROUTE_PREFIX}/ui.js" defer></script></body>`),
+      ),
     ]
     return () => {
       clearTimeout(saveTimer)
       saveState(state) // 末次落盘：disable/卸载前保留最终状态
       for (const dispose of disposers) dispose()
     }
-  }, 'whale-girl: tools + state/interact routes + assets')
+  }, 'whale-girl: tools + state/interact routes + assets + ui')
 }
