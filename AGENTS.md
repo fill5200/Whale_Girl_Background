@@ -2,7 +2,7 @@
 
 <!-- 常驻层：每个 session 都必须进入上下文的规则。每条 1–3 行、自包含、链接它的家。不放故事、示例、情境流程、任何从被链接的家里复述来的内容。 -->
 
-whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`，见 [decisions/proposed/2026-08-10-migrate-to-official-repository-plugin.md](decisions/proposed/2026-08-10-migrate-to-official-repository-plugin.md)）：在 DSH Web GUI 内悬浮的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。架构决策见 [decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md](decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md)；文档规范见 [docs/AGENTS.md](docs/AGENTS.md)。
+whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`，见 [decisions/implemented/simplification/2026-08-10-migrate-to-official-repository-plugin.md](decisions/implemented/simplification/2026-08-10-migrate-to-official-repository-plugin.md)）：在 DSH Web GUI 内悬浮的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。架构决策见 [decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md](decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md)；文档规范见 [docs/AGENTS.md](docs/AGENTS.md)。
 
 ## 当前阶段取舍
 

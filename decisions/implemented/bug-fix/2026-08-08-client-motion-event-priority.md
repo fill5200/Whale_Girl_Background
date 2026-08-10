@@ -18,6 +18,7 @@ Status: implemented
 - 每轮游走开始时即时刷新 sprite 的 `scaleX`；即使状态仍为 `walk`，新方向也不会沿用上一轮朝向。
 - 拖拽越过阈值后按连续横向位移更新 `scaleX`，中途反向立即翻转 drag sprite。
 - 状态卡默认紧凑地显示在宠物下方且不自动上翻，避免遮挡角色；舞台状态切换只保留当前 sprite 或 emoji，互动特效留在独立 effects 层，避免残影。
+- 状态卡与菜单均相对固定 110px 舞台绝对定位；菜单打开时显式隐藏状态卡，避免菜单参与流式布局或两层同时遮挡角色。
 
 ## Alternatives considered
 
