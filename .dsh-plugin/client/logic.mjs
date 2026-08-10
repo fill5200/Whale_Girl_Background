@@ -183,27 +183,6 @@ export function nextWorkingRhythm({ now, sessionThink, working, random = Math.ra
 }
 
 /**
- * 回合完成翻转检测：sessions 快照里 completed 从无到有的会话。
- * 已废弃（2026-08-10 修复）：官方 sessions 的 completed 是「非选中会话」running→false
- * 边沿（侧栏 done 提醒语义）——当前会话完成不标记、后台/子会话完成误触发。
- * 改用 detectTurnCompleted（running 边沿）。
- */
-export function detectRoundCompleted(snapshot, seen, currentId) {
-  const byId = snapshot?.byId ?? {}
-  const flips = []
-  const nextSeen = new Set(seen)
-  for (const id of Object.keys(byId)) {
-    const s = byId[id]
-    if (s === null || typeof s !== 'object') continue
-    if (s.completed === true && !nextSeen.has(id)) {
-      nextSeen.add(id)
-      flips.push({ id, title: s.displayTitle ?? id })
-    }
-  }
-  return { flips, seen: nextSeen }
-}
-
-/**
  * 睡醒边沿判断：上一帧显示 sleep、本帧离开 sleep（非拖拽打断、无瞬发占用）→ 播 wake。
  * @param {string} prevState 上一帧视觉状态（animState）
  * @param {string} nextState 本帧目标状态（pickState 结果）
@@ -230,7 +209,7 @@ export function wakeFromInteraction({ sleeping }) {
 }
 
 /**
- * 回合完成边沿检测（v7，取代 detectRoundCompleted）：sessions 快照里 running
+ * 回合完成边沿检测（v7）：sessions 快照里 running
  * true→false 的会话——「一个 turn 结束」的可靠信号（官方快照 running 字段，
  * 含当前会话与子会话；completed 字段是「非选中会话」done 提醒语义，不可用）。
  * @param {object} snapshot sessions 快照 { byId: { [id]: { running, displayTitle } } }

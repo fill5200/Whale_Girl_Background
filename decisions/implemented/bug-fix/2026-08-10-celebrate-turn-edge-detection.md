@@ -14,7 +14,7 @@ Status: implemented
 
 - **回合完成检测改用 `running` true→false 边沿**（官方快照的 running 字段，语义明确）：任一会话（含当前选中、子会话）running 从 true 变 false = 一个 turn 结束 → 播 celebrate（`celebrateUntil` 窗口）+ 非当前会话附气泡。
 - 新增纯函数 `detectTurnCompleted(snapshot, prevRunning)`（logic.mjs）：位表对比 running 边沿，首帧只建位表不触发、持续态不触发、快照缺行清理位表（防重开误判）；宿主在 onSessions 维护 `prevRunning`。
-- `detectRoundCompleted`（completed 字段消费）废弃（保留代码 + 标注弃用，防误用）；onSessions 移除 seen/seed 逻辑。
+- `detectRoundCompleted`（completed 字段消费）废弃并删除（处置由 [2026-08-10-remove-dead-code](../simplification/2026-08-10-remove-dead-code.md) 更新：无消费方，纯死代码）；onSessions 移除 seen/seed 逻辑。
 
 ## Alternatives considered
 

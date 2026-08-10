@@ -34,7 +34,7 @@ export function levelFor(xp) {
   return Math.floor((1 + Math.sqrt(1 + (4 * xpSafe) / 25)) / 2)
 }
 
-/** 称号定义（封闭集合；加称号要同时改本表与 docs/sprites-spec.md 的资历说明）。 */
+/** 称号定义（封闭集合；加称号要同时改本表与 docs/growth-system.md 的成就表）。 */
 export const TITLES = [
   { id: 'first-task', name: '初次协作', when: (s) => s.tasksDone >= 1 },
   { id: 'helper', name: '勤劳伙伴', when: (s) => s.tasksDone >= 20 },
@@ -117,10 +117,4 @@ export const ACTIVE_CAP_MS = 5 * 60_000
 export function recordActive(state, elapsedMs, nowMs) {
   const capped = Math.min(Math.max(0, elapsedMs), ACTIVE_CAP_MS)
   return commit(state, { activeMs: state.stats.activeMs + capped }, nowMs, null)
-}
-
-/** 资历一行摘要（工具输出与路由都复用）。 */
-export function describe(state) {
-  const t = state.titles.length ? `称号「${state.titles.map(titleName).join('」「')}」` : '尚无称号'
-  return `资历 Lv.${state.level}（${state.xp} XP）· 完成 ${state.stats.tasksDone} 个任务 · ${t}`
 }

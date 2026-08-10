@@ -23,7 +23,7 @@ export function normalizeState(saved) {
   if (typeof saved !== 'object' || saved === null) return null
   const xpRaw = num(saved.xp)
   if (!Number.isFinite(xpRaw)) return null
-  // 手改/损坏文件的安全上限（1e12 远超现实积累）与取整（pet_status schema 声明 integer）。
+  // 手改/损坏文件的安全上限（1e12 远超现实积累）与整数取整。
   const xp = Math.max(0, Math.floor(Math.min(xpRaw, XP_CAP)))
   // stats 走 INITIAL_STATE 合并：未来新增字段时旧文件不静默丢失。
   const stats = {

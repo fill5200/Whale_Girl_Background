@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   INITIAL_STATE, MEMORY_MAX, TASK_XP, SESSION_XP, RESUME_XP, xpForLevel, levelFor,
-  recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive, ACTIVE_CAP_MS, describe, titleName,
+  recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive, ACTIVE_CAP_MS, titleName,
 } from '../.dsh-plugin/src/pet-state.mjs'
 
 const NOW = 1_700_000_000_000
@@ -130,9 +130,4 @@ test('回忆环形上限 MEMORY_MAX', () => {
 test('titleName 未知 id 原样返回', () => {
   assert.equal(titleName('first-task'), '初次协作')
   assert.equal(titleName('unknown-id'), 'unknown-id')
-})
-
-test('describe 资历摘要', () => {
-  const { state } = recordTaskCompleted({ ...INITIAL_STATE, updatedAt: 0 }, 'x', NOW)
-  assert.match(describe(state), /资历 Lv\.1（10 XP）· 完成 1 个任务 · 称号「初次协作」/)
 })

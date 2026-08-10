@@ -2,7 +2,7 @@
 // 用法：node scripts/verify-client-smoke.mjs <web-url>
 // 前置：验证站 web 运行中；本机有 Chrome（CHROME_BIN 可覆盖路径）。
 // 断言：无 "Failed to load plugins"（client apply 未抛错）；[data-whale-girl] 存在；
-//       舞台有可见内容（.pet-sprite.ready 或 emoji 文本）。
+//       舞台有可见内容（.pet-sprite.ready sprite 渲染）。
 // 这是 curl 覆盖不到的 client-apply 验证（P6 缺口实操面）——改 client/ 后跑一次。
 // 非门禁（依赖 Chrome 与运行中的 web）：人工验证步骤，见 AGENTS.md 按改动面选检查。
 import { spawnSync } from 'node:child_process'
@@ -29,10 +29,9 @@ function analyze(html) {
   // 元素 vs CSS：host 元素是 <div data-whale-girl=""（属性带 =），CSS 是 [data-whale-girl]。
   if (!/<div data-whale-girl[=> ]/.test(html)) errors.push('未找到 [data-whale-girl] 元素（client half 未 apply）')
   if (!/<span class="pet-lv"/.test(html)) errors.push('状态条未渲染（apply 可能中途抛错）')
-  // 舞台：sprite 元素（含 background-image）或非空 emoji 文本。
+  // 舞台：sprite 元素（含 background-image）。
   const stageHasSprite = /<div class="pet-stage[^"]*"[^>]*>\s*<div class="pet-sprite[^>]*background-image/.test(html)
-  const stageHasEmoji = /<div class="pet-stage[^"]*"[^>]*>([^<\s])/.test(html)
-  if (!stageHasSprite && !stageHasEmoji) errors.push('宠物舞台为空（sprite 未渲染且无 emoji 兜底）')
+  if (!stageHasSprite) errors.push('宠物舞台为空（sprite 未渲染）')
   // motion 配方生效（idle 兜底态必为 pet-motion-bob）与账本渲染（任务计数）——回归防线。
   if (!/pet-motion-[a-z]+/.test(html)) errors.push('未找到 pet-motion-* 运动类（motion 配方未生效）')
   if (!/<span class="pet-stats"[^>]*>\d+ 任务/.test(html)) errors.push('账本统计未渲染（任务计数缺失）')
@@ -68,4 +67,4 @@ if (last.errors.length > 0) {
   for (const e of last.errors) console.error(`[verify-client-smoke] ${e}`)
   process.exit(1)
 }
-console.log('[verify-client-smoke] OK：client apply 成功，宠物已渲染（' + (last.stageHasSprite ? 'sprite' : 'emoji') + '）')
+console.log('[verify-client-smoke] OK：client apply 成功，宠物以 sprite 渲染')

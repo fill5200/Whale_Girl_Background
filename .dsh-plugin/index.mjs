@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import {
-  INITIAL_STATE, titleName, recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive,
+  INITIAL_STATE, recordTaskCompleted, recordFailure, recordSession, recordSessionResume, recordActive,
 } from './src/pet-state.mjs'
 import { deriveActivity, mergeCelebrate } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
@@ -381,5 +381,5 @@ export function apply(ctx) {
       saveState(state) // 末次落盘：disable/卸载前保留最终状态
       for (const dispose of disposers) dispose()
     }
-  }, 'whale-girl: tools + state/interact routes + assets + ui')
+  }, 'whale-girl: state/interact/config/assets/ui routes + events')
 }
