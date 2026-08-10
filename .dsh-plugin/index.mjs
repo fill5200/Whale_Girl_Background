@@ -248,14 +248,14 @@ export function apply(ctx) {
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
         execute: async () => applyAction(state, 'feed', configRef.replies).body.reply,
-      })),
+      }),
       ctx.tools.register({
         name: 'pet_play',
         description: '陪桌面宠物玩耍（社交娱乐）：纯乐趣互动，宠物会回话，不影响资历。',
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
         execute: async () => applyAction(state, 'play', configRef.replies).body.reply,
-      })),
+      }),
       ctx.tools.register({
         name: 'pet_status',
         description: '查看桌面宠物的资历（等级/经验/任务数/称号/最近共同回忆）。',
@@ -294,7 +294,7 @@ export function apply(ctx) {
           titles: state.titles.map(titleName).join('、') || '无',
           memory: state.memory.join('\n') || '还没有共同回忆',
         }),
-      })),
+      }),
       // httpServer 服务存在时（web 模式）：注册 state/interact/config/assets/ui 路由 + 页面注入。
       ...(httpServer !== undefined ? [
       httpServer.register({
