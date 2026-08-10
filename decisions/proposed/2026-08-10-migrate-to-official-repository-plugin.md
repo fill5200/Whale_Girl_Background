@@ -104,3 +104,17 @@ repository-plugins:
 
 - 官方机制：`official-0809-coverage.md`（覆盖度 + UI 自渲染实证）、`2026-07-30-config-only-repository-plugins.md`（config.yaml 安装）、`2026-07-30-static-repository-plugin-format.md`（子目录格式与 containment）、`2026-08-08-trusted-repository-package-code.md`（dsh.entry 可信代码）
 - 现状实现：`client/index.mjs`（`__ModuleLoader__` 契约）、`index.mjs`（assets 路由已自实现）
+
+## 执行状态（Phase 1-3，2026-08-10）
+
+| Phase | 状态 | 证据 |
+|---|---|---|
+| 1a 结构迁移 | ✅ | `72bfd2a`：Node half 全收 `.dsh-plugin/`（entry containment）；verify-contributes 退役；build-client 去 loader 契约 |
+| 1b 路由官方化 + prepack | ✅ | `169fe9a`：ROUTE_PREFIX `/whale-girl`；官方 dsh-plugin-prepare schema 通过 + wrapper 生成（entry=./index.mjs） |
+| 2 client 自执行 + UI 注入 | ✅ | `a04bca0`：去 `__ModuleLoader__`（bundle 0 处）→ `apply({})`；UI 路由 `/whale-girl/ui.js` + 官方 `httpServer.tapIndex` 注入（官方注入面，非自造 patch——tapIndex 是官方 webserver 服务 API，api-catalog 文档化） |
+| 3 挂载验证 + 断链修复 | ✅ | `9127e3b`：0809 官方依赖解析 + stub 服务挂载 entry：3 工具注册、UI 路由、tapIndex 注入+幂等、pet 服务、事件、disposer 清理全过；抓出并修复 2 个迁移潜伏断链（ASSETS_PATH re-export、STATE_PATH 局部绑定）；`ff613aa` 残留清零（dsh.plugin.json 删除、门禁跟随前缀） |
+
+**残留项（Phase 3 集成冒烟，需 mock npm registry 发布 `@deepseek-ai` 包 + API 环境，官方 e2e 同款）**：
+- [ ] config.yaml `repository-plugins.repositories` 真实安装 → RepositoryCache → pnpm 准备 → 挂载（日志无 plugin tree failed to load）
+- [ ] GUI 页面真实渲染宠物（tapIndex 注入 → `/whale-girl/ui.js` 加载 → DOM 渲染）
+- [ ] 真实工具调用（pet_feed/pet_play/pet_status）+ 行为回归（sleep-drag-wake 等价场景）
