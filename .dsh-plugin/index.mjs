@@ -22,7 +22,7 @@ import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 
 export const name = 'whale-girl'
-export const inject = ['httpServer', 'tools', 'tasks', 'agents']
+export const inject = ['tools', 'tasks', 'agents']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
 import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX } from './src/routes.mjs'
 export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX }
@@ -187,6 +187,9 @@ export function apply(ctx) {
     return { name, until }
   }
 
+  // httpServer 可选（headless 无 web 服务器）：有则注册 UI 路由/注入，无则降级为无 UI 工具插件
+  // （官方 repository-plugin entry 语义，见迁移决策记录）。
+  const httpServer = ctx.httpServer ?? (typeof ctx.get === 'function' ? ctx.get('httpServer') : undefined)
   ctx.effect(() => {
     const disposers = [
       // pet 服务（开放性窄缝）：只读快照 + 信号订阅。其他插件 inject ['pet']
@@ -293,7 +296,7 @@ export function apply(ctx) {
           memory: state.memory.join('\n') || '还没有共同回忆',
         }),
       })),
-      ctx.httpServer.register({
+      httpServer.register({
         kind: 'exact',
         path: STATE_PATH,
         handler: async (req, res) => {
@@ -311,7 +314,7 @@ export function apply(ctx) {
           }
         },
       }),
-      ctx.httpServer.register({
+      httpServer.register({
         kind: 'exact',
         path: CONFIG_PATH,
         handler: async (req, res) => {
@@ -328,7 +331,7 @@ export function apply(ctx) {
           }
         },
       }),
-      ctx.httpServer.register({
+      httpServer.register({
         kind: 'exact',
         path: INTERACT_PATH,
         handler: async (req, res) => {
@@ -365,7 +368,7 @@ export function apply(ctx) {
           }
         },
       }),
-      ctx.httpServer.register({
+      httpServer.register({
         kind: 'prefix',
         path: ASSETS_PATH,
         handler: async (req, res) => {
@@ -399,12 +402,14 @@ export function apply(ctx) {
           }
         },
       }),
+      // httpServer 服务存在时（web 模式）：注册 state/interact/config/assets/ui 路由 + 页面注入。
+      ...(httpServer !== undefined ? [
       // ---- UI 路由 + 页面注入（官方 repository-plugin 形态）----
       // client 是自执行脚本（build 产物 client.js，无 __ModuleLoader__）；entry 把它作为
       // /whale-girl/ui.js 提供，并经官方 httpServer.tapIndex 注入 index.html——
       // 每次页面响应都带上 <script>，宠物自动出现（官方注入面，非自造 patch）。
       // 防重复：index 已含该 script 时跳过（tap 幂等）。
-      ctx.httpServer.register({
+      httpServer.register({
         kind: 'exact',
         path: `${ROUTE_PREFIX}/ui.js`,
         handler: async (req, res) => {
@@ -417,9 +422,10 @@ export function apply(ctx) {
           res.end(UI_SCRIPT)
         },
       }),
-      ctx.httpServer.tapIndex((html) =>
+      httpServer.tapIndex((html) =>
         html.includes(`${ROUTE_PREFIX}/ui.js`) ? html : html.replace('</body>', `<script src="${ROUTE_PREFIX}/ui.js" defer></script></body>`),
       ),
+      ] : []),
     ]
     return () => {
       clearTimeout(saveTimer)
