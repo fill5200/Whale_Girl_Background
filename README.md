@@ -85,7 +85,7 @@ whale-girl:
 
 ## 作为参考实现
 
-whale-girl 是官方 repository-plugin（0809 格式）的**完整范本**——开发新插件可对照：
+whale-girl 是官方 repository-plugin 格式的**完整范本**（不绑定具体基线版本，随官方机制演进）——开发新插件可对照：
 
 - **结构**：`.dsh-plugin/`（入口/纯逻辑/client/素材）与 docs/decisions/scripts 分离，见根 [AGENTS.md](AGENTS.md)
 - **规范**：门禁（`scripts/gates/run.mjs`）+ 决策记录 + 素材全量契约；开发引导见 plugin-registry 的 [plugin-registry-create skill](https://github.com/dsh-external/plugin-registry/tree/main/skills/plugin-registry-create) 与 [cookbook](https://github.com/dsh-external/plugin-registry/blob/main/docs/cookbook/creating-a-repository-plugin.md)，踩过的坑见 [gotchas](https://github.com/dsh-external/plugin-registry/blob/main/skills/plugin-registry-create/references/gotchas.md)
