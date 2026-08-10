@@ -311,7 +311,7 @@ export function apply(ctx = {}) {
   // 游走（walk）：周期性沿视口底部散步。
   let walking = false
   let walkDir = 1
-  let flip = 1 // sprite 水平翻转（scaleX），行走方向
+  let flip = 1 // sprite 水平翻转（scaleX）；素材统一朝左基准：1=朝左、-1=镜像朝右
   let wanderTimer = null
   let walkRaf = null
   // 会话感知（P2 思考态）：由 host sessions 服务快照派生的陪伴信号。
@@ -367,7 +367,8 @@ export function apply(ctx = {}) {
     sprite.style.backgroundSize = `${size.w}px ${size.h}px`
     sprite.style.width = `${frameW}px`
     sprite.style.height = `${size.h}px`
-    // scaleX(flip) 支持行走方向翻转（方向由游走行为维护，默认 1 不翻转）。
+    // scaleX(flip) 表达朝向：素材统一朝左（flip=1 朝左、flip=-1 镜像朝右）。
+    // 方向由 walk/drag/静态转身维护（flip 是共享朝向状态，动作间连续）。
     sprite.style.transform = `scale(${scale}) scaleX(${flip})`
     applyFrame(frameW, frame)
   }
@@ -867,7 +868,9 @@ export function apply(ctx = {}) {
       transientUntil = 0
       joyUntil = 0
       layoutStatus() // 拖拽中隐藏状态卡（宠物是主角，卡片跟随移动会闪）
-      const nextFlip = e.clientX < lastPointerX ? -1 : 1
+      // 素材统一朝左基准：flip=1 显示朝左、flip=-1 镜像显示朝右。
+      // 拖拽方向 → 朝向：向左拖朝左（flip=1）、向右拖朝右（flip=-1）。
+      const nextFlip = e.clientX < lastPointerX ? 1 : -1
       if (nextFlip !== flip) {
         flip = nextFlip
         const dragCfg = stateOf(character, 'drag')
@@ -985,7 +988,8 @@ export function apply(ctx = {}) {
   const wander = () => {
     walking = true
     walkDir = Math.random() < 0.5 ? 1 : -1
-    flip = walkDir // sprite scaleX 翻转（showSprite 应用）
+    // 素材统一朝左基准：向右走（walkDir=1）应显示朝右 → flip=-1（镜像）；向左走 flip=1。
+    flip = -walkDir
     // walk 可能已经是当前状态；此时 setState 会短路，必须主动刷新
     // sprite transform，否则新一轮游走仍沿用上一轮朝向。
     const walkCfg = stateOf(character, 'walk')

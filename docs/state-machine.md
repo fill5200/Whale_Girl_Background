@@ -58,7 +58,7 @@ drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
 - **瞬发/覆盖态结束后**：不硬编码回 idle——重新计算底层派生状态（`pickState` 每 tick 重算）。
 - **临时覆盖不抢戏**：事件 burst > 用户互动 > 陪伴态；失败情绪不被新会话欢迎盖掉（welcome 不打断 error/disappointed 尾段）。
 - **会话活跃保持清醒**：think/wait 覆盖 sleep/walk（陪伴底座）。
-- **朝向连续 + 随机转身**：方向（flip）由 walk/drag 写入，静态态沿用（不无谓跳回默认）；idle/think/wait 随机转身（`nextFacingAt`，10-25s 间隔）。素材无朝向（内容居中），flip 即朝向。
+- **朝向连续 + 随机转身**：素材统一朝左基准（flip=1 朝左、flip=-1 镜像朝右）；方向由 walk/drag 写入（walk 向右走 flip=-1、向左走 flip=1；drag 同向），静态态沿用（不无谓跳回默认）；idle/think/wait 随机转身（`nextFacingAt`，10-25s 间隔）。素材规范见 [sprites-spec.md](sprites-spec.md)。
 
 ## 扩展指引（给新角色/新状态）
 

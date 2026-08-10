@@ -891,7 +891,7 @@
         transientUntil = 0;
         joyUntil = 0;
         layoutStatus();
-        const nextFlip = e.clientX < lastPointerX ? -1 : 1;
+        const nextFlip = e.clientX < lastPointerX ? 1 : -1;
         if (nextFlip !== flip) {
           flip = nextFlip;
           const dragCfg = stateOf(character, "drag");
@@ -995,7 +995,7 @@
     const wander = () => {
       walking = true;
       walkDir = Math.random() < 0.5 ? 1 : -1;
-      flip = walkDir;
+      flip = -walkDir;
       const walkCfg = stateOf(character, "walk");
       if (animState === "walk" && walkCfg && loaded.has(sheetKey(walkCfg.sheet))) showSprite("walk", walkCfg);
       const duration = cfg.walk.minMs + Math.random() * (cfg.walk.maxMs - cfg.walk.minMs);
