@@ -198,7 +198,7 @@
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   cursor: grab; touch-action: none; z-index: 3; border-radius: 8px; }
-[data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; }
+[data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; pointer-events: none; /* \u89C6\u89C9\u5C42\uFF1A256px \u5E03\u5C40\u76D2 transform \u7F29\u653E\u540E\u6EA2\u51FA stage\uFF0C\u987B\u7981\u6307\u9488\u9632\u6EA2\u51FA\u533A\u53EF\u70B9 */ }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* \u72B6\u6001\u5361\uFF1A\u9ED8\u8BA4\u7F6E\u4E8E\u5BA0\u7269\u4E0B\u65B9\uFF0C\u95F4\u8DDD\u8DB3\u591F\uFF08\u89D2\u8272 bob \u6D6E\u52A8 \xB14px \u4E0D\u89E6\u5230\uFF09+ \u8D34\u5E95\u65F6\u7FFB\u4E0A\u65B9\u3002 */
 [data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
