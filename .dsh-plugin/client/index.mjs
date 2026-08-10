@@ -804,7 +804,7 @@ export function apply(ctx = {}) {
     }
   }
 
-  // 宠物回话气泡（互动后显示，2.5s 消失；超时记入清理表，dispose 时一并清）。
+  // 宠物回话气泡（互动后显示，cfg.bubbleMs 后消失；超时记入清理表，dispose 时一并清）。
   // 一次只显示一个气泡：新气泡替换旧的（互动回话与回合完成提示不堆叠覆盖——
   // 多会话同时完成时快照循环里后者替换前者，避免同位置重叠）。
   const bubbleTimers = new Set()
@@ -845,7 +845,7 @@ export function apply(ctx = {}) {
       if (activeBubble === bubble) activeBubble = null
       bubble.remove()
       if (typeof onBubbleShown === 'function') onBubbleShown() // 气泡消失后恢复状态卡
-    }, 2500)
+    }, cfg.bubbleMs)
     bubbleTimers.add(timer)
   }
 
@@ -876,6 +876,8 @@ export function apply(ctx = {}) {
   let failStreak = 0
   // 配置热更新：configRevision 门控（变化才拉取/重应用，避免每 3s 重置游走计时器）。
   let lastConfigRevision = 0
+  // /state 轮询定时器句柄：pollMs 配置变化时重建（热生效，见 applyClientConfig）。
+  let pollTimer = null
   const fetchConfig = async () => {
     try {
       const res = await fetch(CONFIG_PATH)
@@ -889,6 +891,7 @@ export function apply(ctx = {}) {
   // 应用客户端配置：尺寸/透明度走 CSS 变量；游走/睡眠/轮询参数更新 cfg（下次行为生效）。
   const applyClientConfig = (config) => {
     if (config === null || typeof config !== 'object') return
+    const prevPollMs = cfg.pollMs
     cfg = { ...CFG_DEFAULTS, ...config }
     if (typeof config.size === 'number') {
       host.style.setProperty('--pet-size', `${config.size}px`)
@@ -901,6 +904,11 @@ export function apply(ctx = {}) {
       }
     }
     if (typeof config.opacity === 'number') host.style.setProperty('--pet-opacity', String(config.opacity))
+    // pollMs 变化 → 重建轮询定时器（热生效；定时器在启动时按旧间隔创建，不重建则改动要刷新页面才生效）。
+    if (typeof config.pollMs === 'number' && config.pollMs !== prevPollMs) {
+      clearInterval(pollTimer)
+      pollTimer = setInterval(refresh, cfg.pollMs)
+    }
     scheduleWander() // 游走参数可能变化：重排下一次游走
   }
   const refresh = async () => {
@@ -1192,7 +1200,7 @@ export function apply(ctx = {}) {
   // ---- 启动 ----
   loadAssets()
   refresh()
-  const timer = setInterval(refresh, cfg.pollMs)
+  pollTimer = setInterval(refresh, cfg.pollMs)
   const animTimer = setInterval(tick, TICK_MS)
   scheduleWander()
   armWorking()
@@ -1281,7 +1289,7 @@ export function apply(ctx = {}) {
   syncInert()
 
   return () => {
-    clearInterval(timer)
+    clearInterval(pollTimer)
     clearInterval(animTimer)
     clearTimeout(wanderTimer)
     if (workingTimer !== null) clearTimeout(workingTimer)

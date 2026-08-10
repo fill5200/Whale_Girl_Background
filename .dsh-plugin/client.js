@@ -855,13 +855,13 @@
       }
       activeBubble = bubble;
       if (typeof onBubbleShown === "function") onBubbleShown();
-      const timer2 = setTimeout(() => {
-        bubbleTimers.delete(timer2);
+      const timer = setTimeout(() => {
+        bubbleTimers.delete(timer);
         if (activeBubble === bubble) activeBubble = null;
         bubble.remove();
         if (typeof onBubbleShown === "function") onBubbleShown();
-      }, 2500);
-      bubbleTimers.add(timer2);
+      }, cfg.bubbleMs);
+      bubbleTimers.add(timer);
     };
     const interact = async (action) => {
       stopWalk();
@@ -885,6 +885,7 @@
     let refreshing = false;
     let failStreak = 0;
     let lastConfigRevision = 0;
+    let pollTimer = null;
     const fetchConfig = async () => {
       try {
         const res = await fetch(CONFIG_PATH);
@@ -897,6 +898,7 @@
     };
     const applyClientConfig = (config) => {
       if (config === null || typeof config !== "object") return;
+      const prevPollMs = cfg.pollMs;
       cfg = { ...CFG_DEFAULTS, ...config };
       if (typeof config.size === "number") {
         host.style.setProperty("--pet-size", `${config.size}px`);
@@ -908,6 +910,10 @@
         }
       }
       if (typeof config.opacity === "number") host.style.setProperty("--pet-opacity", String(config.opacity));
+      if (typeof config.pollMs === "number" && config.pollMs !== prevPollMs) {
+        clearInterval(pollTimer);
+        pollTimer = setInterval(refresh, cfg.pollMs);
+      }
       scheduleWander();
     };
     const refresh = async () => {
@@ -1148,7 +1154,7 @@
     };
     loadAssets();
     refresh();
-    const timer = setInterval(refresh, cfg.pollMs);
+    pollTimer = setInterval(refresh, cfg.pollMs);
     const animTimer = setInterval(tick, TICK_MS);
     scheduleWander();
     armWorking();
@@ -1216,7 +1222,7 @@
     dialogObserver.observe(document.body, { childList: true, subtree: true });
     syncInert();
     return () => {
-      clearInterval(timer);
+      clearInterval(pollTimer);
       clearInterval(animTimer);
       clearTimeout(wanderTimer);
       if (workingTimer !== null) clearTimeout(workingTimer);
