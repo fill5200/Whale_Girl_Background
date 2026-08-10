@@ -21,13 +21,13 @@
 | 用户拖拽（pointermove>6px） | `dragging` | `drag` | ❌ 触发固定 |
 | 拖拽放下 | `dragReleaseUntil` | `idle`（1.5s 缓冲） | ❌ |
 | 点击喂食/玩耍 | `transient='eat'/'play'` | `eat` / `play` | ❌ |
-| 睡醒过渡 | `transient='wake'` | `wake` | ❌ |
+| 睡醒过渡（视觉边沿：sleep→非 sleep；交互醒觉：睡着时拖拽/喂食/玩耍/开菜单） | `transient='wake'` | `wake` | ❌ |
 | `tasks.onTaskDone`（completed） | Node burst `celebrate` | `celebrate` | ❌ |
 | 任务升级/称号解锁 | Node burst `celebrate` | `celebrate` | ❌ |
 | `tasks.onTaskDone`（failed） | Node burst `error`→`disappointed` | `error` / `disappointed` | ❌ |
 | `agent/request-error` | Node burst `error`→`disappointed` | `error` / `disappointed` | ❌ |
 | `agent/session-start`（startup） | Node burst `welcome` | `welcome` | ❌ |
-| sessions.list 任一会话 running | client `sessionThink` | `working`↔`think`（交替） | ❌ |
+| sessions.list 任一会话 running | client `sessionThink` | `think`（常态）+ `working`（随机插曲，大部分时间 think） | ❌ |
 | sessions.list 任一等待批准 | client `sessionWait` | `wait` | ❌ |
 | 互动后短时 | client `joyUntil` | `joy` | ❌ |
 | 空闲 ≥60s | client `sleeping` | `sleep` | ❌ |
