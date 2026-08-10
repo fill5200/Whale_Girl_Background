@@ -11,15 +11,17 @@ whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 +
 ## 目录布局
 
 ```
-.dsh-plugin/src/          Node half 纯逻辑（宠物状态机/活动推导/assets 守卫，零宿主依赖，可单测）
+.dsh-plugin/index.mjs     Node half 入口：pet 工具 + state/interact/assets/ui 路由 + 事件记账 + ctx.pet 服务
+.dsh-plugin/src/          Node half 纯逻辑（账本/活动/assets 守卫/配置/signals，零宿主依赖，可单测）
 .dsh-plugin/client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
 .dsh-plugin/client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
-.dsh-plugin/assets/  sprite sheet + manifest.json（静态服务；manifest↔文件由 verify-assets 门禁守护）
-originals/    生图参考原图（不参与服务）
-scripts/      门禁编排器与生成器；门禁清单的权威在 scripts/gates/run.mjs
-tests/        Node half 单测（node:test）
-docs/         文档；标准见 docs/AGENTS.md
-decisions/    决策记录；契约见 decisions/README.md
+.dsh-plugin/assets/       sprite sheet + manifest.json（静态服务；manifest↔文件由 verify-assets 门禁守护）
+originals/                生图参考原图（不参与服务）
+docs/preview/             状态动画预览 gif（由 scripts/make-previews.py 生成）
+scripts/                  门禁编排器与生成器（清单权威在 scripts/gates/run.mjs）+ 预览生成
+tests/                    Node half 单测（node:test）
+docs/                     文档；标准见 docs/AGENTS.md
+decisions/                决策记录；契约见 decisions/README.md
 ```
 
 ## 命令

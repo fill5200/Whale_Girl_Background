@@ -12,9 +12,47 @@ repository-plugins:
     - github:dsh-external/whale-girl#<commit>&path:/.dsh-plugin
 ```
 
-启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；状态条显示资历（等级/任务数）与最近共同回忆（hover 宠物显示），每 3s 轮询刷新。任务完成时宠物庆祝（页面关闭期间完成的任务重开后也会庆祝）、失败时短暂失落（`error`→`disappointed` 瞬发）、新会话时挥手欢迎；任一会话运行/思考时宠物沉思陪伴（`think`），等待批准时抬眼期待（`wait`）。初始配置/欢迎页（onboarding）宠物隐藏。
+启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；状态条显示资历（等级/任务数）与最近共同回忆（hover 宠物显示）。初始配置/欢迎页（onboarding）宠物隐藏。
 
-启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；状态条显示资历（等级/任务数）与最近共同回忆（hover 宠物显示），每 3s 轮询刷新。任务完成时宠物庆祝（页面关闭期间完成的任务重开后也会庆祝）、失败时短暂失落（`error`→`disappointed` 瞬发）、新会话时挥手欢迎；任一会话运行/思考时宠物沉思陪伴（`think`），等待批准时抬眼期待（`wait`）。初始配置/欢迎页（onboarding）宠物隐藏。
+## 支持的动作与触发事件
+
+| 你做什么 / 发生什么 | 宠物表现 |
+|---|---|
+| 拖拽宠物 | 被斜向拉扯（`drag`） |
+| 点击菜单 🍗 投喂 | 啃咬（`eat`）→ 开心（`joy`） |
+| 点击菜单 🎾 玩耍 | 抛接球（`play`）→ 开心（`joy`） |
+| 空闲 ≥60s | 打盹（`sleep`）；拖拽/投喂/玩耍/开菜单时醒过来（`wake`） |
+| 任务完成 / 升级 / 称号 | 举手欢呼（`celebrate`） |
+| 任务失败 / 请求出错 | 惊吓（`error`）→ 失落（`disappointed`） |
+| 新会话开始 | 挥手欢迎（`welcome`） |
+| 任一会话运行/思考中 | 沉思陪伴（`think`，偶尔`working`工作姿态） |
+| 等待批准 | 期待等待（`wait`） |
+| 周期游走 | 散步（`walk`） |
+| 常态 | 待机（`idle`，随机眨眼/转身） |
+
+完整状态机（优先级/转换语义/触发源）见 [docs/state-machine.md](docs/state-machine.md)。
+
+## 状态与动画预览
+
+| 状态 | 触发 | 预览 |
+|---|---|---|
+| `idle` | 常态待机（随机眨眼/转身） | ![idle](docs/preview/idle.gif) |
+| `working` | 会话思考期随机工作插曲 | ![working](docs/preview/working.gif) |
+| `celebrate` | 任务完成/升级/称号/回合完成 | ![celebrate](docs/preview/celebrate.gif) |
+| `error` | 任务失败/请求出错 | ![error](docs/preview/error.gif) |
+| `disappointed` | 失败后短时失落 | ![disappointed](docs/preview/disappointed.gif) |
+| `joy` | 投喂/玩耍后开心 | ![joy](docs/preview/joy.gif) |
+| `eat` | 点击投喂 | ![eat](docs/preview/eat.gif) |
+| `play` | 点击玩耍 | ![play](docs/preview/play.gif) |
+| `drag` | 拖拽中 | ![drag](docs/preview/drag.gif) |
+| `walk` | 周期游走 | ![walk](docs/preview/walk.gif) |
+| `sleep` | 空闲 ≥60s | ![sleep](docs/preview/sleep.gif) |
+| `wake` | 睡醒过渡 | ![wake](docs/preview/wake.gif) |
+| `welcome` | 新会话 | ![welcome](docs/preview/welcome.gif) |
+| `think` | 会话思考陪伴 | ![think](docs/preview/think.gif) |
+| `wait` | 等待批准 | ![wait](docs/preview/wait.gif) |
+
+预览由 [scripts/make-previews.py](scripts/make-previews.py) 从素材 sheet 合成（按 playback 帧序）；素材规格见 [docs/sprites-spec.md](docs/sprites-spec.md)。
 
 ## 配置（体验层）
 
@@ -31,50 +69,9 @@ whale-girl:
 
 完整配置项清单与语义层（XP/称号）封闭说明见 `.dsh-plugin/src/config.mjs`。**语义层不可配**（改 XP/称号阈值会破坏积累账本一致性，见决策记录）。
 
-## 角色（换角色零改代码）
+## 角色
 
-`assets/manifest.json` 是角色索引：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）+ `default`。换角色 = 新增角色目录 + manifest 条目 + 设置 localStorage `whale-girl:character`（或点菜单「🎭 换角色」按钮循环切换）；每个角色必须提供**全部 15 状态**的 sheet（素材全量契约，缺一即门禁拒收）。**完整开发指南（事件→动作映射、动作槽位、扩展边界、动手步骤）见 [docs/adding-a-character.md](docs/adding-a-character.md)**。旧格式顶层 `states`（sheet 平铺 `assets/`）兼容。
-
-## 开发循环
-
-```sh
-node scripts/gates/run.mjs          # 本地门禁组（链接/决策格式/assets manifest/工具 schema/生成物新鲜度）
-node --test 'tests/*.test.mjs'      # Node half 单测
-node scripts/build-client.mjs       # 改 .dsh-plugin/client/ 源码后重新生成 .dsh-plugin/client.js（勿手改产物）
-（官方 repository-plugin 安装：更新 config.yaml 的 ref 后 HMR 事务性换代，无需 CLI）
-```
-
-**进程边界（易错）**：`dsh registry enable` 在 CLI 进程注册，**已运行的 web 不感知**——disable/enable 对运行中实例无效。改 `.dsh-plugin/index.mjs`（Node half，含工具 schema）后需 **web 重启**（并检查日志无 `plugin tree failed to load`）；改 `.dsh-plugin/client/` 或 `assets/` 后重装（上例把新 `.dsh-plugin/client.js`/sheet 复制进安装目录）+ **刷新页面**即可（`serveBundle` 按请求读磁盘，页面刷新即取新文件）。
-
-## 素材（sprite sheet）契约
-
-宠物的图是**每状态一张横排帧图**（1~3 帧，由状态播放模式决定），由 `assets/manifest.json` 声明。**完整规格（15 状态、帧数、播放行为、逐状态生图提示、manifest 模板）见 [docs/sprites-spec.md](docs/sprites-spec.md)**；**状态机（状态清单/触发/优先级/扩展指引）见 [docs/state-machine.md](docs/state-machine.md)**，要点：
-
-- **生图要求**：**纯绿色 `#00FF00` 背景**（❌ 洋红/粉/紫底——与鲸鱼娘蓝紫粉配色在色域重叠，实测反复出残边；❌ 白/浅灰底；❌ 不要提示透明背景——生图模型会画假透明棋盘格，抠图死局）；每状态一张横排帧图，帧等宽同高；风格一致（参考 `originals/鲸鱼娘.png`，建议先出角色设定图锁定风格）。
-- **投放方式**：图放进 `assets/characters/<角色id>/`（多帧为横排单图），在 `assets/manifest.json` 对应角色的 `states` 加条目（含 `playback` 播放模式）——`verify-assets` 门禁保证引用的文件存在、多帧 PNG 尺寸符合帧数、playback 枚举合法、角色 id 合法（缺文件/尺寸不符/非法 id 即门禁红）。
-- **素材全量契约**：每个角色必须提供全部 15 状态 sheet（不再 emoji 兜底——缺失即门禁拒收）；每状态声明 `playback`（loop/pingpong/once/blink）决定帧如何播放。
-
-## 结构
-
-| 路径 | 作用 |
-|---|---|
-| `.dsh-plugin/index.mjs` | Node half：`pet_feed`/`pet_play`/`pet_status` 工具 + 状态/互动/assets/config 路由 + 事件记账（积累）+ `ctx.pet` 服务 |
-| `.dsh-plugin/src/pet-state.mjs` | 积累账本（等级/称号/回忆，零衰减零惩罚，纯函数） |
-| `.dsh-plugin/src/activity.mjs` | 任务活动推导（working/celebrate/error + 翻转任务 id，纯函数） |
-| `.dsh-plugin/src/persistence.mjs` | 账本持久化归一化（纯函数） |
-| `.dsh-plugin/src/assets.mjs` | assets 路由守卫（路径净化 + MIME，纯函数） |
-| `.dsh-plugin/src/config.mjs` | 体验层配置 schema + DEFAULTS（单一来源，settings 注册用） |
-| `.dsh-plugin/src/signals.mjs` | pet 服务信号器（订阅/广播/异常隔离，纯函数） |
-| `assets/characters/` | 角色 sheet（每角色一目录）+ manifest 角色索引（静态服务） |
-| `originals/` | 生图参考原图（不参与服务） |
-| `.dsh-plugin/client/.dsh-plugin/index.mjs` | client bundle 源码（构建产物 `.dsh-plugin/client.js` 勿手改） |
-| `.dsh-plugin/client/logic.mjs` | 状态选择纯函数（STATE_TABLE 声明式状态表 + EMOJI 兜底） |
-| `.dsh-plugin/client/character.mjs` | 角色清单解析（纯函数） |
-| `decisions/` | 决策记录；事件模型见 [implemented/feature/2026-08-08-accumulation-pet-model.md](decisions/implemented/feature/2026-08-08-accumulation-pet-model.md) |
-
-## 边界
-
-宠物只存在于 DSH Web GUI 页面内；关掉页面宠物即消失。真·OS 桌面宠物（脱离浏览器、置顶、托盘）不在本插件能力内（见决策记录的备选方案 B'）。
+菜单「🎭 换角色」循环切换角色（或设置 localStorage `whale-girl:character`）。每个角色提供**全部 15 状态**的素材（素材全量契约，见 [docs/sprites-spec.md](docs/sprites-spec.md)）；给 whale-girl 贡献新角色的完整指南（生图契约/槽位/动手步骤）见 [docs/adding-a-character.md](docs/adding-a-character.md)。
 
 ## 致谢
 
@@ -88,5 +85,3 @@ node scripts/build-client.mjs       # 改 .dsh-plugin/client/ 源码后重新生
 - 💡 **功能建议**（新动作/新互动/成长系统扩展）：提交 issue 描述你想要的行为——参考 [docs/state-machine.md](docs/state-machine.md)（状态机）与 [docs/growth-system.md](docs/growth-system.md)（成长系统）了解现状，说明你期待的效果。
 - 🎨 **新角色**：想贡献角色素材，见 [docs/adding-a-character.md](docs/adding-a-character.md) §贡献角色速览——只读契约（sprites-spec 状态总表 + 生图提示）、不读代码，产出 15 张 sheet + manifest 条目，本地跑 `verify-assets` 验收即可（换角色零改代码）。
 - 🔧 **代码贡献**：改动遵循仓库规范——每个非平凡改动带决策记录（`decisions/`）、门禁自证、单一性质提交（见 [docs/AGENTS.md](docs/AGENTS.md) 与根 [AGENTS.md](AGENTS.md)）。
-
-**提交前建议**：先跑 `node scripts/gates/run.mjs` 确认门禁通过；涉及 client 的改动跑 `node scripts/build-client.mjs --check`。
