@@ -10,7 +10,7 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt } from './logic.mjs'
+import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters, emojiFor } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
@@ -298,6 +298,9 @@ export function apply(ctx = {}) {
   // nextBlinkAt 决策触发时刻；idleBlinking=眨眼动画进行中（播完回帧 0 静止）。
   let idleBlinkAt = 0
   let idleBlinking = false
+  // 随机朝向转换：静态陪伴态（idle/think/wait）偶尔转身；nextFacingAt 决策触发时刻。
+  // flip 由 walk/drag 写入（动作间朝向连续），静态态在到点时翻转一次并刷新 sprite。
+  let facingAt = 0
   let lastFrameAt = 0
   // working 随机插曲（v3）：think 常态、偶尔随机插入 working；由 nextWorkingRhythm 决策，
   // 宿主只做「到点翻转」的薄执行。workingActive 喂 pickState；workingTimer 是翻转闹钟。
@@ -373,6 +376,20 @@ export function apply(ctx = {}) {
     sprite.style.backgroundPosition = `-${frameW * idx}px 0`
   }
 
+  // 静态态随机转身：只刷新当前 sprite 的 transform（scaleX flip），不动帧/背景。
+  // 用于 nextFacingAt 到点时翻转朝向——walk/drag 改 flip 时已有各自的刷新路径。
+  const applyFacing = () => {
+    if (!showingSprite) return
+    const cfg = stateOf(character, animState)
+    if (!cfg || !loaded.has(sheetKey(cfg.sheet))) return
+    const size = sheetSize.get(sheetKey(cfg.sheet))
+    if (!size || size.w <= 0 || size.h <= 0) return
+    const frameW = size.w / cfg.frames
+    const target = host.offsetWidth || 110
+    const scale = Math.min(target / frameW, target / size.h, 1)
+    sprite.style.transform = `scale(${scale}) scaleX(${flip})`
+  }
+
   const setState = (name) => {
     if (name === animState) return
     animState = name
@@ -380,6 +397,7 @@ export function apply(ctx = {}) {
     frameDirection = 1
     idleBlinkAt = 0 // 重进 idle 时重新排随机眨眼
     idleBlinking = false
+    facingAt = 0 // 重进静态态时重新排随机转身
     lastFrameAt = 0
     // 运动配方：manifest.motion → 舞台类（emoji 与 sprite 路径都生效；无 motion 时清类）。
     // 快照迭代再删：活 DOMTokenList 边遍历边删可能跳项（当前单类无碍，加固免踩）。
@@ -586,6 +604,19 @@ export function apply(ctx = {}) {
         showingSprite = true
         frame = 0
         lastFrameAt = 0
+      }
+      // 随机朝向转换：静态陪伴态（idle/think/wait）偶尔转身（flip 翻转），
+      // 与 walk/drag 的方向写入共享同一 flip——动作间朝向连续，静态态随机转身。
+      // 不转身的态（walk/drag/burst/transient）到点也重置排程，避免离开静态态后旧时刻误触发。
+      if (animState === 'idle' || animState === 'think' || animState === 'wait') {
+        if (facingAt === 0) facingAt = nextFacingAt({ now })
+        if (now >= facingAt) {
+          flip = -flip
+          applyFacing()
+          facingAt = nextFacingAt({ now })
+        }
+      } else if (facingAt !== 0) {
+        facingAt = 0 // 离开静态态：清排程（下次重进时重新随机）
       }
       // frames>1 才走帧循环；frames=1 的单图状态由 manifest.motion 的 CSS 动画驱动，不推进帧
       // （否则会推进到 -width 位置闪空白）。

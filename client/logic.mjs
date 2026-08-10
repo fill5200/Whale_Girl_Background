@@ -116,6 +116,10 @@ export const WORKING_MAX_DUR_MS = 6000   // 插曲最长时长
 export const BLINK_MIN_INTERVAL_MS = 3000 // 眨眼最小间隔
 export const BLINK_MAX_INTERVAL_MS = 9000 // 眨眼最大间隔
 
+// 随机朝向转换参数（L2 语义层，代码级）：静态陪伴态（idle/think/wait）偶尔转身。
+export const FACING_MIN_INTERVAL_MS = 10000 // 转身最小间隔
+export const FACING_MAX_INTERVAL_MS = 25000 // 转身最大间隔
+
 /**
  * idle 随机眨眼决策：常态睁眼静止，随机间隔触发一次眨眼（帧 0→1→2→0）。
  * @param {object} input
@@ -125,6 +129,19 @@ export const BLINK_MAX_INTERVAL_MS = 9000 // 眨眼最大间隔
  */
 export function nextBlinkAt({ now, random = Math.random }) {
   const wait = BLINK_MIN_INTERVAL_MS + random() * (BLINK_MAX_INTERVAL_MS - BLINK_MIN_INTERVAL_MS)
+  return now + wait
+}
+
+/**
+ * 随机朝向转换决策：静态陪伴态（idle/think/wait）偶尔转身（flip 翻转），
+ * 动作间朝向保持连续（walk/drag 的方向写入 flip 后，静态态沿用，不无谓翻转）。
+ * @param {object} input
+ * @param {number} input.now 当前时刻
+ * @param {() => number} [input.random] 随机源（测试注入；默认 Math.random）
+ * @returns {number} 下次转身触发时刻（now + 随机间隔）
+ */
+export function nextFacingAt({ now, random = Math.random }) {
+  const wait = FACING_MIN_INTERVAL_MS + random() * (FACING_MAX_INTERVAL_MS - FACING_MIN_INTERVAL_MS)
   return now + wait
 }
 

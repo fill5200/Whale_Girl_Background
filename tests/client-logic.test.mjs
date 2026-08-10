@@ -2,7 +2,7 @@
 // v2：零负反馈——无 hunger/mood 属性状态；情绪只由事件瞬发 + 互动喜悦。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, EMOJI, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt } from '../client/logic.mjs'
+import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, EMOJI, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from '../client/logic.mjs'
 
 const IDLE = { activity: { name: 'idle', until: 0 }, dragging: false, transient: null, sleeping: false, joyUntil: 0, now: 1000 }
 
@@ -249,5 +249,15 @@ test('nextBlinkAt：随机间隔内返回下次眨眼时刻（区间边界用注
   // 每次调用随机独立（不同随机源值 → 不同结果）
   const a = nextBlinkAt({ now: 0, random: () => 0.2 })
   const b = nextBlinkAt({ now: 0, random: () => 0.8 })
+  assert.notEqual(a, b)
+})
+
+test('nextFacingAt：随机转身间隔（区间边界用注入随机源）', () => {
+  const min = nextFacingAt({ now: 1000, random: () => 0 })
+  assert.equal(min, 1000 + 10000) // FACING_MIN_INTERVAL_MS
+  const max = nextFacingAt({ now: 1000, random: () => 0.999 })
+  assert.ok(max >= 1000 + 10000 && max <= 1000 + 25000) // FACING_MAX_INTERVAL_MS 区间
+  const a = nextFacingAt({ now: 0, random: () => 0.2 })
+  const b = nextFacingAt({ now: 0, random: () => 0.8 })
   assert.notEqual(a, b)
 })

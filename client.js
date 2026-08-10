@@ -82,8 +82,14 @@
   var WORKING_MAX_DUR_MS = 6e3;
   var BLINK_MIN_INTERVAL_MS = 3e3;
   var BLINK_MAX_INTERVAL_MS = 9e3;
+  var FACING_MIN_INTERVAL_MS = 1e4;
+  var FACING_MAX_INTERVAL_MS = 25e3;
   function nextBlinkAt({ now, random = Math.random }) {
     const wait = BLINK_MIN_INTERVAL_MS + random() * (BLINK_MAX_INTERVAL_MS - BLINK_MIN_INTERVAL_MS);
+    return now + wait;
+  }
+  function nextFacingAt({ now, random = Math.random }) {
+    const wait = FACING_MIN_INTERVAL_MS + random() * (FACING_MAX_INTERVAL_MS - FACING_MIN_INTERVAL_MS);
     return now + wait;
   }
   function nextWorkingRhythm({ now, sessionThink, working, random = Math.random }) {
@@ -415,6 +421,7 @@
     let frameDirection = 1;
     let idleBlinkAt = 0;
     let idleBlinking = false;
+    let facingAt = 0;
     let lastFrameAt = 0;
     let working = { active: false, until: 0 };
     let workingTimer = null;
@@ -465,6 +472,17 @@
     const applyFrame = (frameW, idx) => {
       sprite.style.backgroundPosition = `-${frameW * idx}px 0`;
     };
+    const applyFacing = () => {
+      if (!showingSprite) return;
+      const cfg2 = stateOf(character, animState);
+      if (!cfg2 || !loaded.has(sheetKey(cfg2.sheet))) return;
+      const size = sheetSize.get(sheetKey(cfg2.sheet));
+      if (!size || size.w <= 0 || size.h <= 0) return;
+      const frameW = size.w / cfg2.frames;
+      const target = host.offsetWidth || 110;
+      const scale = Math.min(target / frameW, target / size.h, 1);
+      sprite.style.transform = `scale(${scale}) scaleX(${flip})`;
+    };
     const setState = (name) => {
       if (name === animState) return;
       animState = name;
@@ -472,6 +490,7 @@
       frameDirection = 1;
       idleBlinkAt = 0;
       idleBlinking = false;
+      facingAt = 0;
       lastFrameAt = 0;
       for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
       const cfg2 = stateOf(character, name);
@@ -655,6 +674,16 @@
           showingSprite = true;
           frame = 0;
           lastFrameAt = 0;
+        }
+        if (animState === "idle" || animState === "think" || animState === "wait") {
+          if (facingAt === 0) facingAt = nextFacingAt({ now });
+          if (now >= facingAt) {
+            flip = -flip;
+            applyFacing();
+            facingAt = nextFacingAt({ now });
+          }
+        } else if (facingAt !== 0) {
+          facingAt = 0;
         }
         if (cfg2.frames > 1 && now - lastFrameAt >= 1e3 / cfg2.fps) {
           if (animState === "idle") {

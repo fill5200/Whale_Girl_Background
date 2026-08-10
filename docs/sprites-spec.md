@@ -70,6 +70,10 @@
 | `think` | 任一会话运行中（sessions 订阅，陪伴底座） | 1 | `float` | ✓ | 沉思陪伴（托腮望向远处，上下浮动） |
 | `wait` | 任一会话等待批准（sessions 订阅，陪伴底座） | 1 | `wiggle` | ✓ | 等待回应（前倾看向观众，左右摇摆） |
 
+### 朝向（flip）
+
+素材本身无朝向（内容水平居中），朝向由 client 的 `flip`（`scaleX` 翻转）表达。方向写入点：**walk**（按移动方向，随机左右）、**drag**（按拖拽位移方向）；静态陪伴态（`idle`/`think`/`wait`）在 walk/drag 结束后沿用其方向（**动作间朝向连续**，不无谓跳回默认），并**随机转身**（`nextFacingAt`，间隔 10-25s，见 [state-machine.md](state-machine.md)）。
+
 优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > 回合完成 `celebrate`（client 本地窗口）> `working`（随机插曲）> `think` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 
 ## manifest 模板（角色索引；whale-girl 13 个有 sheet 状态）
