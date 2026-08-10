@@ -11,7 +11,7 @@ whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 +
 ## 目录布局
 
 ```
-.dsh-plugin/index.mjs     Node half 入口：pet 工具 + state/interact/assets/ui 路由 + 事件记账 + ctx.pet 服务
+.dsh-plugin/index.mjs     Node half 入口：state/interact/assets/ui 路由 + 事件记账 + ctx.pet 服务
 .dsh-plugin/src/          Node half 纯逻辑（账本/活动/assets 守卫/配置/signals，零宿主依赖，可单测）
 .dsh-plugin/client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
 .dsh-plugin/client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）

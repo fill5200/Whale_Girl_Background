@@ -1,5 +1,5 @@
 // whale-girl Node half：积累型账本宿主 + assets 静态服务 + 活动/事件推导 + 状态持久化。
-// 契约：官方 repository-plugin 的 dsh.entry（完整 Cordis 插件）；工具经 ctx.tools.register 注册；
+// 契约：官方 repository-plugin 的 dsh.entry（完整 Cordis 插件）；交互经 httpServer 路由；
 // 路由端点单一来源 src/routes.mjs（verify-routes-sync 门禁守护，改前缀只改那里）；
 // activity 是派生字段，不写入账本（账本保持纯函数积累，见 src/pet-state.mjs）。
 // 事件机制（v2，零负反馈）：任务完成 → 资历 +XP/称号/回忆 + celebrate；失败 → 只计数 +
@@ -21,7 +21,7 @@ import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 
 export const name = 'whale-girl'
-export const inject = ['tools', 'tasks', 'agents']
+export const inject = ['tasks', 'agents']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
 import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX } from './src/routes.mjs'
 export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX }
@@ -242,59 +242,9 @@ export function apply(ctx) {
         }
         scheduleSave()
       }),
-      ctx.tools.register({
-        name: 'pet_feed',
-        description: '投喂桌面宠物（社交娱乐）：纯乐趣互动，宠物会回话，不影响资历。',
-        parameters: {},
-        output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
-        execute: async () => applyAction(state, 'feed', configRef.replies).body.reply,
-      }),
-      ctx.tools.register({
-        name: 'pet_play',
-        description: '陪桌面宠物玩耍（社交娱乐）：纯乐趣互动，宠物会回话，不影响资历。',
-        parameters: {},
-        output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
-        execute: async () => applyAction(state, 'play', configRef.replies).body.reply,
-      }),
-      ctx.tools.register({
-        name: 'pet_status',
-        description: '查看桌面宠物的资历（等级/经验/任务数/称号/最近共同回忆）。',
-        parameters: {},
-        output: {
-          // 注意：工具 schema 须为合法 JSON Schema——object 必须显式声明 additionalProperties；
-          // 这里全部扁平化为原始类型字段（见 verify-tool-schemas 门禁）。
-          schema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              level: { type: 'integer', description: '资历等级' },
-              xp: { type: 'integer', description: '累计资历经验' },
-              tasksDone: { type: 'integer', description: '完成的任务数' },
-              failures: { type: 'integer', description: '失败的任务数' },
-              sessions: { type: 'integer', description: '开启的会话数' },
-              activeMs: { type: 'integer', description: '累计活跃毫秒' },
-              titles: { type: 'string', description: '已解锁称号（顿号分隔）' },
-              memory: { type: 'string', description: '最近共同事件（换行分隔）' },
-            },
-          },
-          // render 消费 execute 的扁平返回（schema 扁平化的同一面）——不能用 describe(state)，
-          // 后者期望 state 形状（state.titles.map/stats），对扁平对象抛 TypeError。
-          render: (_args, value) => [{
-            type: 'text',
-            text: `资历 Lv.${value.level}（${value.xp} XP）· 完成 ${value.tasksDone} 个任务 · ${value.titles ? `称号「${value.titles}」` : '尚无称号'}`,
-          }],
-        },
-        execute: async () => ({
-          level: state.level,
-          xp: state.xp,
-          tasksDone: state.stats.tasksDone,
-          failures: state.stats.failures,
-          sessions: state.stats.sessions,
-          activeMs: state.stats.activeMs,
-          titles: state.titles.map(titleName).join('、') || '无',
-          memory: state.memory.join('\n') || '还没有共同回忆',
-        }),
-      }),
+      
+      
+      
       // httpServer 服务存在时（web 模式）：注册 state/interact/config/assets/ui 路由 + 页面注入。
       ...(httpServer !== undefined ? [
       httpServer.register({
