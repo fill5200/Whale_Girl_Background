@@ -76,7 +76,7 @@
 
 方向写入点：**walk**（按移动方向）、**drag**（按拖拽位移方向）；静态陪伴态（`idle`/`think`/`wait`）沿用其方向（**动作间朝向连续**，不无谓跳回默认），并**随机转身**（`nextFacingAt`，间隔 10-25s，见 [state-machine.md](state-machine.md)）。
 
-**已知素材缺陷**：`joy`（帧0 偏右/帧1 偏左，头比 0.5 vs 2.06）、`welcome`（0.63 vs 1.35）**帧内朝向不一致**（AI 生图抖动）——镜像无法修复（只对单帧正确），需重绘统一为朝左。
+**朝向统一状态**（2026-08-09 审计后逐帧镜像）：walk/eat/drag/joy/play/wake/welcome 已镜像为朝左；余下状态本就朝左。**生图时人物一律朝左**——新状态/新角色不遵守会在审计时暴露（帧内左右比偏离 1 即提示）。
 
 优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > 回合完成 `celebrate`（client 本地窗口）> `working`（随机插曲）> `think` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 

@@ -9,7 +9,7 @@ Status: implemented
 ## Decision
 
 - **素材统一朝左基准（角色契约，全角色适用）**：所有状态素材人物默认朝左（flip=1 显示朝左、flip=-1 镜像显示朝右）。生图提示模板加「人物朝向一律朝左」；代码 flip 以朝左为基准（walk 向右走 flip=-1、向左走 flip=1；drag 向左拖 flip=1、向右拖 flip=-1；静态态随机转身 flip 翻转）。**代码不依赖具体角色朝向**——第二个角色遵守素材契约即零代码改动（解耦）。
-- **素材修正**：walk/eat 逐帧镜像为偏左（帧内一致，脚本处理）；joy/welcome 帧内朝向不一致（AI 生图抖动）镜像无效，列入重绘待办（sprites-spec 标注）。
+- **素材修正**：walk/eat/drag/joy/play/wake/welcome 逐帧镜像为偏左（用户肉眼审计清单 + 像素复核镜像精确生效）；所有状态统一朝左。
 - **动作间朝向连续**：flip 是模块级状态，walk/drag 的方向写入后，静态态（idle/think/wait）沿用其值渲染（setState 的 showSprite 读当前 flip）——不无谓跳回默认方向。
 - **静态态随机转身**：新增纯函数 `nextFacingAt({ now, random })`（间隔 10-25s，L2 语义层代码级）决策转身时刻；tick 里静态态（idle/think/wait）到点时 `flip = -flip` 并 `applyFacing()` 刷新当前 sprite transform（不动帧/背景）；离开静态态清排程。
 - **`applyFacing` 刷新封装**：复用 showSprite 的 scale 计算，只更新 transform。
@@ -27,7 +27,7 @@ Status: implemented
 
 ## Consequences
 
-- 素材统一朝左：walk/eat 已镜像；joy/welcome 帧内不一致需重绘（sprites-spec 已标注）；代码 flip 基准改为朝左（walk/drag 方向映射取反）。
+- 素材统一朝左：walk/eat/drag/joy/play/wake/welcome 已逐帧镜像；代码 flip 基准改为朝左（walk/drag 方向映射取反）。
 - 朝向连续：walk 朝左停下 → idle/think 保持朝左；drag 方向延续；静态态随机转身（10-25s）。
 - 第二个角色零代码接入朝向（只需素材朝左）。
 - 测试：`nextFacingAt` 确定性测试（注入随机源，区间边界）；单测 102 条全绿，14 门禁全过。
