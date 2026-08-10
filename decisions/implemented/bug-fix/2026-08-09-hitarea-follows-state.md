@@ -4,15 +4,17 @@ Status: implemented
 
 ## Problem
 
-两轮问题。**第一轮**：热区由 `contentBox`（全部状态不透明像素并集）驱动，被宽幅状态撑到 88×97px。**第二轮（用户实测纠偏）**：改逐状态后仍「think 左侧大片空白可点击、flip 后仍在左侧」——headless 实测热区 101.7×96.2px（应 85.5px）。**真正根因**：`analyzeSheet` 扫描**整张 sheet** 的不透明像素范围——多帧 sheet（如 idle 768px 宽）把第 2..N 帧的内容跨度计入 bbox（w=0.925），热区被撑到接近 sheet 全宽（角色只在帧 0 位置，右侧大片空白）。flip 后角色镜像到右侧，但热区定位未镜像——错位仍在。
+三轮问题。**第一轮**：热区由 `contentBox`（全部状态不透明像素并集）驱动，被宽幅状态撑到 88×97px。**第二轮**：改逐状态后仍「think 左侧大片空白可点击、flip 后仍在左侧」——`analyzeSheet` 扫描**整张 sheet**，多帧 sheet（idle 768px 宽）把第 2..N 帧内容跨度计入 bbox（w=0.925），热区被撑到 sheet 全宽（101.7px 实测）。**第三轮（用户纠偏：怀疑非素材按钮/消息框）**：修 analyzeSheet 后用户仍「没有变化」——DOM 探针（模拟页 elementFromPoint）证实：**交互事件绑在 stage（110×110 全尺寸），hitarea 收窄到内容区后 stage 的四周透明仍暴露且可点**（宿主左缘+5px → pet-stage，且 stage 有 pointerdown 监听触发拖拽/菜单）——「大片空白可点击」的真实来源是 stage 全尺寸承载交互，而非素材。
 
 ## Decision
 
+- **交互统一由 hitarea 承载**：5 个 pointer 事件（down/move/up/cancel/lostpointercapture）从 stage 改绑 hitarea；stage 设 `pointer-events: none`（纯视觉层，不再拦事件）——点击只在内容 bbox 内触发拖拽/互动，四周透明完全不可点。
 - **热区逐状态 bbox**：`contentBox`（全局并集）替换为 `stateBoxes`（`Map<stateName, bbox>`）。
-- **analyzeSheet 只取首帧**：离屏 canvas 只裁出帧 0 分析（`drawImage` 限定首帧区域），bbox 以单帧为单位——修复多帧 sheet 撑宽 bug。
-- **热区按内容实际位置对齐**：`offX = size * box.x`（不再假设居中），flip 时镜像 `offX = size * (1 - box.x - box.w)`；flip 变化的三处（转身/行走方向/拖拽方向）补 `applyHitArea()`——热区与角色视觉严格同步。
+- **analyzeSheet 只取首帧**：离屏 canvas 只裁出帧 0 分析，bbox 以单帧为单位——修复多帧 sheet 撑宽 bug。
+- **热区按内容实际位置对齐**：`offX = size * box.x`，flip 时镜像 `offX = size * (1 - box.x - box.w)`；flip 变化三处（转身/行走/拖拽）补 `applyHitArea()`。
+- **cursor 移到 hitarea**：host 不再显示 grab 光标（避免空白区 hover 误导），仅内容区显示可交互光标。
 - 素材本身不动（0 边界会破坏「帧等宽同高 + background-position 切帧」契约，且 88% 内容占比给动画留呼吸空间）。
-- 热区尺寸保留 `Math.max(40, ...)` 下限（防止过小难点）。
+- 热区尺寸保留 `Math.max(40, ...)` 下限。
 
 ## Alternatives considered
 
@@ -26,6 +28,6 @@ Status: implemented
 
 ## Consequences
 
-- 热区跟随状态 + 首帧 bbox + flip 镜像对齐：headless 实测 walk 热区从 101.7px（bug 撑宽）修正为 61px（内容实际 55% 宽），位置按内容对齐（left=24.9px=110×box.x）——「大片空白可点击」消除。
+- 交互统一由 hitarea（贴合内容 bbox）承载：headless 实测宿主左缘+5px → stage（旧）→ DIV 无监听（新，点击无响应）；hitarea 85.5×96.25px 正确收窄。walk 热区 101.7→61px。
 - 每个状态自身的透明边缘（内容占比 88% 契约）仍让热区略大于角色轮廓——属预期（素材契约给动画留空间），非缺陷。
 - 纯 client 改动：重装 + 刷新生效，无需重启 web。

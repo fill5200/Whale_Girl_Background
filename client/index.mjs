@@ -34,12 +34,12 @@ const DRAG_RELEASE_MS = 1500
 const CSS = `
 [data-dsh-pet] { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
   width: var(--pet-size, 110px); height: var(--pet-size, 110px);
-  font-family: system-ui, sans-serif; user-select: none; cursor: grab; touch-action: none;
+  font-family: system-ui, sans-serif; user-select: none; touch-action: none;
   opacity: var(--pet-opacity, 1); }
 [data-dsh-pet] .pet-stage { position: relative; width: var(--pet-size, 110px); height: var(--pet-size, 110px); display: grid; place-items: center;
   font-size: calc(var(--pet-size, 110px) * 0.4); line-height: 1; text-align: center;
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.25));
-  /* 视觉层与 hitarea 双命中：stage 保持可指针（drag 兜底），hitarea 做热区收窄。 */
+  pointer-events: none; /* 视觉层不拦事件——交互统一由 hitarea（贴合内容 bbox）承载，四周透明不可点 */
 [data-dsh-pet] .pet-effects { position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
@@ -846,7 +846,7 @@ export function apply(ctx = {}) {
 
   // capture 只在越过拖拽阈值后启用：纯点击不捕获，菜单按钮的 click 正常派发。
   // 热区只绑舞台本体（110×110）：状态条/菜单区不参与拖拽与点击切换，减少误触与遮挡。
-  stage.addEventListener('pointerdown', (e) => {
+  hitarea.addEventListener('pointerdown', (e) => {
     pressed = true
     dragging = false
     moved = false
@@ -858,10 +858,10 @@ export function apply(ctx = {}) {
     offsetX = e.clientX - host.offsetLeft
     offsetY = e.clientY - host.offsetTop
   })
-  stage.addEventListener('pointermove', (e) => {
+  hitarea.addEventListener('pointermove', (e) => {
     if (!pressed) return
     if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) {
-      if (!moved) stage.setPointerCapture(e.pointerId)
+      if (!moved) hitarea.setPointerCapture(e.pointerId)
       moved = true
       dragging = true
       // 拖拽打断当前互动：清掉 eat/play/wake 瞬发与互动喜悦——释放后回到拖拽前
@@ -889,10 +889,10 @@ export function apply(ctx = {}) {
     host.style.right = 'auto'
     host.style.bottom = 'auto'
   })
-  stage.addEventListener('pointerup', (e) => {
+  hitarea.addEventListener('pointerup', (e) => {
     pressed = false
     dragging = false
-    if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId)
+    if (hitarea.hasPointerCapture(e.pointerId)) hitarea.releasePointerCapture(e.pointerId)
     if (moved) {
       savePos() // 拖拽结束落盘位置
       dragReleaseUntil = Date.now() + DRAG_RELEASE_MS // 放下缓冲：短暂回 idle
@@ -901,14 +901,14 @@ export function apply(ctx = {}) {
     // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
     if (!moved && !e.target.closest('button')) toggleMenu()
   })
-  stage.addEventListener('pointercancel', () => {
+  hitarea.addEventListener('pointercancel', () => {
     pressed = false
     dragging = false
     moved = false
     layoutStatus()
   })
   // 捕获被系统强制释放（元素移除/其它元素抢捕获）时复位，防拖拽状态卡死。
-  stage.addEventListener('lostpointercapture', () => {
+  hitarea.addEventListener('lostpointercapture', () => {
     pressed = false
     dragging = false
     moved = false
