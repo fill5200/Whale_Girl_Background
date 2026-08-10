@@ -52,12 +52,15 @@ def main():
         fw = sheet.width // cfg['frames']
         seq = frame_sequence(cfg['frames'], cfg['playback'])
         duration = max(60, int(1000 / cfg['fps']))
-        frames = [sheet.crop((fw * idx, 0, fw * (idx + 1), sheet.height)) for idx in seq]
+        # GIF 透明是 1-bit（半透明/透明像素量化后出黑边/黑底）——预览统一白底，
+        # RGBA 帧先合成到白底再存 GIF（README 表格在深浅主题下都干净）。
+        frames = []
+        for idx in seq:
+            f = sheet.crop((fw * idx, 0, fw * (idx + 1), sheet.height)).convert('RGBA')
+            bg = Image.new('RGBA', f.size, (255, 255, 255, 255))
+            frames.append(Image.alpha_composite(bg, f).convert('RGB'))
         out = os.path.join(OUT_DIR, f'{name}.gif')
-        frames[0].save(
-            out, save_all=True, append_images=frames[1:],
-            duration=duration, loop=0, disposal=2, transparency=0,
-        )
+        frames[0].save(out, save_all=True, append_images=frames[1:], duration=duration, loop=0, disposal=2)
         previews[name] = out
         print(f'[ok] {name}: {len(seq)} 帧 @ {duration}ms -> {os.path.basename(out)}')
     # 输出 README 表格用的状态清单
