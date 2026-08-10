@@ -4,17 +4,16 @@ Status: implemented
 
 ## Problem
 
-四轮问题。**第一轮**：热区由 `contentBox`（全部状态不透明像素并集）驱动，被宽幅状态撑到 88×97px。**第二轮**：改逐状态后仍「大片空白可点击」——`analyzeSheet` 扫描**整张 sheet**，多帧 sheet 把第 2..N 帧内容跨度计入 bbox（w=0.925），热区被撑到 sheet 全宽。**第三轮**：修 analyzeSheet 后仍「没有变化」——DOM 探针证实交互事件绑在 stage（110×110 全尺寸），hitarea 收窄后 stage 四周透明仍暴露可点。**第四轮（用户纠偏：左上角随宠物移动）**：改绑 hitarea 后仍「宠物左上角大片空白可点击」——**sprite 是 256px 布局盒，`transform: scale(0.43)` 仅视觉缩放，布局盒仍 256px 居中溢出 stage 73px/侧**；sprite 无 `pointer-events: none`，溢出区（角色左上角等）拦截事件。
+五轮问题。**第一轮**：热区由 `contentBox`（全部状态不透明像素并集）驱动，被宽幅状态撑到 88×97px。**第二轮**：改逐状态后仍「大片空白可点击」——`analyzeSheet` 扫描**整张 sheet**，多帧 sheet 把第 2..N 帧内容跨度计入 bbox（w=0.925），热区被撑到 sheet 全宽。**第三轮**：修 analyzeSheet 后仍「没有变化」——DOM 探针证实交互事件绑在 stage（110×110 全尺寸），hitarea 收窄后 stage 四周透明仍暴露可点。**第四轮**：改绑 hitarea 后仍「宠物左上角大片空白可点击」——sprite 是 256px 布局盒 transform 仅视觉缩放，溢出 stage 73px/侧，sprite 无 `pointer-events: none` 拦截事件。**第五轮（用户反馈：整个 pet 无交互点）**：CDP 真实浏览器实测——hitarea computed `position: static`、`z-index: auto`、`cursor: auto`——**`.pet-hitarea` 的 CSS 类规则全部失效**（宿主清理/覆盖注入的 style 标签，同 status/menu 已知问题，但 hitarea 未做 JS 内联），hitarea 掉出文档流（宿主下方 110px），整个 pet 无交互点。
 
 ## Decision
 
-- **sprite 设 `pointer-events: none`**：视觉层（与 stage 一致）不拦事件——256px 溢出盒不再产生可点击区域，交互统一由 hitarea（贴合内容 bbox）承载。
-- **交互统一由 hitarea 承载**：5 个 pointer 事件（down/move/up/cancel/lostpointercapture）从 stage 改绑 hitarea；stage 设 `pointer-events: none`。
-- **热区逐状态 bbox**：`contentBox`（全局并集）替换为 `stateBoxes`（`Map<stateName, bbox>`）。
-- **analyzeSheet 只取首帧**：离屏 canvas 只裁出帧 0 分析，bbox 以单帧为单位。
-- **热区按内容实际位置对齐**：`offX = size * box.x`，flip 时镜像；flip 变化三处补 `applyHitArea()`。
-- **cursor 移到 hitarea**；热区尺寸保留 `Math.max(40, ...)` 下限。
+- **hitarea 关键样式 JS 内联**：`position: absolute; cursor: grab; touch-action: none; z-index: 3` 在创建时内联（不依赖 CSS 注入——宿主环境可能覆盖/清理 style 标签，与 status/menu 同款规避）；尺寸/定位由 applyHitArea 更新。
+- **sprite 设 `pointer-events: none`**：256px 溢出盒不再产生可点击区域。
+- **交互统一由 hitarea 承载**：5 个 pointer 事件从 stage 改绑 hitarea；stage 设 `pointer-events: none`。
+- **热区逐状态 bbox** + **analyzeSheet 只取首帧** + **热区按内容实际位置对齐（flip 镜像）** + **cursor 移到 hitarea**。
 - 素材本身不动（0 边界会破坏「帧等宽同高 + background-position 切帧」契约，且 88% 内容占比给动画留呼吸空间）。
+- 热区尺寸保留 `Math.max(40, ...)` 下限。
 
 ## Alternatives considered
 
@@ -28,6 +27,7 @@ Status: implemented
 
 ## Consequences
 
-- 交互统一由 hitarea（贴合内容 bbox）承载；sprite/stage 溢出区禁指针：模拟页验证角色左上角溢出区（-20,-20）→ HTML 无命中，热区中心可交互。walk 热区 101.7→61px。
+- 交互统一由 hitarea（贴合内容 bbox，关键样式 JS 内联防宿主清理）承载：CDP 真实浏览器实测热区中心命中 hitarea、点击触发；walk 热区 101.7→61px。
+- 教训：CSS 注入的 style 标签可能被宿主覆盖/清理——所有承载交互的元素（status/menu/hitarea）关键样式必须 JS 内联，不能只靠 CSS 类。
 - 每个状态自身的透明边缘（内容占比 88% 契约）仍让热区略大于角色轮廓——属预期（素材契约给动画留空间），非缺陷。
 - 纯 client 改动：重装 + 刷新生效，无需重启 web。

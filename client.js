@@ -347,6 +347,7 @@
     effects.className = "pet-effects";
     const hitarea = document.createElement("div");
     hitarea.className = "pet-hitarea";
+    hitarea.style.cssText = `position: absolute; inset: 0; cursor: grab; touch-action: none; z-index: 3; border-radius: 8px;`;
     effects.appendChild(status);
     host.append(effects, stage, hitarea, menu);
     const setStatusVisible = (visible) => {

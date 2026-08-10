@@ -205,6 +205,9 @@ export function apply(ctx = {}) {
   // 拖拽/点击热区 = 角色实际轮廓，四周透明边缘不可点。
   const hitarea = document.createElement('div')
   hitarea.className = 'pet-hitarea'
+  // 关键样式 JS 内联（不依赖 CSS 注入——宿主环境可能覆盖/清理 style 标签，内联保证生效；
+  // 否则 hitarea 变 static 掉出文档流，整个 pet 无交互点）。尺寸/定位由 applyHitArea 更新。
+  hitarea.style.cssText = `position: absolute; inset: 0; cursor: grab; touch-action: none; z-index: 3; border-radius: 8px;`
   // 状态卡放入 effects 层：effects 与 stage 同尺寸同位置（host 内 0,0,110,110），
   // 状态卡 top:calc(100%+18px) 相对 effects = 角色下方 18px，与角色视觉对齐（不遮挡）。
   effects.appendChild(status)
