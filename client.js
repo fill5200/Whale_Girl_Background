@@ -490,6 +490,7 @@
       blinkActive = false;
       facingAt = 0;
       lastFrameAt = 0;
+      applyHitArea();
       for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
       const cfg2 = stateOf(character, name);
       const motion = cfg2?.motion;
@@ -506,22 +507,11 @@
         stage.style.opacity = "1";
       }));
     };
-    let contentBox = null;
-    const mergeContentBox = (box) => {
-      if (contentBox === null) {
-        contentBox = { ...box };
-        return;
-      }
-      const nx = Math.min(contentBox.x, box.x);
-      const ny = Math.min(contentBox.y, box.y);
-      const nr = Math.max(contentBox.x + contentBox.w, box.x + box.w);
-      const nb = Math.max(contentBox.y + contentBox.h, box.y + box.h);
-      contentBox = { x: nx, y: ny, w: nr - nx, h: nb - ny };
-    };
+    let stateBoxes = /* @__PURE__ */ new Map();
     const applyHitArea = () => {
       if (hitarea === null) return;
       const size = parseFloat(getComputedStyle(host).getPropertyValue("--pet-size")) || 110;
-      const box = contentBox ?? { x: 0, y: 0, w: 1, h: 1 };
+      const box = stateBoxes.get(animState) ?? { x: 0, y: 0, w: 1, h: 1 };
       const hitW = Math.max(40, size * box.w);
       const hitH = Math.max(40, size * box.h);
       const offX = (size - hitW) / 2;
@@ -532,7 +522,7 @@
       hitarea.style.height = `${hitH}px`;
     };
     const resetContentBox = () => {
-      contentBox = null;
+      stateBoxes = /* @__PURE__ */ new Map();
     };
     const analyzeSheet = (img, frames) => {
       const canvas = document.createElement("canvas");
@@ -567,7 +557,7 @@
         sheetSize.set(sheetKey(cfg2.sheet), { w: img.naturalWidth, h: img.naturalHeight });
         loaded.add(sheetKey(cfg2.sheet));
         const box = analyzeSheet(img, cfg2.frames);
-        if (box !== null) mergeContentBox(box);
+        if (box !== null) stateBoxes.set(name, box);
         applyHitArea();
         resolve();
       };
@@ -614,7 +604,7 @@
             nextSize.set(`${id}:${cfg2.sheet}`, { w: img.naturalWidth, h: img.naturalHeight });
             nextLoaded.add(`${id}:${cfg2.sheet}`);
             const box = analyzeSheet(img, cfg2.frames);
-            if (box !== null) mergeContentBox(box);
+            if (box !== null) stateBoxes.set(n, box);
             applyHitArea();
             resolve();
           };

@@ -399,6 +399,7 @@ export function apply(ctx = {}) {
     blinkActive = false
     facingAt = 0 // 重进静态态时重新排随机转身
     lastFrameAt = 0
+    applyHitArea() // 热区跟随当前状态（各状态内容 bbox 独立，切换即收窄/放宽）
     // 运动配方：manifest.motion → 舞台类（sprite 与占位路径都生效；无 motion 时清类）。
     // 快照迭代再删：活 DOMTokenList 边遍历边删可能跳项（当前单类无碍，加固免踩）。
     for (const cls of [...stage.classList]) if (cls.startsWith('pet-motion-')) stage.classList.remove(cls)
@@ -418,27 +419,16 @@ export function apply(ctx = {}) {
   }
 
   // ---- 资产加载 ----
-  // 角色内容 bbox（0-1 归一化比例）：所有状态 sheet 的不透明像素并集——
-  // 驱动点击热区贴合角色实际轮廓（四周透明边缘不算可点击，见手测反馈）。
-  // 初始为「空」而非「全图」：合并首个真实 bbox 时不被默认值污染。
-  let contentBox = null
-  const mergeContentBox = (box) => {
-    if (contentBox === null) {
-      contentBox = { ...box }
-      return
-    }
-    const nx = Math.min(contentBox.x, box.x)
-    const ny = Math.min(contentBox.y, box.y)
-    const nr = Math.max(contentBox.x + contentBox.w, box.x + box.w)
-    const nb = Math.max(contentBox.y + contentBox.h, box.y + box.h)
-    contentBox = { x: nx, y: ny, w: nr - nx, h: nb - ny }
-  }
-  // 应用点击热区：hitarea 层贴合角色内容 bbox（--pet-hit 驱动）。
-  // 角色内容约占帧的 74-90%（四周透明边缘），热区收窄到内容——不点透明区。
+  // 每状态内容 bbox（0-1 归一化比例）：驱动点击热区贴合「当前显示状态」的实际轮廓——
+  // 热区跟随状态切换实时收窄（各状态内容占比 55-88% 差异大：walk 横向仅 55%，
+  // 若用全部状态并集会因宽幅状态撑大热区；逐状态 bbox 让 idle 贴合 idle、walk 贴合 walk）。
+  // 初始为 null：未分析完成时热区回退全图。
+  let stateBoxes = new Map() // stateName → { x, y, w, h }
   const applyHitArea = () => {
     if (hitarea === null) return
     const size = parseFloat(getComputedStyle(host).getPropertyValue('--pet-size')) || 110
-    const box = contentBox ?? { x: 0, y: 0, w: 1, h: 1 } // 未分析完成时用全图
+    // 当前显示状态的 bbox；未就绪时回退全图（不点空）。
+    const box = stateBoxes.get(animState) ?? { x: 0, y: 0, w: 1, h: 1 }
     const hitW = Math.max(40, size * box.w)
     const hitH = Math.max(40, size * box.h)
     const offX = (size - hitW) / 2 // 内容居中于 host
@@ -450,7 +440,7 @@ export function apply(ctx = {}) {
   }
   // 换角色/重载时重置内容 bbox（新角色的轮廓不同）。
   const resetContentBox = () => {
-    contentBox = null
+    stateBoxes = new Map()
   }
 
   // 用离屏 canvas 读 sheet 的不透明像素范围（仅首帧采样，性能可接受）。
@@ -486,7 +476,7 @@ export function apply(ctx = {}) {
       sheetSize.set(sheetKey(cfg.sheet), { w: img.naturalWidth, h: img.naturalHeight })
       loaded.add(sheetKey(cfg.sheet))
       const box = analyzeSheet(img, cfg.frames)
-      if (box !== null) mergeContentBox(box)
+      if (box !== null) stateBoxes.set(name, box) // 每状态独立 bbox——热区跟随当前状态
       applyHitArea()
       resolve()
     }
@@ -536,7 +526,7 @@ export function apply(ctx = {}) {
           nextSize.set(`${id}:${cfg.sheet}`, { w: img.naturalWidth, h: img.naturalHeight })
           nextLoaded.add(`${id}:${cfg.sheet}`)
           const box = analyzeSheet(img, cfg.frames)
-          if (box !== null) mergeContentBox(box)
+          if (box !== null) stateBoxes.set(n, box) // 新角色每状态独立 bbox
           applyHitArea()
           resolve()
         }
