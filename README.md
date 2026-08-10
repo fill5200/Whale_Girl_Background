@@ -15,12 +15,19 @@
 
 ## 安装
 
-官方 repository-plugin 格式（`.dsh-plugin/` + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（**ref** = 仓库提交的完整哈希，如 `6f6d3f2ec283…`——安装以 ref 锁定，缓存按 ref 不可变，建议用提交哈希而非分支/tag 引用）：
+官方 repository-plugin 格式（`.dsh-plugin/` + `package.json#dsh.entry`）。在 `$DSH_HOME/cordis.patch.yml` 加入（**ref** = 仓库提交的完整哈希，如 `6f6d3f2ec283…`——安装以 ref 锁定，缓存按 ref 不可变，建议用提交哈希而非分支/tag 引用）：
 
 ```yaml
 repository-plugins:
   repositories:
     - github:dsh-external/whale-girl#6f6d3f2ec283&path:/.dsh-plugin
+```
+
+**安装前置（官方包未发布期）**：`@deepseek-ai/dsh-repository-plugin` 是 `private: true`，RepositoryCache 的 `pnpm install` 会因它 404——loader 又硬校验 prepack/devDependencies 声明，不能移除。安装前先预填充缓存，让 loader 跳过安装（见 [decisions/implemented/process/2026-08-10-private-install-bridge.md](decisions/implemented/process/2026-08-10-private-install-bridge.md)）：
+
+```sh
+node scripts/prepare-cache.mjs            # 默认 ~/.dsh，ref = 当前仓库 HEAD
+# 或 node scripts/prepare-cache.mjs --home=<隔离 home> --ref=<与 config 行一致的 commit>
 ```
 
 启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 喂食 / 🎾 玩耍），拖拽可移动；hover 显示状态条（资历等级/任务数/最近共同回忆）。初始配置/欢迎页（onboarding）宠物隐藏。
