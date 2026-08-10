@@ -198,7 +198,7 @@
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   cursor: grab; touch-action: none; z-index: 3; border-radius: 8px; }
-[data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; pointer-events: none; /* \u89C6\u89C9\u5C42\uFF1A256px \u5E03\u5C40\u76D2 transform \u7F29\u653E\u540E\u6EA2\u51FA stage\uFF0C\u987B\u7981\u6307\u9488\u9632\u6EA2\u51FA\u533A\u53EF\u70B9 */ }
+[data-dsh-pet] .pet-sprite { pointer-events: none; /* \u89C6\u89C9\u5C42\uFF1A\u5B9A\u4F4D/\u5C3A\u5BF8/transform \u7531 JS \u5185\u8054\uFF08\u5BBF\u4E3B\u53EF\u80FD\u8986\u76D6 CSS \u6CE8\u5165\uFF09 */ }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* \u72B6\u6001\u5361\uFF1A\u9ED8\u8BA4\u7F6E\u4E8E\u5BA0\u7269\u4E0B\u65B9\uFF0C\u95F4\u8DDD\u8DB3\u591F\uFF08\u89D2\u8272 bob \u6D6E\u52A8 \xB14px \u4E0D\u89E6\u5230\uFF09+ \u8D34\u5E95\u65F6\u7FFB\u4E0A\u65B9\u3002 */
 [data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
@@ -467,11 +467,13 @@
       const target = host.offsetWidth || 110;
       const scale = Math.min(target / frameW, target / size.h, 1);
       sprite.className = "pet-sprite ready";
-      sprite.style.backgroundImage = `url("${sheetUrl(anim.sheet)}")`;
-      sprite.style.backgroundSize = `${size.w}px ${size.h}px`;
-      sprite.style.width = `${frameW}px`;
-      sprite.style.height = `${size.h}px`;
-      sprite.style.transform = `scale(${scale}) scaleX(${flip})`;
+      sprite.style.cssText = `
+      position: absolute; left: 50%; top: 50%; display: block;
+      background-image: url("${sheetUrl(anim.sheet)}");
+      background-size: ${size.w}px ${size.h}px;
+      width: ${frameW}px; height: ${size.h}px;
+      transform: translate(-50%, -50%) scale(${scale}) scaleX(${flip});
+    `;
       applyFrame(frameW, frame);
     };
     const applyFrame = (frameW, idx) => {
@@ -486,7 +488,7 @@
       const frameW = size.w / cfg2.frames;
       const target = host.offsetWidth || 110;
       const scale = Math.min(target / frameW, target / size.h, 1);
-      sprite.style.transform = `scale(${scale}) scaleX(${flip})`;
+      sprite.style.transform = `translate(-50%, -50%) scale(${scale}) scaleX(${flip})`;
       applyHitArea();
     };
     const setState = (name) => {

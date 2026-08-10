@@ -44,7 +44,7 @@ const CSS = `
   pointer-events: none; overflow: visible; z-index: 2; }
 [data-dsh-pet] .pet-hitarea { position: absolute; inset: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px);
   cursor: grab; touch-action: none; z-index: 3; border-radius: 8px; }
-[data-dsh-pet] .pet-sprite { display: none; background-repeat: no-repeat; transition: opacity .12s ease; pointer-events: none; /* 视觉层：256px 布局盒 transform 缩放后溢出 stage，须禁指针防溢出区可点 */ }
+[data-dsh-pet] .pet-sprite { pointer-events: none; /* 视觉层：定位/尺寸/transform 由 JS 内联（宿主可能覆盖 CSS 注入） */ }
 [data-dsh-pet] .pet-sprite.ready { display: block; }
 /* 状态卡：默认置于宠物下方，间距足够（角色 bob 浮动 ±4px 不触到）+ 贴底时翻上方。 */
 [data-dsh-pet] .pet-status { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
@@ -372,13 +372,16 @@ export function apply(ctx = {}) {
     const target = host.offsetWidth || 110
     const scale = Math.min(target / frameW, target / size.h, 1)
     sprite.className = 'pet-sprite ready'
-    sprite.style.backgroundImage = `url("${sheetUrl(anim.sheet)}")`
-    sprite.style.backgroundSize = `${size.w}px ${size.h}px`
-    sprite.style.width = `${frameW}px`
-    sprite.style.height = `${size.h}px`
-    // scaleX(flip) 表达朝向：素材统一朝左（flip=1 朝左、flip=-1 镜像朝右）。
-    // 方向由 walk/drag/静态转身维护（flip 是共享朝向状态，动作间连续）。
-    sprite.style.transform = `scale(${scale}) scaleX(${flip})`
+    sprite.style.cssText = `
+      position: absolute; left: 50%; top: 50%; display: block;
+      background-image: url("${sheetUrl(anim.sheet)}");
+      background-size: ${size.w}px ${size.h}px;
+      width: ${frameW}px; height: ${size.h}px;
+      transform: translate(-50%, -50%) scale(${scale}) scaleX(${flip});
+    `
+    // 内联绝对定位居中（不依赖 stage 的 grid place-items——宿主可能覆盖 CSS 注入，
+    // 使 sprite 布局盒不居中、视觉与 hitarea 错位）；translate(-50%,-50%) 以自身中心为原点，
+    // 与 hitarea 的内容 bbox 定位（box.x/box.y）严格对齐。
     applyFrame(frameW, frame)
   }
 
@@ -397,7 +400,7 @@ export function apply(ctx = {}) {
     const frameW = size.w / cfg.frames
     const target = host.offsetWidth || 110
     const scale = Math.min(target / frameW, target / size.h, 1)
-    sprite.style.transform = `scale(${scale}) scaleX(${flip})`
+    sprite.style.transform = `translate(-50%, -50%) scale(${scale}) scaleX(${flip})`
     applyHitArea() // flip 变化 → 热区镜像对齐（否则 flip 后热区与角色错位）
   }
 
