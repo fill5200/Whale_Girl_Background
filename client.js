@@ -412,33 +412,18 @@
       const rect = host.getBoundingClientRect();
       const cardW = status.offsetWidth || 160;
       const cardH = status.offsetHeight || 60;
-      const nearLeft = rect.left < cardW / 2 - 8;
-      const nearRight = rect.right > vw - (cardW / 2 - 8);
       const nearBottom = rect.bottom > vh - cardH - 20;
-      status.style.left = "";
-      status.style.right = "";
-      status.style.bottom = "";
-      status.style.top = "";
-      status.style.transform = "";
+      status.style.left = "50%";
+      status.style.right = "auto";
+      status.style.bottom = "auto";
+      status.style.transform = "translateX(-50%)";
       if (nearBottom) {
         status.classList.add("pet-status-above");
         status.style.top = "auto";
         status.style.bottom = "calc(100% + 18px)";
-        status.style.transform = "translateX(-50%)";
       } else {
         status.classList.remove("pet-status-above");
         status.style.top = "calc(100% + 18px)";
-        status.style.bottom = "auto";
-        status.style.transform = "translateX(-50%)";
-      }
-      if (nearLeft && !nearRight) {
-        status.style.left = "0";
-        status.style.right = "auto";
-        status.style.transform = "translateX(0)";
-      } else if (nearRight && !nearLeft) {
-        status.style.left = "auto";
-        status.style.right = "0";
-        status.style.transform = "translateX(0)";
       }
     };
     const onHostEnter = () => {

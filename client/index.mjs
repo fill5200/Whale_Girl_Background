@@ -292,35 +292,23 @@ export function apply(ctx = {}) {
     const rect = host.getBoundingClientRect()
     const cardW = status.offsetWidth || 160
     const cardH = status.offsetHeight || 60
-    const nearLeft = rect.left < cardW / 2 - 8
-    const nearRight = rect.right > vw - (cardW / 2 - 8)
-    const nearBottom = rect.bottom > vh - cardH - 20 // 下方放不下卡（屏幕边缘）→ 翻上方
-    // 翻转/对齐：内联设置（CSS 类可能被宿主清理，且面板定位已内联——类无法覆盖内联）。
-    status.style.left = ''
-    status.style.right = ''
-    status.style.bottom = ''
-    status.style.top = ''
-    status.style.transform = ''
+    // 贴边判定：仅当状态卡「居中时」真会溢出视口才贴边（居中位置 = 角色中心 ± 半卡宽）。
+    // 对齐策略（v6）：状态卡始终以角色中心居中（left:50% + translateX(-50%)），
+    // 不做左右贴边——宠物在视口边缘时卡轻微溢出可接受（max-width 缓解）。
+    // 仅保留「贴底翻转」：宠物贴视口底部时卡翻到角色上方（防底部溢出/被裁）。
+    const nearBottom = rect.bottom > vh - cardH - 20
+    status.style.left = '50%'
+    status.style.right = 'auto'
+    status.style.bottom = 'auto'
+    status.style.transform = 'translateX(-50%)'
     if (nearBottom) {
       // 贴底翻转：状态卡翻到角色上方（main 内联；after 连接尾方向由类控制）
       status.classList.add('pet-status-above')
       status.style.top = 'auto'
       status.style.bottom = 'calc(100% + 18px)'
-      status.style.transform = 'translateX(-50%)'
     } else {
       status.classList.remove('pet-status-above')
       status.style.top = 'calc(100% + 18px)'
-      status.style.bottom = 'auto'
-      status.style.transform = 'translateX(-50%)'
-    }
-    if (nearLeft && !nearRight) {
-      status.style.left = '0'
-      status.style.right = 'auto'
-      status.style.transform = 'translateX(0)'
-    } else if (nearRight && !nearLeft) {
-      status.style.left = 'auto'
-      status.style.right = '0'
-      status.style.transform = 'translateX(0)'
     }
   }
   const onHostEnter = () => {
