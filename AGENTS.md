@@ -6,7 +6,7 @@ whale-girl 是一个 plugin-registry 插件：在 DSH Web GUI 内悬浮的桌面
 
 ## 当前阶段取舍
 
-**首个版本对外分发（进 hub/registry 索引）时删除本节。** 尚无外部消费者，优先正确的基础形态而非兼容性垫片：可自由重命名与重组，但必须在同一改动内更新全部引用。
+**首个版本对外分发（进 hub/registry 索引）时删除本节。** 尚无外部消费者，优先正确的基础形态而非兼容性垫片：可自由重命名与重组，但必须在同一改动内更新全部引用。**分发/发布动作前必须重评本节失效条件与 deep-standard 档位**（检查点：分发前置流程，重评结论写入决策记录——见 [decisions/implemented/process/2026-08-08-adopt-deep-standard-l2.md](decisions/implemented/process/2026-08-08-adopt-deep-standard-l2.md) 升档条件）。
 
 ## 目录布局
 
@@ -54,6 +54,7 @@ node scripts/build-client.mjs --check   # 校验 client.js 新鲜度（只读）
 - **注释与文档写契约，不写推理转录**：行为、时序、异常、后果、所有权、安全使用条件保留；实现叙述、测试走查、评审史、代码复述删除。只写当前态。
 - **一个 PR 一种性质** + 对应标签（feature / bug-fix / doc / testing / cleanup）；独立改动拆开；缺陷在引入它的那个 PR 上修，不往下游打补丁。**PR 性质标签与决策分类是两套词汇**：决策分类是封闭集合（feature/bug-fix/simplification/architecture/process/testing，见 [decisions/README.md](decisions/README.md)）——cleanup 改动进 `simplification/` 目录，doc 改动通常无决策记录（纯文档豁免）。
 - **宿主/平台环境性行为首次复现即沉淀**：如「宿主会清理/覆盖 CSS 注入样式」这类环境事实，第 1 次踩坑就写 bug-fix 决策记录并标注「环境事实」，不等到第 N 次再固化（教训见 hitarea/menu/effects 系列记录）。
+- **并行/在途改动保护**：`git status` 存在未暂存改动时**禁用 `git add -A`**——显式路径 add，只暂存本次改动的文件（pre-commit 会列出未暂存文件提醒）；提交前确认未吞入他人在途修改。
 - **未被明确要求时不推送、不合并、不发布**；不可逆动作需要针对该具体动作的显式批准。
 
 ## 编辑本文件

@@ -9,7 +9,7 @@ deep-standard 实践暴露的四处流程缺口：**PR 性质标签与决策分�
 ## Decision
 
 - **两套词汇显式区分 + 映射**（AGENTS.md）：PR 性质标签 = deep-standard 法则 6 定义（feature/bug-fix/doc/testing/cleanup）；决策分类 = 项目封闭集合（feature/bug-fix/simplification/architecture/process/testing，门禁强制）——cleanup 改动进 `simplification/` 目录，doc 改动通常无决策记录（纯文档豁免）。
-- **记录数量纪律**（decisions/README.md）：能由现有记录覆盖的小修复优先更新旧记录（部分取代互链），不为其造新记录；价值密度在理由不在仪式。
+- **记录数量纪律**（decisions/README.md）：能由现有记录覆盖的小修复优先更新旧记录（互链），不为其造新记录；价值密度在理由不在仪式。
 - **环境事实首现沉淀**（AGENTS.md）：宿主/平台环境性行为第 1 次复现即写 bug-fix 决策记录并标注「环境事实」，不等第 N 次。
 - **证据分层显式化**（AGENTS.md）：pre-commit hook 跑本地精选组 = 提交底线；开发中按改动面跑最窄证据；CI 全量组独占穷尽覆盖，本地不重复预演。
 

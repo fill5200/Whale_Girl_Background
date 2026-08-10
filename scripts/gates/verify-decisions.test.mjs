@@ -81,3 +81,77 @@ test('拒绝：文件名不带日期', () => {
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /文件名必须形如/)
 })
+
+// ---- 取代检查输出契约（2026-08-10 落地，漏洞 A 审查）----
+
+test('接受：部分取代声明带链接 + 目标含回链（双向互链）', () => {
+  const a = GOOD.replace('## Decision', '## Decision\n\n本决策部分取代 [B](2026-08-08-b.md) 的 X 描述。')
+  const b = GOOD.replace('## Decision', '## Decision\n\n关联：见 [A](2026-08-09-a.md)。')
+  const root = makeTree({
+    'decisions/implemented/feature/2026-08-09-a.md': a,
+    'decisions/implemented/feature/2026-08-08-b.md': b,
+  })
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
+})
+
+test('拒绝：取代声明不带链接（散文提及不可机械校验）', () => {
+  const a = GOOD.replace('## Decision', '## Decision\n\n本决策部分取代 B 的 X 描述。')
+  const root = makeTree({ 'decisions/implemented/feature/2026-08-09-a.md': a })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /取代声明必须带相对路径链接/)
+})
+
+test('拒绝：部分取代目标缺回链（单向声明，双向互链缺失）', () => {
+  const a = GOOD.replace('## Decision', '## Decision\n\n本决策部分取代 [B](2026-08-08-b.md) 的 X 描述。')
+  const root = makeTree({
+    'decisions/implemented/feature/2026-08-09-a.md': a,
+    'decisions/implemented/feature/2026-08-08-b.md': GOOD,
+  })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /部分取代目标 .* 必须含指向本记录的链接/)
+})
+
+test('拒绝：完全取代未归档到 archived/（旧件必须归档冻结）', () => {
+  const a = GOOD.replace('## Decision', '## Decision\n\n本决策完全取代 [B](2026-08-08-b.md)。')
+  const root = makeTree({
+    'decisions/implemented/feature/2026-08-09-a.md': a,
+    'decisions/implemented/feature/2026-08-08-b.md': GOOD,
+  })
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /完全取代的旧件必须归档到 decisions\/archived\//)
+})
+
+test('接受：完全取代已归档且带 Archived 标记', () => {
+  const a = GOOD.replace('## Decision', '## Decision\n\n本决策完全取代 [../archived/feature/2026-08-08-b.md](decisions/archived/feature/2026-08-08-b.md)。')
+  const archived = `# Decision: 旧决策
+
+Status: archived
+Archived: 2026-08-09
+
+## Problem
+
+动机。
+
+## Decision
+
+已落地。
+
+## Alternatives considered
+
+**备选 A。**
+
+## Consequences
+
+后果。
+`
+  const root = makeTree({
+    'decisions/implemented/feature/2026-08-09-a.md': a,
+    'decisions/archived/feature/2026-08-08-b.md': archived,
+  })
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
+})

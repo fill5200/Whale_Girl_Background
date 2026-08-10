@@ -1,9 +1,11 @@
 // 门禁：决策记录格式与分类合法。
 // 拒绝不变量：decisions/ 下任何记录违反契约——头部缺失、状态行与所在生命周期目录不一致、
-// 必需章节缺失、已实施记录出现规划语气标题、分类不在封闭集合、文件名不带日期。
+// 必需章节缺失、已实施记录出现规划语气标题、分类不在封闭集合、文件名不带日期、
+// 取代声明不带链接 / 部分取代缺双向互链 / 完全取代未归档（取代检查的输出契约，
+// 见 decisions/README.md「每条新记录都触发取代检查」）。
 // 只读、确定性；archived/ 内容本身跳过（其出站链接由 verify-md-links 跳过）。
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, resolve, dirname, basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const ROOT = resolve(import.meta.dirname, '../..')
@@ -20,12 +22,23 @@ const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-.+\.md$/
 const STATUS_RE = /^Status: (.+)$/
 const ARCHIVED_MARKER = /^Archived: \d{4}-\d{2}-\d{2}$/
 const PRE_FORMAT_MARKER = 'decision-format: alternatives-not-recorded'
+// 取代声明：仅「完全取代/部分取代」触发（决策间取代契约）；语义性「取代」（如「字段取代 X 语义」）不触发。
+const SUPERSEDE_RE = /完全取代|部分取代/
+const LINK_RE = /\]\(([^)]+\.md)\)/g
 
 function existsSafe(p) {
   try {
     return statSync(p).isDirectory()
   } catch {
     return false
+  }
+}
+
+function readSafe(file) {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch {
+    return null
   }
 }
 
@@ -103,6 +116,36 @@ function checkRecord(file, relPath, lifecycle, errors) {
   if ((lifecycle === 'implemented' || lifecycle === 'archived')) {
     for (const heading of FORBIDDEN_IN_IMPLEMENTED) {
       if (text.includes(heading)) errors.push(`${relPath}: 已实施记录禁止规划语气标题 "${heading}"`)
+    }
+  }
+  checkSupersede(file, relPath, errors)
+}
+
+/** 取代检查的输出契约（决策间取代声明）：带链接、部分取代双向互链、完全取代归档闭环。 */
+function checkSupersede(file, relPath, errors) {
+  const text = readSafe(file)
+  if (text === null) return
+  const dir = dirname(file)
+  for (const line of text.split('\n')) {
+    if (!SUPERSEDE_RE.test(line)) continue
+    const links = [...line.matchAll(LINK_RE)].map((m) => m[1])
+    if (links.length === 0) {
+      errors.push(`${relPath}: 取代声明必须带相对路径链接（"完全取代/部分取代" 所在行须链接到相关记录）`)
+      continue
+    }
+    for (const link of links) {
+      const target = readSafe(join(dir, link))
+      if (line.includes('完全取代')) {
+        if (!link.includes('archived')) {
+          errors.push(`${relPath}: 完全取代的旧件必须归档到 decisions/archived/（链接目标 ${link} 不在 archived/）`)
+        }
+        if (target !== null && !ARCHIVED_MARKER.test(target)) {
+          errors.push(`${relPath}: 完全取代目标 ${link} 缺 "Archived: YYYY-MM-DD" 标记（归档即永久冻结）`)
+        }
+      }
+      if (line.includes('部分取代') && target !== null && !target.includes(basename(file))) {
+        errors.push(`${relPath}: 部分取代目标 ${link} 必须含指向本记录的链接（双向互链——部分取代保持活跃）`)
+      }
     }
   }
 }
