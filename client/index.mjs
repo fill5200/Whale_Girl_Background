@@ -175,11 +175,18 @@ export function apply(ctx = {}) {
     transition: opacity .15s ease-out, visibility 0s linear .2s;
   `.replace(/\s+/g, ' ')
   status.innerHTML = `
-    <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-stats">0 任务</span></div>
-    <div class="pet-note">…</div>`
+    <div class="pet-meta" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span class="pet-lv" style="background:rgba(86,134,254,.16); color:#B7C8FE; border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; line-height:16px; white-space:nowrap;">Lv.1</span>
+      <span class="pet-stats" style="color:#AEB6C4; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;">0 任务</span>
+    </div>
+    <div class="pet-note" style="color:#AEB6C4; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">…</div>`
   const metaLv = status.querySelector('.pet-lv')
   const metaStats = status.querySelector('.pet-stats')
   const metaNote = status.querySelector('.pet-note')
+  // 渲染时徽章样式保持内联（宿主 CSS 可能覆盖 class——内联优先级最高，徽章背景/分隔不被清）。
+  metaLv.style.cssText = 'background:rgba(86,134,254,.16); color:#B7C8FE; border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; line-height:16px; white-space:nowrap;'
+  metaStats.style.cssText = 'color:#AEB6C4; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;'
+  metaNote.style.cssText = 'color:#AEB6C4; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;'
 
   const menu = document.createElement('div')
   menu.className = 'pet-menu'
@@ -325,7 +332,7 @@ export function apply(ctx = {}) {
   const renderStatus = () => {
     if (pet) {
       metaLv.textContent = `Lv.${pet.level}`
-      // 任务计数：失败为 0 时省略「· 0 失败」（保持安静，不抢眼）。
+      // 任务计数：徽章与统计由内联 flex gap 分隔（宿主覆盖也不粘连误读）。
       metaStats.textContent = pet.stats.failures > 0
         ? `${pet.stats.tasksDone} 任务 · ${pet.stats.failures} 失败`
         : `${pet.stats.tasksDone} 任务`

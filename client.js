@@ -324,11 +324,17 @@
     transition: opacity .15s ease-out, visibility 0s linear .2s;
   `.replace(/\s+/g, " ");
     status.innerHTML = `
-    <div class="pet-meta"><span class="pet-lv">Lv.1</span><span class="pet-stats">0 \u4EFB\u52A1</span></div>
-    <div class="pet-note">\u2026</div>`;
+    <div class="pet-meta" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span class="pet-lv" style="background:rgba(86,134,254,.16); color:#B7C8FE; border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; line-height:16px; white-space:nowrap;">Lv.1</span>
+      <span class="pet-stats" style="color:#AEB6C4; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;">0 \u4EFB\u52A1</span>
+    </div>
+    <div class="pet-note" style="color:#AEB6C4; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">\u2026</div>`;
     const metaLv = status.querySelector(".pet-lv");
     const metaStats = status.querySelector(".pet-stats");
     const metaNote = status.querySelector(".pet-note");
+    metaLv.style.cssText = "background:rgba(86,134,254,.16); color:#B7C8FE; border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; line-height:16px; white-space:nowrap;";
+    metaStats.style.cssText = "color:#AEB6C4; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;";
+    metaNote.style.cssText = "color:#AEB6C4; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;";
     const menu = document.createElement("div");
     menu.className = "pet-menu";
     menu.style.cssText = "display:none; position:absolute; left:50%; top:calc(100% + 12px); transform:translateX(-50%); width:max-content; gap:6px; padding:6px; border-radius:8px; background:rgba(20,20,28,.72); z-index:4;";

@@ -35,7 +35,7 @@ function analyze(html) {
   if (!stageHasSprite && !stageHasEmoji) errors.push('宠物舞台为空（sprite 未渲染且无 emoji 兜底）')
   // motion 配方生效（idle 兜底态必为 pet-motion-bob）与账本渲染（任务计数）——回归防线。
   if (!/pet-motion-[a-z]+/.test(html)) errors.push('未找到 pet-motion-* 运动类（motion 配方未生效）')
-  if (!/<span class="pet-stats">\d+ 任务/.test(html)) errors.push('账本统计未渲染（任务计数缺失）')
+  if (!/<span class="pet-stats"[^>]*>\d+ 任务/.test(html)) errors.push('账本统计未渲染（任务计数缺失）')
   // transform 合法性：sprite 的 transform 必须是合法 scale 数值（曾因 scale(NaN) 整条被
   // 浏览器丢弃——尺寸变大 + flip 失效双回归，此处防线）。
   if (stageHasSprite) {
