@@ -736,9 +736,19 @@
         heart.style.cssText = `
         position: absolute; font-size: 20px; pointer-events: none; line-height: 1;
         left: ${20 + Math.random() * 110}px; top: ${30 + Math.random() * 80}px;
-        animation: dsh-pet-float 1.8s ease-out forwards; z-index: 3;
+        z-index: 3; opacity: 1;
       `;
         effects.appendChild(heart);
+        if (typeof heart.animate === "function") {
+          heart.animate(
+            [
+              { opacity: 1, transform: "translateY(0) scale(.7)" },
+              { opacity: 1, transform: "translateY(-60%) scale(1.25)", offset: 0.7 },
+              { opacity: 0, transform: "translateY(-120%) scale(1.4)" }
+            ],
+            { duration: 1800, easing: "ease-out", fill: "forwards" }
+          );
+        }
         heart.addEventListener("animationend", () => heart.remove());
         setTimeout(() => heart.remove(), 2e3);
       }
@@ -757,12 +767,22 @@
       bubble.className = "pet-bubble";
       bubble.textContent = text;
       bubble.style.cssText = `
-      position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+      position: absolute; left: 50%; top: -8px; transform: translate(-50%, -100%);
       background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px;
-      border-radius: 8px; white-space: nowrap; pointer-events: none; z-index: 3;
-      animation: dsh-pet-pop .25s ease-out;
+      border-radius: 8px; white-space: nowrap; pointer-events: none; z-index: 3; opacity: 0;
     `;
       effects.appendChild(bubble);
+      if (typeof bubble.animate === "function") {
+        bubble.animate(
+          [
+            { opacity: 0, transform: "translate(-50%, -85%)" },
+            { opacity: 1, transform: "translate(-50%, -100%)" }
+          ],
+          { duration: 250, easing: "ease-out", fill: "forwards" }
+        );
+      } else {
+        bubble.style.opacity = "1";
+      }
       activeBubble = bubble;
       if (typeof onBubbleShown === "function") onBubbleShown();
       const timer2 = setTimeout(() => {

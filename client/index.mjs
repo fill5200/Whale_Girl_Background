@@ -698,11 +698,23 @@ export function apply(ctx = {}) {
       heart.style.cssText = `
         position: absolute; font-size: 20px; pointer-events: none; line-height: 1;
         left: ${20 + Math.random() * 110}px; top: ${30 + Math.random() * 80}px;
-        animation: dsh-pet-float 1.8s ease-out forwards; z-index: 3;
+        z-index: 3; opacity: 1;
       `
       effects.appendChild(heart)
+      // 动画用 Web Animations API（不依赖 CSS 注入的 keyframes——宿主可能清理 style 标签，
+      // 此前 dsh-pet-float keyframes 失效导致爱心静态）。上浮 + 放大 + 淡出。
+      if (typeof heart.animate === 'function') {
+        heart.animate(
+          [
+            { opacity: 1, transform: 'translateY(0) scale(.7)' },
+            { opacity: 1, transform: 'translateY(-60%) scale(1.25)', offset: 0.7 },
+            { opacity: 0, transform: 'translateY(-120%) scale(1.4)' },
+          ],
+          { duration: 1800, easing: 'ease-out', fill: 'forwards' },
+        )
+      }
       heart.addEventListener('animationend', () => heart.remove())
-      // 兜底超时移除：reduced-motion 下动画被禁用（animation: none），
+      // 兜底超时移除：reduced-motion 下动画被禁用 / animate 不可用 →
       // animationend 永不触发 → 爱心永久残留 DOM（不可见但泄漏）。
       setTimeout(() => heart.remove(), 2000)
     }
@@ -725,13 +737,26 @@ export function apply(ctx = {}) {
     bubble.className = 'pet-bubble'
     bubble.textContent = text
     // 关键样式 JS 内联（宿主可能清理 CSS 类——position 缺失会参与文档流顶开角色）。
+    // 定位：角色上方（bottom:100% 之上 8px，translate(-50%,-100%) 让气泡底部贴在角色头顶）。
     bubble.style.cssText = `
-      position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+      position: absolute; left: 50%; top: -8px; transform: translate(-50%, -100%);
       background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px;
-      border-radius: 8px; white-space: nowrap; pointer-events: none; z-index: 3;
-      animation: dsh-pet-pop .25s ease-out;
+      border-radius: 8px; white-space: nowrap; pointer-events: none; z-index: 3; opacity: 0;
     `
     effects.appendChild(bubble)
+    // 动画用 Web Animations API（不依赖 CSS 注入的 keyframes——宿主可能清理 style 标签）。
+    // 注意动画 transform 覆盖定位 transform，帧里须含 translate(-50%, ...) 保持水平居中。
+    if (typeof bubble.animate === 'function') {
+      bubble.animate(
+        [
+          { opacity: 0, transform: 'translate(-50%, -85%)' },
+          { opacity: 1, transform: 'translate(-50%, -100%)' },
+        ],
+        { duration: 250, easing: 'ease-out', fill: 'forwards' },
+      )
+    } else {
+      bubble.style.opacity = '1'
+    }
     activeBubble = bubble
     if (typeof onBubbleShown === 'function') onBubbleShown()
     const timer = setTimeout(() => {
