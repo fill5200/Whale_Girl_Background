@@ -1,16 +1,18 @@
 # whale-girl
 
-DSH Web GUI 内的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。**积累型伙伴（Harness Pet）**：右下角悬浮、可拖拽、可投喂/玩耍；宠物不模拟饥饿/心情（零负反馈——不会因被冷落而难受），它的"生命"= 工作台脉搏——完成任务/会话/陪伴时长积累成**资历等级、称号与回忆**（完整成长系统见 [docs/growth-system.md](docs/growth-system.md)）。
+DSH Web GUI 内的桌面宠物（QQ 宠物形态）。**积累型伙伴**：右下角悬浮、可拖拽、可投喂/玩耍；宠物不模拟饥饿/心情（零负反馈——不会因被冷落而难受），它的"生命"= 工作台脉搏——完成任务/会话/陪伴时长积累成**资历等级、称号与回忆**（完整成长系统见 [docs/growth-system.md](docs/growth-system.md)）。
 
 ## 安装与启用
 
-官方 repository-plugin 格式（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（`<commit>` 用仓库提交哈希锁定）：
+官方 repository-plugin 格式（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（ref 用任意已推送的提交哈希——**官方要求精确 ref，不支持 latest/分支**）：
 
 ```yaml
 repository-plugins:
   repositories:
-    - github:dsh-external/whale-girl#<commit>&path:/.dsh-plugin
+    - github:dsh-external/whale-girl#f5e6c07bf06c&path:/.dsh-plugin
 ```
+
+上面的 ref 可直接复制使用；需要更新插件时换成仓库 main 的最新提交哈希（HMR 事务性换代，无需重启）。
 
 启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；状态条显示资历（等级/任务数）与最近共同回忆（hover 宠物显示）。初始配置/欢迎页（onboarding）宠物隐藏。
 

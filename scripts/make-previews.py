@@ -17,8 +17,9 @@ CHAR_DIR = os.path.join(ROOT, '.dsh-plugin', 'assets', 'characters', 'whale-girl
 OUT_DIR = os.path.join(ROOT, 'docs', 'preview')
 
 # 每状态输出帧数上限（控制 gif 体积）；once 保持末帧的帧数。
-MAX_FRAMES = 14
-HOLD_FRAMES = 5  # once 末帧停留 / blink 常态帧0停留
+MAX_FRAMES = 8
+HOLD_FRAMES = 3
+PREVIEW_SCALE = 0.5  # 256px → 128px（README 表格预览尺寸）  # once 末帧停留 / blink 常态帧0停留
 
 
 def frame_sequence(frames, playback):
@@ -58,7 +59,7 @@ def main():
         for idx in seq:
             f = sheet.crop((fw * idx, 0, fw * (idx + 1), sheet.height)).convert('RGBA')
             bg = Image.new('RGBA', f.size, (255, 255, 255, 255))
-            frames.append(Image.alpha_composite(bg, f).convert('RGB'))
+            frames.append(Image.alpha_composite(bg, f).convert('RGB').resize((int(f.width * PREVIEW_SCALE), int(f.height * PREVIEW_SCALE)), Image.LANCZOS))
         out = os.path.join(OUT_DIR, f'{name}.gif')
         frames[0].save(out, save_all=True, append_images=frames[1:], duration=duration, loop=0, disposal=2)
         previews[name] = out
