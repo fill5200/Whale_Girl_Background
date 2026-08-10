@@ -1132,12 +1132,15 @@
         if (next === "onboarding") {
           host.setAttribute("data-dsh-pet-hidden", "");
           host.removeAttribute("data-dsh-pet-inert");
+          host.style.display = "none";
         } else if (next === "dialog") {
           host.removeAttribute("data-dsh-pet-hidden");
+          host.style.display = "";
           host.setAttribute("data-dsh-pet-inert", "");
         } else {
           host.removeAttribute("data-dsh-pet-inert");
           host.removeAttribute("data-dsh-pet-hidden");
+          host.style.display = "";
         }
       }
     };

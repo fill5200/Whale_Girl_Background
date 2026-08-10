@@ -1181,12 +1181,16 @@ export function apply(ctx = {}) {
       if (next === 'onboarding') {
         host.setAttribute('data-dsh-pet-hidden', '')
         host.removeAttribute('data-dsh-pet-inert')
+        // 内联 display 是权威（CSS 规则可能被宿主清理——属性设了但视觉不隐藏）。
+        host.style.display = 'none'
       } else if (next === 'dialog') {
         host.removeAttribute('data-dsh-pet-hidden')
+        host.style.display = ''
         host.setAttribute('data-dsh-pet-inert', '')
       } else {
         host.removeAttribute('data-dsh-pet-inert')
         host.removeAttribute('data-dsh-pet-hidden')
+        host.style.display = ''
       }
     }
   }
