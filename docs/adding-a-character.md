@@ -2,6 +2,16 @@
 
 本文面向**想给 dsh-pet 加角色或加动作的开发者**，说明机制契约：事件如何触发动作、动作有哪些槽位、哪些能扩展哪些不能。素材生图规格见 [sprites-spec.md](sprites-spec.md)，状态机优先级见 [state-machine.md](state-machine.md)，架构分层见 [architecture-evolution.md](architecture-evolution.md)——本文不重复这些事实，只串起「怎么做」。
 
+## 贡献角色速览（只看契约，不看代码）
+
+**贡献角色 = 产出 15 张素材 sheet + 1 段 manifest 条目，零代码改动。** 知识面最小化：
+
+- **必读（仅 1 份文档 + 1 张参考图）**：[sprites-spec.md](sprites-spec.md)（§状态总表：15 状态的帧数/画面/播放行为/朝向；§素材管线：切图工具与参数；§角色契约：5 项硬性要求）+ `originals/鲸鱼娘.png`（画风参考）。本文件 §二动作槽位（manifest 字段）与 §四动手步骤（具体命令）。
+- **必不读**：`client/`、`index.mjs`、`src/` 及一切触发/优先级/播放器/热区实现——行为文法全角色共通（见下 §心智模型），素材自动跟随，无需理解代码。
+- **本机前置**：`python3` + `Pillow` + `numpy`（切图工具 [slice-sheet.py](../scripts/slice-sheet.py) 的依赖）。
+- **验收**：`node scripts/gates/verify-assets.mjs`——门禁即契约的机器化，**通过即合格**，无需运行 DSH、无需看渲染效果（表现细节由素材决定）。
+- **产出物**：`assets/characters/<id>/`（15 张 sheet）+ `assets/manifest.json` 条目；提交/共享这两样即可，不碰任何代码文件。
+
 ## 心智模型：三层契约
 
 ```

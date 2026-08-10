@@ -81,7 +81,7 @@ dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh reg
 
 - 🐛 **遇到问题**（动画异常/交互 bug/状态不符）：提交 issue，附上复现步骤、浏览器与 dsh 版本；如果是客户端问题，附上控制台报错更佳。
 - 💡 **功能建议**（新动作/新互动/成长系统扩展）：提交 issue 描述你想要的行为——参考 [docs/state-machine.md](docs/state-machine.md)（状态机）与 [docs/growth-system.md](docs/growth-system.md)（成长系统）了解现状，说明你期待的效果。
-- 🎨 **新角色**：想贡献角色素材，见 [docs/sprites-spec.md](docs/sprites-spec.md)（生图契约：纯绿背景/256 帧/帧序）与 [docs/state-machine.md](docs/state-machine.md) 的扩展指引——换角色零改代码。
+- 🎨 **新角色**：想贡献角色素材，见 [docs/adding-a-character.md](docs/adding-a-character.md) §贡献角色速览——只读契约（sprites-spec 状态总表 + 生图提示）、不读代码，产出 15 张 sheet + manifest 条目，本地跑 `verify-assets` 验收即可（换角色零改代码）。
 - 🔧 **代码贡献**：改动遵循仓库规范——每个非平凡改动带决策记录（`decisions/`）、门禁自证、单一性质提交（见 [docs/AGENTS.md](docs/AGENTS.md) 与根 [AGENTS.md](AGENTS.md)）。
 
 **提交前建议**：先跑 `node scripts/gates/run.mjs` 确认门禁通过；涉及 client 的改动跑 `node scripts/build-client.mjs --check`。
