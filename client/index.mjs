@@ -10,7 +10,7 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from './logic.mjs'
+import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
@@ -332,9 +332,12 @@ export function apply(ctx = {}) {
     // 内联 display 是权威（类规则可能被宿主清理，且内联 display:none 优先级高于
     // .pet-menu.open 类——toggle class 不足以显示/隐藏菜单）。显式切换内联。
     menu.style.display = next ? 'flex' : 'none'
-    if (next) { statusForcedHidden = true; setStatusVisible(false) }
+    if (next) {
+      statusForcedHidden = true
+      setStatusVisible(false)
+      releaseInteraction() // 打开菜单 = 用户在场：重置空闲（菜单开着宠物不睡）；睡着则醒
+    }
     host.setAttribute('aria-expanded', String(next))
-    if (next) lastActiveAt = Date.now() // 键盘/点击打开菜单也算活跃（防睡着）
     return next
   }
 
@@ -356,7 +359,6 @@ export function apply(ctx = {}) {
   let joyUntil = 0 // 互动后短时喜悦（JOY_MS）
   let dragReleaseUntil = 0 // 拖拽放下缓冲：短暂回 idle（1.5s）再进入底层状态
   let showingSprite = false // 当前 animState 是否以 sprite 呈现（迟到加载后换肤）
-  let lastActiveAt = Date.now()
   let idleSince = 0 // 进入 idle 的时刻（sleep 从此刻起算持续空闲）
   let sleeping = false
   let animState = null
@@ -739,6 +741,18 @@ export function apply(ctx = {}) {
   }
 
   // ---- 互动 ----
+  // 用户交互醒觉（v6）：拖拽放下/喂食/玩耍/开菜单都是用户在场信号——空闲计时从交互
+  // 时刻重新起算（交互后不再「立即回 sleep」，见 wakeFromInteraction 决策）；交互瞬间
+  // 若正睡着则附加 wake 过渡（「被拖起来」的自然醒觉）。薄执行：决策在纯函数。
+  const releaseInteraction = () => {
+    const decision = wakeFromInteraction({ sleeping })
+    sleeping = decision.sleeping
+    idleSince = 0 // 空闲计时重新起算（refresh 在 activity idle 时重新标记起点）
+    if (decision.wake) {
+      transient = 'wake'
+      transientUntil = Date.now() + WAKE_MS
+    }
+  }
   // 互动爱心爆发：围绕角色本体（stage 中心区域）散开上浮，不贴角。
   // stage 是 position:relative 锚点；偏移取角色所在的中上部区域，避免缩进左上角。
   const spawnHearts = () => {
@@ -819,9 +833,9 @@ export function apply(ctx = {}) {
 
   const interact = async (action) => {
     stopWalk() // 互动即停下游走：eat/play 动画期间位置保持不动（点击时 walking 未停会继续移动）
+    releaseInteraction() // 互动即用户在场：重置空闲（eat/play 播完不回 sleep）；睡着则附加 wake（随后被 eat/play 覆盖）
     transient = action === 'feed' ? 'eat' : 'play'
     transientUntil = Date.now() + TRANSIENT_MS
-    lastActiveAt = Date.now()
     try {
       const res = await fetch(INTERACT_PATH, {
         method: 'POST',
@@ -886,11 +900,11 @@ export function apply(ctx = {}) {
       if (act !== null && typeof act === 'object' && typeof act.name === 'string') {
         activity = act
       }
-      // sleep 语义：从「进入 idle 的时刻」起算持续空闲（不是从 lastActiveAt——那会停在
-      // 工作期间导致 agent 停止后立即判睡）。
+      // sleep 语义：从「进入 idle 的时刻」起算持续空闲（不是从「最后一次活动时刻」——那会停在
+      // 工作期间导致 agent 停止后立即判睡）。用户交互（拖拽/喂食/玩耍/开菜单）由
+      // releaseInteraction 重置 idleSince（唤醒），此处只消费 Node half activity。
       const isActive = activity.name !== 'idle' || activity.until > Date.now()
       if (isActive) {
-        lastActiveAt = Date.now()
         idleSince = 0
       } else if (idleSince === 0) {
         idleSince = Date.now()
@@ -955,7 +969,6 @@ export function apply(ctx = {}) {
     dragging = false
     moved = false
     stopWalk() // 被拖走即停下游走
-    lastActiveAt = Date.now()
     startX = e.clientX
     startY = e.clientY
     lastPointerX = e.clientX
@@ -996,28 +1009,33 @@ export function apply(ctx = {}) {
   hitarea.addEventListener('pointerup', (e) => {
     pressed = false
     dragging = false
+    const wasMoved = moved // 快照：本 handler 内 moved 会归零，菜单判断用快照
     if (hitarea.hasPointerCapture(e.pointerId)) hitarea.releasePointerCapture(e.pointerId)
-    if (moved) {
+    if (wasMoved) {
       savePos() // 拖拽结束落盘位置
       dragReleaseUntil = Date.now() + DRAG_RELEASE_MS // 放下缓冲：短暂回 idle
+      releaseInteraction() // 放下即用户在场：重置空闲（不再放下即回 sleep）；睡着则播 wake
+      moved = false // 收尾完成：releasePointerCapture 会触发 lostpointercapture，moved 归零防重复收尾
     }
     layoutStatus() // 拖拽结束：状态卡恢复（若仍在 hover）
     // 点菜单按钮不切换菜单（按钮的 click 触发互动）。
-    if (!moved && !e.target.closest('button')) toggleMenu()
+    if (!wasMoved && !e.target.closest('button')) toggleMenu()
   })
-  hitarea.addEventListener('pointercancel', () => {
+  // 拖拽被系统打断（pointercancel / 捕获被抢/元素移除）：同样按「放下」收尾——
+  // 回 idle 缓冲 + 重置空闲（用户拖过 = 在场），防拖拽状态卡死 + 防打断后立即回 sleep。
+  const onDragAbort = () => {
     pressed = false
     dragging = false
-    moved = false
+    if (moved) {
+      dragReleaseUntil = Date.now() + DRAG_RELEASE_MS
+      releaseInteraction()
+      moved = false
+    }
     layoutStatus()
-  })
+  }
+  hitarea.addEventListener('pointercancel', onDragAbort)
   // 捕获被系统强制释放（元素移除/其它元素抢捕获）时复位，防拖拽状态卡死。
-  hitarea.addEventListener('lostpointercapture', () => {
-    pressed = false
-    dragging = false
-    moved = false
-    layoutStatus()
-  })
+  hitarea.addEventListener('lostpointercapture', onDragAbort)
   // 键盘（a11y）：Enter/Space 切换菜单；Esc 关闭；点外部关闭。
   stage.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {

@@ -2,7 +2,7 @@
 // v2：零负反馈——无 hunger/mood 属性状态；情绪只由事件瞬发 + 互动喜悦。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, STATE_NAMES, PLAYBACK_MODES, PLAYBACK_MIN_FRAMES, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from '../client/logic.mjs'
+import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, STATE_NAMES, PLAYBACK_MODES, PLAYBACK_MIN_FRAMES, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from '../client/logic.mjs'
 
 const IDLE = { activity: { name: 'idle', until: 0 }, dragging: false, transient: null, sleeping: false, joyUntil: 0, now: 1000 }
 
@@ -277,4 +277,37 @@ test('nextFacingAt：随机转身间隔（区间边界用注入随机源）', ()
   const a = nextFacingAt({ now: 0, random: () => 0.2 })
   const b = nextFacingAt({ now: 0, random: () => 0.8 })
   assert.notEqual(a, b)
+})
+
+// ---- v6 交互醒觉（sleep → drag → 放下立即回 sleep 的修复）----
+
+test('wakeFromInteraction：醒着交互 → 重置空闲、不播 wake', () => {
+  assert.deepEqual(wakeFromInteraction({ sleeping: false }), { sleeping: false, wake: false })
+})
+
+test('wakeFromInteraction：睡着交互 → 重置空闲、附加 wake 醒觉过渡', () => {
+  assert.deepEqual(wakeFromInteraction({ sleeping: true }), { sleeping: false, wake: true })
+})
+
+test('交互醒觉集成：sleep → drag → 放下（sleeping 归零）→ 缓冲过期后不回 sleep', () => {
+  // 放下瞬间：sleeping=true → wakeFromInteraction 归零 + 播 wake（宿主设 transient='wake'）
+  const afterRelease = wakeFromInteraction({ sleeping: true })
+  assert.equal(afterRelease.sleeping, false)
+  assert.equal(afterRelease.wake, true)
+  // 放下缓冲期内：短暂回 idle（wake 行在 idle 缓冲行之后）
+  assert.equal(pickState({ ...IDLE, dragReleaseUntil: 2500, now: 1000, sleeping: afterRelease.sleeping, transient: 'wake' }), 'idle')
+  // 缓冲过期、wake 播完（宿主 resetTransient → transient=null）：sleeping 已归零 → 底层状态而非 sleep
+  assert.equal(pickState({ ...IDLE, dragReleaseUntil: 2500, now: 3000, sleeping: afterRelease.sleeping, transient: null }), 'idle')
+  assert.equal(pickState({ ...IDLE, dragReleaseUntil: 2500, now: 3000, sleeping: afterRelease.sleeping, transient: null, sessionThink: true }), 'think')
+  // 对照：若 sleeping 未归零（旧行为）→ 缓冲过期立即回 sleep（本修复消灭的链路）
+  assert.equal(pickState({ ...IDLE, dragReleaseUntil: 2500, now: 3000, sleeping: true, transient: null }), 'sleep')
+})
+
+test('交互醒觉：feed/play 结束后同样不回 sleep（sleeping 已归零）', () => {
+  // 互动瞬间 sleeping=true → 归零；eat 播完 + joy 结束后进入底层状态而非 sleep
+  const afterRelease = wakeFromInteraction({ sleeping: true })
+  assert.equal(pickState({ ...IDLE, sleeping: afterRelease.sleeping, joyUntil: 1500 }), 'joy')
+  assert.equal(pickState({ ...IDLE, sleeping: afterRelease.sleeping, joyUntil: 800 }), 'idle')
+  // 对照：旧行为（sleeping 未归零）→ joy 结束后立即回 sleep
+  assert.equal(pickState({ ...IDLE, sleeping: true, joyUntil: 800 }), 'sleep')
 })

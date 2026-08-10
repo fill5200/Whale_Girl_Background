@@ -215,3 +215,18 @@ export function detectRoundCompleted(snapshot, seen, currentId) {
 export function shouldWake(prevState, nextState, ctx = {}) {
   return prevState === 'sleep' && nextState !== 'sleep' && !ctx.dragging && (ctx.transient ?? null) === null
 }
+
+/**
+ * 用户交互醒觉决策（v6）：拖拽/喂食/玩耍/开菜单都是用户在场信号——空闲计时从交互
+ * 时刻重新起算（交互后不再「放下立即回 sleep」），交互瞬间若正睡着则附加 wake 过渡。
+ * 修复链路：sleep → drag → 放下（sleeping 未重置）→ 缓冲过期 → 立即回 sleep；
+ * 同类：feed/play 播完（eat/play + joy）后同样立即回 sleep。
+ * 宿主执行：sleeping 与 idleSince 归零；wake=true 时播 wake（transient='wake' + WAKE_MS）。
+ * @param {object} input
+ * @param {boolean} input.sleeping 交互瞬间的睡眠标志（refresh 派生）
+ * @returns {{ sleeping: boolean, wake: boolean }} sleeping=交互后的睡眠标志（恒 false：
+ *   空闲从交互时刻重新起算）；wake=交互前正睡着 → 应播 wake 醒觉过渡
+ */
+export function wakeFromInteraction({ sleeping }) {
+  return { sleeping: false, wake: sleeping === true }
+}

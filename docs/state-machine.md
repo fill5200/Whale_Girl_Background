@@ -18,7 +18,7 @@
 | `drag` | 用户拖拽（pointermove 越过 6px） | client 本地 | 拖拽中最高优先 |
 | `idle`（缓冲） | 拖拽放下后 1.5s（`dragReleaseUntil`） | client 本地 | 放下缓冲，再进底层状态 |
 | `eat` / `play` | 点击喂食/玩耍 | client 本地（`transient`） | 瞬发 1.5s，超时复位 |
-| `wake` | 睡眠→醒来过渡 | client 本地 | 瞬发 3s，非循环 |
+| `wake` | 睡眠→醒来过渡（视觉边沿；交互醒觉：睡着时拖拽/喂食/玩耍/开菜单） | client 本地 | 瞬发 3s，非循环 |
 | `wait` | 任一会话等待批准 | client（sessions 订阅） | 陪伴底座，覆盖 sleep/walk |
 
 ### 事件 burst（Node 窗口，until 有效期内优先）
@@ -57,6 +57,7 @@ drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
 
 - **瞬发/覆盖态结束后**：不硬编码回 idle——重新计算底层派生状态（`pickState` 每 tick 重算）。
 - **临时覆盖不抢戏**：事件 burst > 用户互动 > 陪伴态；失败情绪不被新会话欢迎盖掉（welcome 不打断 error/disappointed 尾段）。
+- **用户交互醒觉**：拖拽放下/喂食/玩耍/开菜单都是用户在场信号——空闲计时从交互时刻重新起算（`wakeFromInteraction`），交互后保持清醒直至再次空闲 ≥ sleepAfterMs；交互瞬间若正睡着则附加 wake 醒觉过渡（拖拽放下先走 1.5s idle 缓冲再 wake）。
 - **会话活跃保持清醒**：think/wait 覆盖 sleep/walk（陪伴底座）。
 - **朝向连续 + 随机转身**：素材统一朝左基准（flip=1 朝左、flip=-1 镜像朝右）；方向由 walk/drag 写入（walk 向右走 flip=-1、向左走 flip=1；drag 同向），静态态沿用（不无谓跳回默认）；idle/think/wait 随机转身（`nextFacingAt`，10-25s 间隔）。素材规范见 [sprites-spec.md](sprites-spec.md)。
 

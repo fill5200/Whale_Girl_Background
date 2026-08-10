@@ -125,6 +125,9 @@
   function shouldWake(prevState, nextState, ctx = {}) {
     return prevState === "sleep" && nextState !== "sleep" && !ctx.dragging && (ctx.transient ?? null) === null;
   }
+  function wakeFromInteraction({ sleeping }) {
+    return { sleeping: false, wake: sleeping === true };
+  }
 
   // client/character.mjs
   var DEFAULT_ROLE_ID = "whale-girl";
@@ -444,9 +447,9 @@
       if (next) {
         statusForcedHidden = true;
         setStatusVisible(false);
+        releaseInteraction();
       }
       host.setAttribute("aria-expanded", String(next));
-      if (next) lastActiveAt = Date.now();
       return next;
     };
     let pet = null;
@@ -464,7 +467,6 @@
     let joyUntil = 0;
     let dragReleaseUntil = 0;
     let showingSprite = false;
-    let lastActiveAt = Date.now();
     let idleSince = 0;
     let sleeping = false;
     let animState = null;
@@ -770,6 +772,15 @@
         }
       }
     };
+    const releaseInteraction = () => {
+      const decision = wakeFromInteraction({ sleeping });
+      sleeping = decision.sleeping;
+      idleSince = 0;
+      if (decision.wake) {
+        transient = "wake";
+        transientUntil = Date.now() + WAKE_MS;
+      }
+    };
     const spawnHearts = () => {
       for (let i = 0; i < 4; i++) {
         const heart = document.createElement("div");
@@ -835,9 +846,9 @@
     };
     const interact = async (action) => {
       stopWalk();
+      releaseInteraction();
       transient = action === "feed" ? "eat" : "play";
       transientUntil = Date.now() + TRANSIENT_MS;
-      lastActiveAt = Date.now();
       try {
         const res = await fetch(INTERACT_PATH, {
           method: "POST",
@@ -896,7 +907,6 @@
         }
         const isActive = activity.name !== "idle" || activity.until > Date.now();
         if (isActive) {
-          lastActiveAt = Date.now();
           idleSince = 0;
         } else if (idleSince === 0) {
           idleSince = Date.now();
@@ -947,7 +957,6 @@
       dragging = false;
       moved = false;
       stopWalk();
-      lastActiveAt = Date.now();
       startX = e.clientX;
       startY = e.clientY;
       lastPointerX = e.clientX;
@@ -984,26 +993,29 @@
     hitarea.addEventListener("pointerup", (e) => {
       pressed = false;
       dragging = false;
+      const wasMoved = moved;
       if (hitarea.hasPointerCapture(e.pointerId)) hitarea.releasePointerCapture(e.pointerId);
-      if (moved) {
+      if (wasMoved) {
         savePos();
         dragReleaseUntil = Date.now() + DRAG_RELEASE_MS;
+        releaseInteraction();
+        moved = false;
       }
       layoutStatus();
-      if (!moved && !e.target.closest("button")) toggleMenu();
+      if (!wasMoved && !e.target.closest("button")) toggleMenu();
     });
-    hitarea.addEventListener("pointercancel", () => {
+    const onDragAbort = () => {
       pressed = false;
       dragging = false;
-      moved = false;
+      if (moved) {
+        dragReleaseUntil = Date.now() + DRAG_RELEASE_MS;
+        releaseInteraction();
+        moved = false;
+      }
       layoutStatus();
-    });
-    hitarea.addEventListener("lostpointercapture", () => {
-      pressed = false;
-      dragging = false;
-      moved = false;
-      layoutStatus();
-    });
+    };
+    hitarea.addEventListener("pointercancel", onDragAbort);
+    hitarea.addEventListener("lostpointercapture", onDragAbort);
     stage.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
