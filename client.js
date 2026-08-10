@@ -480,6 +480,7 @@
       const target = host.offsetWidth || 110;
       const scale = Math.min(target / frameW, target / size.h, 1);
       sprite.style.transform = `scale(${scale}) scaleX(${flip})`;
+      applyHitArea();
     };
     const setState = (name) => {
       if (name === animState) return;
@@ -514,8 +515,9 @@
       const box = stateBoxes.get(animState) ?? { x: 0, y: 0, w: 1, h: 1 };
       const hitW = Math.max(40, size * box.w);
       const hitH = Math.max(40, size * box.h);
-      const offX = (size - hitW) / 2;
-      const offY = (size - hitH) / 2;
+      const flipped = flip < 0;
+      const offX = size * (flipped ? 1 - box.x - box.w : box.x);
+      const offY = size * box.y;
       hitarea.style.left = `${offX}px`;
       hitarea.style.top = `${offY}px`;
       hitarea.style.width = `${hitW}px`;
@@ -526,16 +528,16 @@
     };
     const analyzeSheet = (img, frames) => {
       const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
+      const fw = img.naturalWidth / frames;
+      canvas.width = fw;
       canvas.height = img.naturalHeight;
       const ctx2 = canvas.getContext("2d", { willReadFrequently: true });
-      ctx2.drawImage(img, 0, 0);
-      const data = ctx2.getImageData(0, 0, canvas.width, canvas.height).data;
-      const fw = img.naturalWidth / frames;
+      ctx2.drawImage(img, 0, 0, fw, img.naturalHeight, 0, 0, fw, img.naturalHeight);
+      const data = ctx2.getImageData(0, 0, fw, canvas.height).data;
       let minX = Infinity, minY = Infinity, maxX = -1, maxY = -1;
-      for (let y = 0; y < img.naturalHeight; y++) {
-        for (let x = 0; x < img.naturalWidth; x++) {
-          if (data[(y * img.naturalWidth + x) * 4 + 3] > 10) {
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < fw; x++) {
+          if (data[(y * fw + x) * 4 + 3] > 10) {
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
@@ -545,10 +547,10 @@
       }
       if (maxX < 0) return null;
       return {
-        x: minX / img.naturalWidth,
-        y: minY / img.naturalHeight,
-        w: (maxX - minX + 1) / img.naturalWidth,
-        h: (maxY - minY + 1) / img.naturalHeight
+        x: minX / fw,
+        y: minY / canvas.height,
+        w: (maxX - minX + 1) / fw,
+        h: (maxY - minY + 1) / canvas.height
       };
     };
     const preload = (name, cfg2) => new Promise((resolve) => {
@@ -887,6 +889,7 @@
           flip = nextFlip;
           const dragCfg = stateOf(character, "drag");
           if (animState === "drag" && dragCfg && loaded.has(sheetKey(dragCfg.sheet))) showSprite("drag", dragCfg);
+          applyHitArea();
         }
       }
       lastPointerX = e.clientX;
@@ -989,6 +992,7 @@
       flip = -walkDir;
       const walkCfg = stateOf(character, "walk");
       if (animState === "walk" && walkCfg && loaded.has(sheetKey(walkCfg.sheet))) showSprite("walk", walkCfg);
+      applyHitArea();
       const duration = cfg.walk.minMs + Math.random() * (cfg.walk.maxMs - cfg.walk.minMs);
       const start = performance.now();
       const maxX = Math.max(0, window.innerWidth - host.offsetWidth);

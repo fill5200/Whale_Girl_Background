@@ -388,6 +388,7 @@ export function apply(ctx = {}) {
     const target = host.offsetWidth || 110
     const scale = Math.min(target / frameW, target / size.h, 1)
     sprite.style.transform = `scale(${scale}) scaleX(${flip})`
+    applyHitArea() // flip 变化 → 热区镜像对齐（否则 flip 后热区与角色错位）
   }
 
   const setState = (name) => {
@@ -431,8 +432,12 @@ export function apply(ctx = {}) {
     const box = stateBoxes.get(animState) ?? { x: 0, y: 0, w: 1, h: 1 }
     const hitW = Math.max(40, size * box.w)
     const hitH = Math.max(40, size * box.h)
-    const offX = (size - hitW) / 2 // 内容居中于 host
-    const offY = (size - hitH) / 2
+    // 按内容在帧内的实际位置对齐（不假设居中）：box.x/box.y 是内容左/上缘相对帧的比例。
+    // flip（scaleX 镜像）时内容水平位置镜像：1 - x - w。sprite 以中心镜像，内容在宿主内
+    // 的位置随 flip 翻转——热区须同步，否则 flip 后热区与角色错位。
+    const flipped = flip < 0
+    const offX = size * (flipped ? 1 - box.x - box.w : box.x)
+    const offY = size * box.y
     hitarea.style.left = `${offX}px`
     hitarea.style.top = `${offY}px`
     hitarea.style.width = `${hitW}px`
@@ -443,19 +448,21 @@ export function apply(ctx = {}) {
     stateBoxes = new Map()
   }
 
-  // 用离屏 canvas 读 sheet 的不透明像素范围（仅首帧采样，性能可接受）。
+  // 用离屏 canvas 读 sheet 的「首帧」不透明像素范围（内容 bbox 以单帧为单位——
+  // 多帧 sheet 横向排布，若扫描整张会把第 2..N 帧的内容跨度计入 bbox，热区被撑到
+  // sheet 全宽（如 idle 3 帧 768px → w=0.925 而非 0.78），造成大片空白可点击）。
   const analyzeSheet = (img, frames) => {
     const canvas = document.createElement('canvas')
-    canvas.width = img.naturalWidth
+    const fw = img.naturalWidth / frames
+    canvas.width = fw
     canvas.height = img.naturalHeight
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    ctx.drawImage(img, 0, 0)
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
-    const fw = img.naturalWidth / frames
+    ctx.drawImage(img, 0, 0, fw, img.naturalHeight, 0, 0, fw, img.naturalHeight) // 只取首帧
+    const data = ctx.getImageData(0, 0, fw, canvas.height).data
     let minX = Infinity, minY = Infinity, maxX = -1, maxY = -1
-    for (let y = 0; y < img.naturalHeight; y++) {
-      for (let x = 0; x < img.naturalWidth; x++) {
-        if (data[(y * img.naturalWidth + x) * 4 + 3] > 10) {
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < fw; x++) {
+        if (data[(y * fw + x) * 4 + 3] > 10) {
           if (x < minX) minX = x
           if (x > maxX) maxX = x
           if (y < minY) minY = y
@@ -465,8 +472,8 @@ export function apply(ctx = {}) {
     }
     if (maxX < 0) return null // 全透明
     return {
-      x: minX / img.naturalWidth, y: minY / img.naturalHeight,
-      w: (maxX - minX + 1) / img.naturalWidth, h: (maxY - minY + 1) / img.naturalHeight,
+      x: minX / fw, y: minY / canvas.height,
+      w: (maxX - minX + 1) / fw, h: (maxY - minY + 1) / canvas.height,
     }
   }
 
@@ -870,6 +877,7 @@ export function apply(ctx = {}) {
         flip = nextFlip
         const dragCfg = stateOf(character, 'drag')
         if (animState === 'drag' && dragCfg && loaded.has(sheetKey(dragCfg.sheet))) showSprite('drag', dragCfg)
+        applyHitArea() // drag 方向变化 → 热区镜像对齐
       }
     }
     lastPointerX = e.clientX
@@ -989,6 +997,7 @@ export function apply(ctx = {}) {
     // sprite transform，否则新一轮游走仍沿用上一轮朝向。
     const walkCfg = stateOf(character, 'walk')
     if (animState === 'walk' && walkCfg && loaded.has(sheetKey(walkCfg.sheet))) showSprite('walk', walkCfg)
+    applyHitArea() // walk 方向变化 → 热区镜像对齐
     const duration = cfg.walk.minMs + Math.random() * (cfg.walk.maxMs - cfg.walk.minMs)
     const start = performance.now()
     const maxX = Math.max(0, window.innerWidth - host.offsetWidth)
