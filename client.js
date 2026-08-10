@@ -399,6 +399,7 @@
     const toggleMenu = (open) => {
       const next = open ?? !menu.classList.contains("open");
       menu.classList.toggle("open", next);
+      menu.style.display = next ? "flex" : "none";
       status.classList.toggle("pet-status-hidden", next);
       if (next) setStatusVisible(false);
       host.setAttribute("aria-expanded", String(next));

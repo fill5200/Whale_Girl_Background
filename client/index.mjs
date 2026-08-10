@@ -273,6 +273,9 @@ export function apply(ctx = {}) {
   const toggleMenu = (open) => {
     const next = open ?? !menu.classList.contains('open')
     menu.classList.toggle('open', next)
+    // 内联 display 是权威（类规则可能被宿主清理，且内联 display:none 优先级高于
+    // .pet-menu.open 类——toggle class 不足以显示/隐藏菜单）。显式切换内联。
+    menu.style.display = next ? 'flex' : 'none'
     status.classList.toggle('pet-status-hidden', next)
     if (next) setStatusVisible(false)
     host.setAttribute('aria-expanded', String(next))
