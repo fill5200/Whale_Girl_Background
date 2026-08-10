@@ -189,6 +189,12 @@ export function apply(ctx = {}) {
   host.setAttribute('role', 'group')
   host.setAttribute('aria-label', '桌面宠物')
   host.setAttribute('aria-expanded', 'false')
+  // 关键样式 JS 内联（宿主可能清理 CSS 注入——position 缺失 host 会掉出文档流不可见，
+  // 见 hitarea/menu/effects 系列环境事实；host 基础定位是最后一处依赖 CSS 注入的面）。
+  host.style.cssText = `position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
+    width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+    font-family: system-ui, sans-serif; user-select: none; touch-action: none;
+    opacity: var(--pet-opacity, 1);`
   document.body.appendChild(host)
 
   const stage = document.createElement('div')
@@ -487,8 +493,11 @@ export function apply(ctx = {}) {
       showingSprite = false
     }
     // 状态切换淡入：快速过渡掩盖姿势硬切（sprite 有 opacity transition）。
+    // rAF 双帧在页面隐藏时不执行 → opacity 卡 0（宠物变空白）；setTimeout 兜底保证恢复。
     stage.style.opacity = '0'
-    requestAnimationFrame(() => requestAnimationFrame(() => { stage.style.opacity = '1' }))
+    const restoreOpacity = () => { stage.style.opacity = '1' }
+    requestAnimationFrame(() => requestAnimationFrame(restoreOpacity))
+    setTimeout(restoreOpacity, 60)
   }
 
   // ---- 资产加载 ----
@@ -549,24 +558,38 @@ export function apply(ctx = {}) {
     }
   }
 
-  const preload = (name, cfg) => new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      sheetSize.set(sheetKey(cfg.sheet), { w: img.naturalWidth, h: img.naturalHeight })
-      loaded.add(sheetKey(cfg.sheet))
-      const box = analyzeSheet(img, cfg.frames)
-      if (box !== null) stateBoxes.set(name, box) // 每状态独立 bbox——热区跟随当前状态
-      applyHitArea()
-      resolve()
+  // sheet 加载带有限重试（偶发网络/缓存失败 → 该状态永久占位空白的防线；重试耗尽后
+  // resolve(null)，由 showPlaceholder 提示）。onload 成功 resolve(img)。
+  const loadImageWithRetry = (src, retries = 3) => new Promise((resolve) => {
+    let attempts = 0
+    const attempt = () => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => {
+        attempts += 1
+        if (attempts < retries) setTimeout(attempt, 250 * attempts)
+        else resolve(null)
+      }
+      img.src = src
     }
-    img.onerror = resolve
-    img.src = sheetUrl(cfg.sheet)
+    attempt()
   })
 
-  const loadAssets = async () => {
+  const preload = (name, cfg) => loadImageWithRetry(sheetUrl(cfg.sheet)).then((img) => {
+    if (img === null) return // 重试耗尽：该状态保持占位（showPlaceholder 提示）
+    sheetSize.set(sheetKey(cfg.sheet), { w: img.naturalWidth, h: img.naturalHeight })
+    loaded.add(sheetKey(cfg.sheet))
+    const box = analyzeSheet(img, cfg.frames)
+    if (box !== null) stateBoxes.set(name, box) // 每状态独立 bbox——热区跟随当前状态
+    applyHitArea()
+  })
+
+  // manifest 拉取失败/非 2xx → 有限重试（偶发失败 → 全部状态占位空白的防线）；
+  // 结构守卫失败（坏 manifest）不重试（数据坏了重试也坏，保持当前角色）。
+  const loadAssets = async (attempt = 1) => {
     try {
       const res = await fetch(MANIFEST_URL)
-      if (!res.ok) return
+      if (!res.ok) throw new Error(`manifest ${res.status}`)
       const next = await res.json()
       // 结构守卫：manifest 必须是对象且可解析出角色（坏 manifest 不赋值 → 保持当前角色）。
       if (next === null || typeof next !== 'object') return
@@ -586,7 +609,8 @@ export function apply(ctx = {}) {
       }
       await Promise.all(Object.entries(character.states).map(([n, cfg]) => preload(n, cfg)))
     } catch {
-      // manifest 不可用 → 保持当前角色（素材缺失路径由 showPlaceholder 提示）
+      // manifest 网络失败：有限重试（偶发失败 → 全占位空白）；耗尽后保持当前角色
+      if (attempt < 3) setTimeout(() => loadAssets(attempt + 1), 500 * attempt)
     }
   }
 
@@ -599,18 +623,13 @@ export function apply(ctx = {}) {
       resetContentBox() // 新角色轮廓：重置内容 bbox
       const nextLoaded = new Set()
       const nextSize = new Map()
-      await Promise.all(Object.entries(target.states).map(([n, cfg]) => new Promise((resolve) => {
-        const img = new Image()
-        img.onload = () => {
-          nextSize.set(`${id}:${cfg.sheet}`, { w: img.naturalWidth, h: img.naturalHeight })
-          nextLoaded.add(`${id}:${cfg.sheet}`)
-          const box = analyzeSheet(img, cfg.frames)
-          if (box !== null) stateBoxes.set(n, box) // 新角色每状态独立 bbox
-          applyHitArea()
-          resolve()
-        }
-        img.onerror = resolve
-        img.src = `${ASSETS_URL}/characters/${id}/${cfg.sheet}`
+      await Promise.all(Object.entries(target.states).map(([n, cfg]) => loadImageWithRetry(`${ASSETS_URL}/characters/${id}/${cfg.sheet}`).then((img) => {
+        if (img === null) return // 重试耗尽：该状态保持占位（showPlaceholder 提示）
+        nextSize.set(`${id}:${cfg.sheet}`, { w: img.naturalWidth, h: img.naturalHeight })
+        nextLoaded.add(`${id}:${cfg.sheet}`)
+        const box = analyzeSheet(img, cfg.frames)
+        if (box !== null) stateBoxes.set(n, box) // 新角色每状态独立 bbox
+        applyHitArea()
       })))
       // 原子替换
       characterId = id

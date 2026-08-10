@@ -340,6 +340,10 @@
     host.setAttribute("role", "group");
     host.setAttribute("aria-label", "\u684C\u9762\u5BA0\u7269");
     host.setAttribute("aria-expanded", "false");
+    host.style.cssText = `position: fixed; right: 16px; bottom: 16px; z-index: 2147483000;
+    width: var(--pet-size, 110px); height: var(--pet-size, 110px);
+    font-family: system-ui, sans-serif; user-select: none; touch-action: none;
+    opacity: var(--pet-opacity, 1);`;
     document.body.appendChild(host);
     const stage = document.createElement("div");
     stage.className = "pet-stage";
@@ -563,9 +567,11 @@
         showingSprite = false;
       }
       stage.style.opacity = "0";
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+      const restoreOpacity = () => {
         stage.style.opacity = "1";
-      }));
+      };
+      requestAnimationFrame(() => requestAnimationFrame(restoreOpacity));
+      setTimeout(restoreOpacity, 60);
     };
     let stateBoxes = /* @__PURE__ */ new Map();
     const applyHitArea = () => {
@@ -612,23 +618,32 @@
         h: (maxY - minY + 1) / canvas.height
       };
     };
-    const preload = (name, cfg2) => new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        sheetSize.set(sheetKey(cfg2.sheet), { w: img.naturalWidth, h: img.naturalHeight });
-        loaded.add(sheetKey(cfg2.sheet));
-        const box = analyzeSheet(img, cfg2.frames);
-        if (box !== null) stateBoxes.set(name, box);
-        applyHitArea();
-        resolve();
+    const loadImageWithRetry = (src, retries = 3) => new Promise((resolve) => {
+      let attempts = 0;
+      const attempt = () => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          attempts += 1;
+          if (attempts < retries) setTimeout(attempt, 250 * attempts);
+          else resolve(null);
+        };
+        img.src = src;
       };
-      img.onerror = resolve;
-      img.src = sheetUrl(cfg2.sheet);
+      attempt();
     });
-    const loadAssets = async () => {
+    const preload = (name, cfg2) => loadImageWithRetry(sheetUrl(cfg2.sheet)).then((img) => {
+      if (img === null) return;
+      sheetSize.set(sheetKey(cfg2.sheet), { w: img.naturalWidth, h: img.naturalHeight });
+      loaded.add(sheetKey(cfg2.sheet));
+      const box = analyzeSheet(img, cfg2.frames);
+      if (box !== null) stateBoxes.set(name, box);
+      applyHitArea();
+    });
+    const loadAssets = async (attempt = 1) => {
       try {
         const res = await fetch(MANIFEST_URL);
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`manifest ${res.status}`);
         const next = await res.json();
         if (next === null || typeof next !== "object") return;
         manifest = next;
@@ -650,6 +665,7 @@
         }
         await Promise.all(Object.entries(character.states).map(([n, cfg2]) => preload(n, cfg2)));
       } catch {
+        if (attempt < 3) setTimeout(() => loadAssets(attempt + 1), 500 * attempt);
       }
     };
     const switchCharacter = async (id) => {
@@ -659,18 +675,13 @@
         resetContentBox();
         const nextLoaded = /* @__PURE__ */ new Set();
         const nextSize = /* @__PURE__ */ new Map();
-        await Promise.all(Object.entries(target.states).map(([n, cfg2]) => new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            nextSize.set(`${id}:${cfg2.sheet}`, { w: img.naturalWidth, h: img.naturalHeight });
-            nextLoaded.add(`${id}:${cfg2.sheet}`);
-            const box = analyzeSheet(img, cfg2.frames);
-            if (box !== null) stateBoxes.set(n, box);
-            applyHitArea();
-            resolve();
-          };
-          img.onerror = resolve;
-          img.src = `${ASSETS_URL}/characters/${id}/${cfg2.sheet}`;
+        await Promise.all(Object.entries(target.states).map(([n, cfg2]) => loadImageWithRetry(`${ASSETS_URL}/characters/${id}/${cfg2.sheet}`).then((img) => {
+          if (img === null) return;
+          nextSize.set(`${id}:${cfg2.sheet}`, { w: img.naturalWidth, h: img.naturalHeight });
+          nextLoaded.add(`${id}:${cfg2.sheet}`);
+          const box = analyzeSheet(img, cfg2.frames);
+          if (box !== null) stateBoxes.set(n, box);
+          applyHitArea();
         })));
         characterId = id;
         character = target;
