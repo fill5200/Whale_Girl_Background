@@ -6,7 +6,7 @@ whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 +
 
 ## 当前阶段取舍
 
-**首个版本对外分发（进 hub/registry 索引）时删除本节。** 尚无外部消费者，优先正确的基础形态而非兼容性垫片：可自由重命名与重组，但必须在同一改动内更新全部引用。**分发/发布动作前必须重评本节失效条件与 deep-standard 档位**（检查点：分发前置流程，重评结论写入决策记录——见 [decisions/implemented/process/2026-08-08-adopt-deep-standard-l2.md](decisions/implemented/process/2026-08-08-adopt-deep-standard-l2.md) 升档条件）。
+**首个版本已分发（官方 repository-plugin 形态）。** 不再有「可自由重命名与重组」的过渡条款——公开 ref 被消费后改名/重组破坏安装；deep-standard 档位重评结论见 [decisions/implemented/process/2026-08-10-l3-tier-review.md](decisions/implemented/process/2026-08-10-l3-tier-review.md)。
 
 ## 目录布局
 

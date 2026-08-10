@@ -4,10 +4,15 @@ DSH Web GUI 内的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。**
 
 ## 安装与启用
 
-```sh
-dsh registry install ./whale-girl   # 安装（默认禁用——信任边界）
-dsh registry enable vlln/whale-girl # 启用（实时挂载；浏览器端需刷新页面）
+官方 repository-plugin 格式（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（`<commit>` 用仓库提交哈希锁定）：
+
+```yaml
+repository-plugins:
+  repositories:
+    - github:dsh-external/whale-girl#<commit>&path:/.dsh-plugin
 ```
+
+启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；状态条显示资历（等级/任务数）与最近共同回忆（hover 宠物显示），每 3s 轮询刷新。任务完成时宠物庆祝（页面关闭期间完成的任务重开后也会庆祝）、失败时短暂失落（`error`→`disappointed` 瞬发）、新会话时挥手欢迎；任一会话运行/思考时宠物沉思陪伴（`think`），等待批准时抬眼期待（`wait`）。初始配置/欢迎页（onboarding）宠物隐藏。
 
 启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 投喂 / 🎾 玩耍），拖拽可移动；状态条显示资历（等级/任务数）与最近共同回忆（hover 宠物显示），每 3s 轮询刷新。任务完成时宠物庆祝（页面关闭期间完成的任务重开后也会庆祝）、失败时短暂失落（`error`→`disappointed` 瞬发）、新会话时挥手欢迎；任一会话运行/思考时宠物沉思陪伴（`think`），等待批准时抬眼期待（`wait`）。初始配置/欢迎页（onboarding）宠物隐藏。
 
@@ -36,7 +41,7 @@ whale-girl:
 node scripts/gates/run.mjs          # 本地门禁组（链接/决策格式/assets manifest/工具 schema/生成物新鲜度）
 node --test 'tests/*.test.mjs'      # Node half 单测
 node scripts/build-client.mjs       # 改 .dsh-plugin/client/ 源码后重新生成 .dsh-plugin/client.js（勿手改产物）
-dsh registry uninstall vlln/whale-girl && dsh registry install ./whale-girl && dsh registry enable vlln/whale-girl
+（官方 repository-plugin 安装：更新 config.yaml 的 ref 后 HMR 事务性换代，无需 CLI）
 ```
 
 **进程边界（易错）**：`dsh registry enable` 在 CLI 进程注册，**已运行的 web 不感知**——disable/enable 对运行中实例无效。改 `.dsh-plugin/index.mjs`（Node half，含工具 schema）后需 **web 重启**（并检查日志无 `plugin tree failed to load`）；改 `.dsh-plugin/client/` 或 `assets/` 后重装（上例把新 `.dsh-plugin/client.js`/sheet 复制进安装目录）+ **刷新页面**即可（`serveBundle` 按请求读磁盘，页面刷新即取新文件）。
