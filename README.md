@@ -4,7 +4,7 @@ DSH Web GUI 内的桌面宠物（QQ 宠物形态）。**积累型伙伴**：右�
 
 ## 安装与启用
 
-官方 repository-plugin 格式（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（ref 用任意已推送的提交哈希——**官方要求精确 ref，不支持 latest/分支**）：
+官方 repository-plugin 格式（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`）。在 `$DSH_HOME/config.yaml` 加入（**ref** = 仓库某个提交的完整哈希，如 `f5e6c07bf06c…`——锁定安装的版本；官方机制要求精确 ref，不支持 `latest`/分支）：
 
 ```yaml
 repository-plugins:
@@ -54,11 +54,9 @@ repository-plugins:
 | `think` | 会话思考陪伴 | ![think](docs/preview/think.gif) |
 | `wait` | 等待批准 | ![wait](docs/preview/wait.gif) |
 
-预览由 [scripts/make-previews.py](scripts/make-previews.py) 从素材 sheet 合成（按 playback 帧序）；素材规格见 [docs/sprites-spec.md](docs/sprites-spec.md)。
+## 配置
 
-## 配置（体验层）
-
-体验层参数（尺寸/透明度/游走/睡眠/窗口时长）经宿主 settings 配置，`<dshHome>/settings.yaml` 的 `whale-girl:` section（或设置 UI）修改后**热生效免重启**：
+参数（尺寸/透明度/游走/睡眠/窗口时长）经宿主 settings 配置，`<dshHome>/settings.yaml` 的 `whale-girl:` section（或设置 UI）修改后**热生效免重启**：
 
 ```yaml
 whale-girl:
