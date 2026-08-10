@@ -295,9 +295,9 @@ export function apply(ctx = {}) {
   let frame = 0
   let frameDirection = 1
   // idle 随机眨眼（v4）：常态保持帧 0（睁眼），随机间隔眨一次（0→1→2→0）。
-  // nextBlinkAt 决策触发时刻；idleBlinking=眨眼动画进行中（播完回帧 0 静止）。
-  let idleBlinkAt = 0
-  let idleBlinking = false
+  // nextBlinkAt 决策触发时刻；blinkActive=眨眼动画进行中（播完回帧 0 静止）。
+  let blinkAt = 0
+  let blinkActive = false
   // 随机朝向转换：静态陪伴态（idle/think/wait）偶尔转身；nextFacingAt 决策触发时刻。
   // flip 由 walk/drag 写入（动作间朝向连续），静态态在到点时翻转一次并刷新 sprite。
   let facingAt = 0
@@ -395,8 +395,8 @@ export function apply(ctx = {}) {
     animState = name
     frame = 0
     frameDirection = 1
-    idleBlinkAt = 0 // 重进 idle 时重新排随机眨眼
-    idleBlinking = false
+    blinkAt = 0 // 重进 blink 状态时重新排随机触发
+    blinkActive = false
     facingAt = 0 // 重进静态态时重新排随机转身
     lastFrameAt = 0
     // 运动配方：manifest.motion → 舞台类（sprite 与占位路径都生效；无 motion 时清类）。
@@ -621,41 +621,43 @@ export function apply(ctx = {}) {
       // frames>1 才走帧循环；frames=1 的单图状态由 manifest.motion 的 CSS 动画驱动，不推进帧
       // （否则会推进到 -width 位置闪空白）。
       if (cfg.frames > 1 && now - lastFrameAt >= 1000 / cfg.fps) {
-        // idle 随机眨眼（v4）：常态保持帧 0（睁眼静止），随机间隔眨一次（0→1→2→0）。
-        // 不用固定循环+固定暂停（旧 idlePauseMs 机制）——眨眼应是随机节奏，同 walk/working。
-        if (animState === 'idle') {
-          if (idleBlinking) {
-            // 眨眼动画推进：0→1→2→0（3 帧一次眨眼）
+        // 帧播放按 playback 模式推进（v5：不再按状态名特判——数据驱动）。
+        if (cfg.playback === 'blink') {
+          // 常态帧 0 静止，随机间隔触发一次动作（0→1→…→N-1→0）。
+          if (blinkActive) {
+            // 动作推进：0→1→…→N-1→0（N=cfg.frames，一次动作）
             lastFrameAt = now
             frame += 1
             if (frame >= cfg.frames) {
-              frame = 0 // 眨眼完成：回帧 0 静止，排下一次随机眨眼
-              idleBlinking = false
-              idleBlinkAt = nextBlinkAt({ now })
+              frame = 0 // 动作完成：回帧 0 静止，排下一次随机触发
+              blinkActive = false
+              blinkAt = nextBlinkAt({ now })
             }
             applyFrame(frameW, frame)
           } else {
-            // 常态：静止在帧 0；到随机触发时刻开始眨眼
+            // 常态：静止在帧 0；到随机触发时刻开始动作
             if (frame !== 0) {
               frame = 0
               applyFrame(frameW, frame)
             }
-            if (idleBlinkAt === 0) idleBlinkAt = nextBlinkAt({ now })
-            if (now >= idleBlinkAt) idleBlinking = true
+            if (blinkAt === 0) blinkAt = nextBlinkAt({ now })
+            if (now >= blinkAt) blinkActive = true
           }
           return
         }
         lastFrameAt = now
         frame += frameDirection
-        if (animState === 'walk' && cfg.loop && cfg.frames > 1) {
+        if (cfg.playback === 'pingpong' && cfg.frames > 1) {
+          // 往返：0→1→…→N-1→…→0（帧方向在端点反转）
           if (frame >= cfg.frames - 1 || frame <= 0) frameDirection *= -1
           frame = Math.max(0, Math.min(cfg.frames - 1, frame))
         } else if (frame >= cfg.frames) {
-          if (cfg.loop) frame = 0
+          if (cfg.playback === 'loop') frame = 0
           else {
+            // once：播完保持末帧（帧0=起点、末帧=完成态）
             frame = cfg.frames - 1
             if (transient !== null && transient !== 'wake') {
-              resetTransient(now) // 非循环 sheet 播完即复位（早于超时）
+              resetTransient(now) // 瞬发 once（wake/error）播完即复位（早于超时）
             }
           }
         }

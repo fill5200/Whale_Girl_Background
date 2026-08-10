@@ -11,95 +11,95 @@
           "sheet": "idle.png",
           "frames": 3,
           "fps": 2,
-          "loop": false
+          "playback": "blink"
         },
         "working": {
           "sheet": "working.png",
           "frames": 3,
           "fps": 3,
-          "loop": true
+          "playback": "loop"
         },
         "celebrate": {
           "sheet": "celebrate.png",
           "frames": 3,
           "fps": 4,
-          "loop": true
+          "playback": "loop"
         },
         "error": {
           "sheet": "error.png",
           "frames": 2,
           "fps": 8,
-          "loop": false,
-          "motion": "shake"
+          "motion": "shake",
+          "playback": "once"
         },
         "disappointed": {
           "sheet": "disappointed.png",
           "frames": 2,
           "fps": 2,
-          "loop": true
+          "playback": "loop"
         },
         "joy": {
           "sheet": "joy.png",
           "frames": 2,
           "fps": 5,
-          "loop": true
+          "playback": "loop"
         },
         "eat": {
           "sheet": "eat.png",
           "frames": 3,
           "fps": 8,
-          "loop": true
+          "playback": "loop"
         },
         "play": {
           "sheet": "play.png",
           "frames": 3,
           "fps": 4,
-          "loop": true
+          "playback": "loop"
         },
         "drag": {
           "sheet": "drag.png",
           "frames": 1,
           "fps": 5,
-          "loop": true,
-          "motion": "tilt"
+          "motion": "tilt",
+          "playback": "loop"
         },
         "walk": {
           "sheet": "walk.png",
           "frames": 3,
           "fps": 6,
-          "loop": true
+          "playback": "pingpong"
         },
         "sleep": {
           "sheet": "sleep.png",
           "frames": 2,
           "fps": 1,
-          "loop": true
+          "playback": "loop"
         },
         "wake": {
           "sheet": "wake.png",
           "frames": 2,
           "fps": 3,
-          "loop": false
+          "playback": "once"
         },
         "welcome": {
           "sheet": "welcome.png",
           "frames": 2,
           "fps": 3,
-          "loop": true
+          "playback": "loop"
         },
         "think": {
           "sheet": "think.png",
           "frames": 1,
           "fps": 2,
-          "loop": true,
-          "motion": "float"
+          "motion": "float",
+          "playback": "loop"
         },
         "wait": {
           "sheet": "wait.png",
           "frames": 1,
           "fps": 2,
-          "loop": true,
-          "motion": "wiggle"
+          "motion": "wiggle",
+          "playback": "loop"
         }
       }
     }
@@ -110,81 +110,81 @@
       "sheet": "idle.png",
       "frames": 3,
       "fps": 2,
-      "loop": false
+      "playback": "blink"
     },
     "working": {
       "sheet": "working.png",
       "frames": 3,
       "fps": 3,
-      "loop": true
+      "playback": "loop"
     },
     "celebrate": {
       "sheet": "celebrate.png",
       "frames": 3,
       "fps": 4,
-      "loop": true
+      "playback": "loop"
     },
     "error": {
       "sheet": "error.png",
       "frames": 2,
       "fps": 8,
-      "loop": false,
-      "motion": "shake"
+      "motion": "shake",
+      "playback": "once"
     },
     "disappointed": {
       "sheet": "disappointed.png",
       "frames": 2,
       "fps": 2,
-      "loop": true
+      "playback": "loop"
     },
     "joy": {
       "sheet": "joy.png",
       "frames": 2,
       "fps": 5,
-      "loop": true
+      "playback": "loop"
     },
     "eat": {
       "sheet": "eat.png",
       "frames": 3,
       "fps": 8,
-      "loop": true
+      "playback": "loop"
     },
     "play": {
       "sheet": "play.png",
       "frames": 3,
       "fps": 4,
-      "loop": true
+      "playback": "loop"
     },
     "drag": {
       "sheet": "drag.png",
       "frames": 1,
       "fps": 5,
-      "loop": true,
-      "motion": "tilt"
+      "motion": "tilt",
+      "playback": "loop"
     },
     "walk": {
       "sheet": "walk.png",
       "frames": 3,
       "fps": 6,
-      "loop": true
+      "playback": "pingpong"
     },
     "sleep": {
       "sheet": "sleep.png",
       "frames": 2,
       "fps": 1,
-      "loop": true
+      "playback": "loop"
     },
     "wake": {
       "sheet": "wake.png",
       "frames": 2,
       "fps": 3,
-      "loop": false
+      "playback": "once"
     },
     "welcome": {
       "sheet": "welcome.png",
       "frames": 2,
       "fps": 3,
-      "loop": true
+      "playback": "loop"
     }
   }
 }

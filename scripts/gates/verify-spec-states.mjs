@@ -36,7 +36,7 @@ export function check(root = ROOT) {
       continue
     }
     if (inTable) {
-      if (line.startsWith('## ')) break // 表格结束（下一小节）
+      if (line.startsWith('#')) break // 表格结束（下一标题，h2/h3 皆然——状态总表是第一个表）
       const m = STATE_ROW_RE.exec(line)
       if (m !== null && !line.includes('---')) rows.push(m[1])
     }

@@ -1,7 +1,9 @@
 // 门禁：assets manifest 引用一致性。
 // 拒绝不变量：assets/manifest.json 里每个角色必须含全部 15 状态（缺一个即拒——
 // 素材必须全量提供，不再 emoji 降级）；每个 state 的 sheet 引用的文件必须真实存在、
-// 扩展名在 MIME 白名单内（与 src/assets.mjs 一致）、frames/fps/loop 字段合法、
+// 扩展名在 MIME 白名单内（与 src/assets.mjs 一致）、frames/fps 字段合法、
+// playback 播放模式在封闭枚举内且帧数满足该模式的下限（loop≥1/pingpong≥2/once≥1/
+// blink≥2——播放器按 playback 数据驱动推进，不再按状态名特判）、
 // motion 配方（若声明）在白名单内且 frames 必须为 1（帧播放器与运动配方互斥；
 // 定向例外：error 是唯一允许多帧+运动叠加的状态——2 帧「正常→惊吓」播完僵住，
 // 叠加 shake 让 burst 窗口内持续颤抖不静止，见 decisions 动画编排修订记录）、
@@ -11,7 +13,7 @@
 import { readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { STATE_NAMES } from '../../client/logic.mjs'
+import { STATE_NAMES, PLAYBACK_MODES, PLAYBACK_MIN_FRAMES } from '../../client/logic.mjs'
 import { ROLE_ID_RE } from '../../client/character.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../..')
@@ -64,7 +66,12 @@ function checkStates(states, roleId, errors, root) {
     }
     if (!Number.isInteger(cfg.frames) || cfg.frames < 1) errors.push(`${label}.${name}: frames 必须是正整数`)
     if (typeof cfg.fps !== 'number' || cfg.fps <= 0) errors.push(`${label}.${name}: fps 必须是正数`)
-    if (typeof cfg.loop !== 'boolean') errors.push(`${label}.${name}: loop 必须是布尔值`)
+    // 播放模式（v5）：playback 枚举 + 帧数交叉校验（取代 loop 布尔——播放器按此推进帧）。
+    if (!PLAYBACK_MODES.includes(cfg.playback)) {
+      errors.push(`${label}.${name}: playback "${cfg.playback}" 不在 ${PLAYBACK_MODES.join('/')}`)
+    } else if (cfg.frames < PLAYBACK_MIN_FRAMES[cfg.playback]) {
+      errors.push(`${label}.${name}: playback ${cfg.playback} 要求 frames ≥ ${PLAYBACK_MIN_FRAMES[cfg.playback]}（当前 ${cfg.frames}）`)
+    }
     if (cfg.motion !== undefined) {
       if (!MOTION_WHITELIST.includes(cfg.motion)) {
         errors.push(`${label}.${name}: motion "${cfg.motion}" 不在白名单 ${MOTION_WHITELIST.join('/')}`)

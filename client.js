@@ -21,6 +21,13 @@
     "think",
     "wait"
   ]);
+  var PLAYBACK_MODES = Object.freeze(["loop", "pingpong", "once", "blink"]);
+  var PLAYBACK_MIN_FRAMES = Object.freeze({
+    loop: 1,
+    pingpong: 2,
+    once: 1,
+    blink: 2
+  });
   var STATE_TABLE = [
     { state: "drag", when: (c) => c.dragging },
     // 拖拽放下缓冲：drag 结束短暂回 idle（1.5s），再进入底层状态——避免放下即跳 think/working 的生硬切换。
@@ -412,8 +419,8 @@
     let animState = null;
     let frame = 0;
     let frameDirection = 1;
-    let idleBlinkAt = 0;
-    let idleBlinking = false;
+    let blinkAt = 0;
+    let blinkActive = false;
     let facingAt = 0;
     let lastFrameAt = 0;
     let working = { active: false, until: 0 };
@@ -479,8 +486,8 @@
       animState = name;
       frame = 0;
       frameDirection = 1;
-      idleBlinkAt = 0;
-      idleBlinking = false;
+      blinkAt = 0;
+      blinkActive = false;
       facingAt = 0;
       lastFrameAt = 0;
       for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
@@ -677,14 +684,14 @@
           facingAt = 0;
         }
         if (cfg2.frames > 1 && now - lastFrameAt >= 1e3 / cfg2.fps) {
-          if (animState === "idle") {
-            if (idleBlinking) {
+          if (cfg2.playback === "blink") {
+            if (blinkActive) {
               lastFrameAt = now;
               frame += 1;
               if (frame >= cfg2.frames) {
                 frame = 0;
-                idleBlinking = false;
-                idleBlinkAt = nextBlinkAt({ now });
+                blinkActive = false;
+                blinkAt = nextBlinkAt({ now });
               }
               applyFrame(frameW, frame);
             } else {
@@ -692,18 +699,18 @@
                 frame = 0;
                 applyFrame(frameW, frame);
               }
-              if (idleBlinkAt === 0) idleBlinkAt = nextBlinkAt({ now });
-              if (now >= idleBlinkAt) idleBlinking = true;
+              if (blinkAt === 0) blinkAt = nextBlinkAt({ now });
+              if (now >= blinkAt) blinkActive = true;
             }
             return;
           }
           lastFrameAt = now;
           frame += frameDirection;
-          if (animState === "walk" && cfg2.loop && cfg2.frames > 1) {
+          if (cfg2.playback === "pingpong" && cfg2.frames > 1) {
             if (frame >= cfg2.frames - 1 || frame <= 0) frameDirection *= -1;
             frame = Math.max(0, Math.min(cfg2.frames - 1, frame));
           } else if (frame >= cfg2.frames) {
-            if (cfg2.loop) frame = 0;
+            if (cfg2.playback === "loop") frame = 0;
             else {
               frame = cfg2.frames - 1;
               if (transient !== null && transient !== "wake") {

@@ -30,6 +30,17 @@ export const STATE_NAMES = Object.freeze([
   'drag', 'walk', 'sleep', 'wake', 'welcome', 'think', 'wait',
 ])
 
+// 帧播放模式（manifest 每状态必填；播放器按此推进帧，不再按状态名特判）。
+// - loop：正向循环 0→1→…→N-1→0（帧0=常态起点）
+// - pingpong：往返 0→1→…→N-1→…→0（帧0/末帧为两端姿态，对称）
+// - once：播完保持末帧（帧0=起点、末帧=完成态；配 motion 可叠加持续表现）
+// - blink：常态帧0静止 + 随机间隔触发一次动作播完回帧0（帧0=常态、1..N-1=动作过程）
+export const PLAYBACK_MODES = Object.freeze(['loop', 'pingpong', 'once', 'blink'])
+// 各播放模式对帧数的约束（verify-assets 交叉校验）。
+export const PLAYBACK_MIN_FRAMES = Object.freeze({
+  loop: 1, pingpong: 2, once: 1, blink: 2,
+})
+
 /**
  * 状态优先级表（文法单源）。行序即优先级：首行命中即返回。
  * - `when`：命中谓词（输入上下文）。

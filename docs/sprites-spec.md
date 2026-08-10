@@ -52,23 +52,36 @@
 
 窗口时长不在此重复：burst/瞬发窗口的毫秒值只存 [index.mjs](../index.mjs)；**完整触发条件/优先级/转换语义见 [state-machine.md](state-machine.md)（唯一权威）**，本表触发列只写事件来源。motion 配方与帧播放器默认互斥（`motion` 只配 `frames:1`）；`error` 是唯一多帧+运动叠加的定向例外（见下方规则）。`think`/`wait` 已有 sheet（1 帧 + `float`/`wiggle` 运动配方），表内为实际投放。
 
-| 状态 | 触发 | 帧数 | motion 配方 | loop | 画面 |
+| 状态 | 触发 | 帧数 | motion 配方 | 播放行为 | 画面 |
 |---|---|---|---|---|---|
-| `idle` | 默认（常态睁眼静止，随机间隔眨眼） | 3 | — | ✗ | 待机站姿（睁眼 + 随机眨眼，不再固定循环） |
-| `working` | 思考陪伴期随机插曲（client 节奏器，大部分时间 think） | 3 | — | ✓ | 托腮思考 |
-| `celebrate` | 任务完成/升级/称号（burst，事件+轮询双源）/回合完成（client 本地窗口） | 3 | — | ✓ | 举手欢呼 |
-| `error` | 失败/`agent/request-error`（burst） | 2 | `shake`（定向例外） | ✗ | 正常→惊吓，僵住颤抖 |
-| `disappointed` | 失败后短时失落（burst 尾段） | 2 | — | ✓ | 垂头含泪 |
-| `joy` | 投喂/玩耍后短时 | 2 | — | ✓ | 眯眼笑 |
-| `eat` | 点击投喂（瞬发） | 3 | — | ✓ | 啃咬循环 |
-| `play` | 点击玩耍（瞬发） | 3 | — | ✓ | 抛接球循环 |
-| `drag` | 拖拽中 | 1 | `tilt` | ✓ | 被斜向拉扯 |
-| `walk` | 周期性游走 | 3 | — | ✓ | 侧面行走 |
-| `sleep` | 空闲 ≥60s | 2 | — | ✓ | 蜷睡 |
-| `wake` | 睡醒过渡（瞬发） | 2 | — | ✗ | 伸懒腰 |
-| `welcome` | 新会话（burst） | 2 | — | ✓ | 挥手打招呼 |
-| `think` | 任一会话运行中（sessions 订阅，陪伴底座） | 1 | `float` | ✓ | 沉思陪伴（托腮望向远处，上下浮动） |
-| `wait` | 任一会话等待批准（sessions 订阅，陪伴底座） | 1 | `wiggle` | ✓ | 等待回应（前倾看向观众，左右摇摆） |
+| `idle` | 默认（常态睁眼静止，随机间隔眨眼） | 3 | — | `blink` | 待机站姿（帧0睁眼常态，随机眨眼 0→1→2→0） |
+| `working` | 思考陪伴期随机插曲（client 节奏器，大部分时间 think） | 3 | — | `loop` | 托腮思考 |
+| `celebrate` | 任务完成/升级/称号（burst，事件+轮询双源）/回合完成（client 本地窗口） | 3 | — | `loop` | 举手欢呼 |
+| `error` | 失败/`agent/request-error`（burst） | 2 | `shake`（定向例外） | `once` | 正常→惊吓，播完僵住颤抖 |
+| `disappointed` | 失败后短时失落（burst 尾段） | 2 | — | `loop` | 垂头含泪 |
+| `joy` | 投喂/玩耍后短时 | 2 | — | `loop` | 眯眼笑 |
+| `eat` | 点击投喂（瞬发） | 3 | — | `loop` | 啃咬循环 |
+| `play` | 点击玩耍（瞬发） | 3 | — | `loop` | 抛接球循环 |
+| `drag` | 拖拽中 | 1 | `tilt` | `loop` | 被斜向拉扯 |
+| `walk` | 周期性游走 | 3 | — | `pingpong` | 侧面行走（往返步态） |
+| `sleep` | 空闲 ≥60s | 2 | — | `loop` | 蜷睡 |
+| `wake` | 睡醒过渡（瞬发） | 2 | — | `once` | 伸懒腰，播完保持末帧 |
+| `welcome` | 新会话（burst） | 2 | — | `loop` | 挥手打招呼 |
+| `think` | 任一会话运行中（sessions 订阅，陪伴底座） | 1 | `float` | `loop` | 沉思陪伴（托腮望向远处，上下浮动） |
+| `wait` | 任一会话等待批准（sessions 订阅，陪伴底座） | 1 | `wiggle` | `loop` | 等待回应（前倾看向观众，左右摇摆） |
+
+### 播放行为（playback，manifest 必填）
+
+帧播放模式决定**每帧如何被推进**（播放器按此数据驱动，不再按状态名特判）：
+
+| 模式 | 帧序 | 帧数下限 | 示例 |
+|---|---|---|---|
+| `loop` | 正向循环 0→1→…→N-1→0（帧0=常态起点） | ≥1 | working/celebrate/joy/eat/play/sleep/welcome 等 |
+| `pingpong` | 往返 0→1→…→N-1→…→0（帧0/末帧为两端姿态） | ≥2 | walk（左右腿步态） |
+| `once` | 播完保持末帧（帧0=起点、末帧=完成态） | ≥1 | wake（伸懒腰）、error（僵住+shake） |
+| `blink` | 常态帧0静止 + 随机间隔触发一次动作播完回帧0 | ≥2 | idle（随机眨眼） |
+
+帧序语义契约：**帧0 = 常态起点**（所有模式）——生图时第 1 帧画起点姿态，动作过程在后续帧。
 
 ### 朝向（flip）与素材朝向规范
 
@@ -80,7 +93,21 @@
 
 优先级（[client/logic.mjs](../client/logic.mjs)）：`drag` > 事件 burst（`welcome`/`celebrate`/`error`/`disappointed` 窗口内）> 瞬发（`eat`/`play`/`wake`）> `wait` > 回合完成 `celebrate`（client 本地窗口）> `working`（随机插曲）> `think` > `joy` > `sleep` > `walk` > `idle`。会话活跃时宠物保持清醒陪伴（覆盖 `sleep`/`walk`），用户互动与事件反馈不抢戏。
 
-## manifest 模板（角色索引；whale-girl 13 个有 sheet 状态）
+## 角色契约（第二角色接入清单）
+
+**一个新角色 = 15 张 sheet + 1 段 manifest**，零代码改动。素材契约由 verify-assets 门禁强制：
+
+| # | 契约项 | 要求 |
+|---|---|---|
+| 1 | 状态全量 | 必须提供**全部 15 状态** sheet（缺一即门禁拒收） |
+| 2 | 素材规范 | 纯绿底 `#00FF00` / 帧 256×256 / 内容占比 88% / 底对齐 / 帧横排 / **人物一律朝左** |
+| 3 | 帧序语义 | **帧0 = 常态起点**；动作过程在后续帧（生图时第 1 帧画起点姿态） |
+| 4 | 播放行为 | 每状态声明 `playback`（loop/pingpong/once/blink），帧数满足下限 |
+| 5 | 文件命名 | `assets/characters/<id>/<状态名>.png`，角色 id 限 `[a-z0-9-]` |
+
+**每帧具体行为**见上方「播放行为（playback）」表——每个状态的帧数、播放模式、帧序语义、画面描述都在状态总表内，照表生图即可。
+
+## manifest 模板（角色索引；whale-girl 15 状态全量）
 
 `verify-assets` 要求每个角色 manifest 含全部 15 状态（素材全量契约——缺 sheet 不再 emoji 降级，门禁拒收）。角色索引格式：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）；`default` 指定默认角色；顶层 `states` 为旧格式兼容简写（单角色、sheet 平铺 `assets/`），`verify-assets` 两种格式都校验。
 
@@ -92,21 +119,21 @@
       "credit": "ZipZipPipe",
       "meta": { "stageSize": 110 },
       "states": {
-        "idle":         { "sheet": "idle.png",         "frames": 3, "fps": 2,  "loop": true },
-        "working":      { "sheet": "working.png",      "frames": 3, "fps": 3,  "loop": true },
-        "celebrate":    { "sheet": "celebrate.png",    "frames": 3, "fps": 4,  "loop": true },
-        "error":        { "sheet": "error.png",        "frames": 2, "fps": 8,  "loop": false, "motion": "shake" },
-        "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "loop": true },
-        "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 5,  "loop": true },
-        "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "loop": true },
-        "play":         { "sheet": "play.png",         "frames": 3, "fps": 4,  "loop": true },
-        "drag":         { "sheet": "drag.png",         "frames": 1, "fps": 5,  "loop": true,  "motion": "tilt" },
-        "walk":         { "sheet": "walk.png",         "frames": 3, "fps": 6,  "loop": true },
-        "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "loop": true },
-        "wake":         { "sheet": "wake.png",         "frames": 2, "fps": 3,  "loop": false },
-        "welcome":      { "sheet": "welcome.png",      "frames": 2, "fps": 3,  "loop": true },
-        "think":        { "sheet": "think.png",        "frames": 1, "fps": 2,  "loop": true,  "motion": "float" },
-        "wait":         { "sheet": "wait.png",         "frames": 1, "fps": 2,  "loop": true,  "motion": "wiggle" }
+        "idle":         { "sheet": "idle.png",         "frames": 3, "fps": 2,  "playback": "blink" },
+        "working":      { "sheet": "working.png",      "frames": 3, "fps": 3,  "playback": "loop" },
+        "celebrate":    { "sheet": "celebrate.png",    "frames": 3, "fps": 4,  "playback": "loop" },
+        "error":        { "sheet": "error.png",        "frames": 2, "fps": 8,  "playback": "once",  "motion": "shake" },
+        "disappointed": { "sheet": "disappointed.png", "frames": 2, "fps": 2,  "playback": "loop" },
+        "joy":          { "sheet": "joy.png",          "frames": 2, "fps": 5,  "playback": "loop" },
+        "eat":          { "sheet": "eat.png",          "frames": 3, "fps": 8,  "playback": "loop" },
+        "play":         { "sheet": "play.png",         "frames": 3, "fps": 4,  "playback": "loop" },
+        "drag":         { "sheet": "drag.png",         "frames": 1, "fps": 5,  "playback": "loop",  "motion": "tilt" },
+        "walk":         { "sheet": "walk.png",         "frames": 3, "fps": 6,  "playback": "pingpong" },
+        "sleep":        { "sheet": "sleep.png",        "frames": 2, "fps": 1,  "playback": "loop" },
+        "wake":         { "sheet": "wake.png",         "frames": 2, "fps": 3,  "playback": "once" },
+        "welcome":      { "sheet": "welcome.png",      "frames": 2, "fps": 3,  "playback": "loop" },
+        "think":        { "sheet": "think.png",        "frames": 1, "fps": 2,  "playback": "loop",  "motion": "float" },
+        "wait":         { "sheet": "wait.png",         "frames": 1, "fps": 2,  "playback": "loop",  "motion": "wiggle" }
       }
     }
   },

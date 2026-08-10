@@ -13,7 +13,7 @@ import { STATE_NAMES } from '../../client/logic.mjs'
 function fullStates(overrides = {}) {
   const states = {}
   for (const name of STATE_NAMES) {
-    states[name] = { sheet: `${name}.png`, frames: 2, fps: 4, loop: true }
+    states[name] = { sheet: `${name}.png`, frames: 2, fps: 4, playback: 'loop' }
   }
   for (const [k, v] of Object.entries(overrides)) states[k] = v
   return { states }
@@ -82,7 +82,7 @@ test('拒绝：manifest 不是合法 JSON', () => {
 })
 
 test('拒绝：frames 非法', () => {
-  const bad = fullStates({ idle: { sheet: 'idle.png', frames: 0, fps: 4, loop: true } })
+  const bad = fullStates({ idle: { sheet: 'idle.png', frames: 0, fps: 4, playback: 'loop' } })
   const root = makeTree({ 'assets/manifest.json': bad })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -91,7 +91,7 @@ test('拒绝：frames 非法', () => {
 })
 
 test('拒绝：sheet 扩展名不在 MIME 白名单', () => {
-  const bad = fullStates({ idle: { sheet: 'idle.txt', frames: 2, fps: 4, loop: true } })
+  const bad = fullStates({ idle: { sheet: 'idle.txt', frames: 2, fps: 4, playback: 'loop' } })
   const root = makeTree({ 'assets/manifest.json': bad })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -100,7 +100,7 @@ test('拒绝：sheet 扩展名不在 MIME 白名单', () => {
 })
 
 test('接受：frames:1 + 白名单 motion 配方', () => {
-  const good = fullStates({ idle: { sheet: 'idle.png', frames: 1, fps: 4, loop: true, motion: 'bob' } })
+  const good = fullStates({ idle: { sheet: 'idle.png', frames: 1, fps: 4, playback: 'loop', motion: 'bob' } })
   const root = makeTree({ 'assets/manifest.json': good })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -108,7 +108,7 @@ test('接受：frames:1 + 白名单 motion 配方', () => {
 })
 
 test('拒绝：motion 不在白名单', () => {
-  const bad = fullStates({ idle: { sheet: 'idle.png', frames: 1, fps: 4, loop: true, motion: 'teleport' } })
+  const bad = fullStates({ idle: { sheet: 'idle.png', frames: 1, fps: 4, playback: 'loop', motion: 'teleport' } })
   const root = makeTree({ 'assets/manifest.json': bad })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -117,7 +117,7 @@ test('拒绝：motion 不在白名单', () => {
 })
 
 test('拒绝：motion 配 frames>1（与帧播放器互斥）', () => {
-  const bad = fullStates({ idle: { sheet: 'idle.png', frames: 2, fps: 4, loop: true, motion: 'bob' } })
+  const bad = fullStates({ idle: { sheet: 'idle.png', frames: 2, fps: 4, playback: 'loop', motion: 'bob' } })
   const root = makeTree({ 'assets/manifest.json': bad })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -126,7 +126,7 @@ test('拒绝：motion 配 frames>1（与帧播放器互斥）', () => {
 })
 
 test('接受：定向例外 error 多帧+运动叠加（2帧+shake，仅 error 放行）', () => {
-  const good = fullStates({ error: { sheet: 'error.png', frames: 2, fps: 8, loop: false, motion: 'shake' } })
+  const good = fullStates({ error: { sheet: 'error.png', frames: 2, fps: 8, playback: 'once', motion: 'shake' } })
   const root = makeTree({ 'assets/manifest.json': good })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -134,7 +134,7 @@ test('接受：定向例外 error 多帧+运动叠加（2帧+shake，仅 error �
 })
 
 test('拒绝：error 之外的状态多帧+运动叠加（例外不扩散）', () => {
-  const bad = fullStates({ drag: { sheet: 'drag.png', frames: 2, fps: 5, loop: true, motion: 'tilt' } })
+  const bad = fullStates({ drag: { sheet: 'drag.png', frames: 2, fps: 5, playback: 'loop', motion: 'tilt' } })
   const root = makeTree({ 'assets/manifest.json': bad })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -143,7 +143,7 @@ test('拒绝：error 之外的状态多帧+运动叠加（例外不扩散）', (
 })
 
 test('拒绝：单姿势 256×256 配 frames:2（宽度 ≠ 2×高度，姿势会被劈开）', () => {
-  const bad = fullStates({ eat: { sheet: 'eat.png', frames: 2, fps: 10, loop: false } })
+  const bad = fullStates({ eat: { sheet: 'eat.png', frames: 2, fps: 10, playback: 'once' } })
   const root = makeTree({ 'assets/manifest.json': bad })
   writeSheets(root, 'assets')
   // 覆盖 eat 为 256 单宽（其他状态正常 512）——在 writeSheets 之后覆盖
@@ -155,7 +155,7 @@ test('拒绝：单姿势 256×256 配 frames:2（宽度 ≠ 2×高度，姿势�
 
 test('拒绝：manifest 状态不在 client STATE_NAMES 权威集合', () => {
   const states = fullStates()
-  states.states.teleport = { sheet: 'teleport.png', frames: 1, fps: 4, loop: true }
+  states.states.teleport = { sheet: 'teleport.png', frames: 1, fps: 4, playback: 'loop' }
   const root = makeTree({ 'assets/manifest.json': states })
   writeSheets(root)
   const { ok, errors } = check(root)
@@ -218,4 +218,43 @@ test('接受：旧格式顶层 states（sheet 平铺 assets/）兼容', () => {
   writeSheets(root)
   const { ok, errors } = check(root)
   assert.equal(ok, true, errors.join('\n'))
+})
+
+// ---- playback 播放模式（v5）----
+
+test('接受：四种 playback 模式 + 帧数下限满足', () => {
+  const good = fullStates({
+    idle: { sheet: 'idle.png', frames: 3, fps: 2, playback: 'blink' },
+    walk: { sheet: 'walk.png', frames: 3, fps: 6, playback: 'pingpong' },
+    wake: { sheet: 'wake.png', frames: 2, fps: 3, playback: 'once' },
+  })
+  const root = makeTree({ 'assets/manifest.json': good })
+  writeSheets(root)
+  // blink/pingpong 用 3 帧 → 需 768×256；覆盖（其他状态默认 512×256 匹配 frames:2）
+  writeFileSync(join(root, 'assets', 'idle.png'), fakePng(768, 256))
+  writeFileSync(join(root, 'assets', 'walk.png'), fakePng(768, 256))
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
+})
+
+test('拒绝：playback 不在封闭枚举', () => {
+  const bad = fullStates({ idle: { sheet: 'idle.png', frames: 3, fps: 2, playback: 'teleport' } })
+  const root = makeTree({ 'assets/manifest.json': bad })
+  writeSheets(root)
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /playback "teleport" 不在/)
+})
+
+test('拒绝：blink/pingpong 帧数低于下限（交叉校验）', () => {
+  const bad = fullStates({
+    idle: { sheet: 'idle.png', frames: 1, fps: 2, playback: 'blink' },    // blink 需 ≥2
+    walk: { sheet: 'walk.png', frames: 1, fps: 6, playback: 'pingpong' }, // pingpong 需 ≥2
+  })
+  const root = makeTree({ 'assets/manifest.json': bad })
+  writeSheets(root)
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /playback blink 要求 frames ≥ 2/)
+  assert.match(errors.join('\n'), /playback pingpong 要求 frames ≥ 2/)
 })

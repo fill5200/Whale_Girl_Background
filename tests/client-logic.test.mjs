@@ -2,7 +2,7 @@
 // v2：零负反馈——无 hunger/mood 属性状态；情绪只由事件瞬发 + 互动喜悦。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, STATE_NAMES, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from '../client/logic.mjs'
+import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, STATE_NAMES, PLAYBACK_MODES, PLAYBACK_MIN_FRAMES, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt } from '../client/logic.mjs'
 
 const IDLE = { activity: { name: 'idle', until: 0 }, dragging: false, transient: null, sleeping: false, joyUntil: 0, now: 1000 }
 
@@ -75,6 +75,15 @@ test('TRANSIENT_MS/JOY_MS 与 STATE_NAMES 完整性（15 状态全量契约）',
     [...STATE_NAMES].sort(),
     ['idle', 'working', 'celebrate', 'error', 'disappointed', 'joy', 'eat', 'play', 'drag', 'walk', 'sleep', 'wake', 'welcome', 'think', 'wait'].sort(),
   )
+})
+
+test('PLAYBACK_MODES：封闭枚举 + 帧数下限（播放器数据驱动契约）', () => {
+  assert.deepEqual([...PLAYBACK_MODES].sort(), ['blink', 'loop', 'once', 'pingpong'].sort())
+  // 帧数下限：loop≥1、pingpong≥2、once≥1、blink≥2
+  assert.equal(PLAYBACK_MIN_FRAMES.loop, 1)
+  assert.equal(PLAYBACK_MIN_FRAMES.pingpong, 2)
+  assert.equal(PLAYBACK_MIN_FRAMES.once, 1)
+  assert.equal(PLAYBACK_MIN_FRAMES.blink, 2)
 })
 
 test('会话感知：等待批准 wait 优先于思考陪伴 think（都需要用户注意）', () => {

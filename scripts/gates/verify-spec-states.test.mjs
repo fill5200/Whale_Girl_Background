@@ -11,7 +11,7 @@ import { STATE_NAMES } from '../../client/logic.mjs'
 
 const names = [...STATE_NAMES]
 
-/** 构造一份与当前 STATE_NAMES 完全一致的 spec 总表。 */
+/** 构造一份与当前 STATE_NAMES 完全一致的 spec 总表（状态总表后紧跟 h3 小节表，验证不误读）。 */
 function goodSpec() {
   const rows = names.map((s) => `| \`${s}\` | 触发 | 1 | — | — | 画面 |`)
   return [
@@ -19,9 +19,16 @@ function goodSpec() {
     '',
     '## 状态总表（权威，15 状态）',
     '',
-    '| 状态 | 触发 | 帧数 | motion 配方 | loop | 画面 |',
+    '| 状态 | 触发 | 帧数 | motion 配方 | 播放行为 | 画面 |',
     '|---|---|---|---|---|---|',
     ...rows,
+    '',
+    '### 播放行为（playback，manifest 必填）',
+    '',
+    '| 模式 | 帧序 | 帧数下限 | 示例 |',
+    '|---|---|---|---|',
+    '| `loop` | 正向循环 | ≥1 | working |',
+    '| `pingpong` | 往返 | ≥2 | walk |',
     '',
     '## 其它小节',
     '',
