@@ -2,7 +2,7 @@
 // v2：零负反馈——无 hunger/mood 属性状态；情绪只由事件瞬发 + 互动喜悦。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, STATE_NAMES, PLAYBACK_MODES, PLAYBACK_MIN_FRAMES, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from '../.dsh-plugin/client/logic.mjs'
+import { pickState, TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, STATE_NAMES, PLAYBACK_MODES, PLAYBACK_MIN_FRAMES, deriveSessionMood, STATE_TABLE, nextWorkingRhythm, detectTurnCompleted, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from '../.dsh-plugin/client/logic.mjs'
 
 const IDLE = { activity: { name: 'idle', until: 0 }, dragging: false, transient: null, sleeping: false, joyUntil: 0, now: 1000 }
 
@@ -231,24 +231,37 @@ test('nextWorkingRhythm：working 中 → 随机时长后回 think', () => {
   assert.ok(long.until >= 5000 + 2500 && long.until <= 5000 + 6000) // WORKING_MAX_DUR_MS 区间
 })
 
-test('detectRoundCompleted：completed 从无到有 → flips；seen 去重', () => {
-  const snap = { byId: { s1: { displayTitle: '甲', completed: true }, s2: { completed: false }, s3: { displayTitle: '丙', completed: true } } }
-  const first = detectRoundCompleted(snap, new Set(), 's1')
-  assert.deepEqual(first.flips.map((f) => f.id), ['s1', 's3'])
-  assert.equal(first.seen.has('s1'), true)
-  // 第二次：无新 flips（去重）
-  const second = detectRoundCompleted(snap, first.seen, 's1')
-  assert.deepEqual(second.flips, [])
-  // 新完成的会话才入 flips
-  const snap2 = { byId: { s1: { completed: true }, s4: { displayTitle: '丁', completed: true } } }
-  const third = detectRoundCompleted(snap2, first.seen, 's1')
-  assert.deepEqual(third.flips.map((f) => f.id), ['s4'])
+test('detectTurnCompleted：running true→false 边沿 → flips（含当前/子会话）', () => {
+  const snap1 = { byId: { s1: { displayTitle: '甲', running: true }, s2: { running: false } } }
+  const first = detectTurnCompleted(snap1, new Map())
+  assert.deepEqual(first.flips, []) // 首帧：仅建位表，不触发
+  assert.equal(first.prevRunning.get('s1'), true)
+  assert.equal(first.prevRunning.get('s2'), false)
+  // s1 完成（running→false）→ flips；s2 保持 false → 不触发
+  const snap2 = { byId: { s1: { displayTitle: '甲', running: false }, s2: { running: false } } }
+  const second = detectTurnCompleted(snap2, first.prevRunning)
+  assert.deepEqual(second.flips.map((f) => f.id), ['s1'])
+  // 再次 false → 不触发（无新边沿）
+  const third = detectTurnCompleted(snap2, second.prevRunning)
+  assert.deepEqual(third.flips, [])
+  // 重新 running → 再完成 → 再次触发（新一轮 turn）
+  const snap3 = { byId: { s1: { displayTitle: '甲', running: true } } }
+  const fourth = detectTurnCompleted(snap3, third.prevRunning)
+  assert.deepEqual(fourth.flips, [])
+  const fifth = detectTurnCompleted({ byId: { s1: { running: false } } }, fourth.prevRunning)
+  assert.deepEqual(fifth.flips.map((f) => f.id), ['s1'])
 })
 
-test('detectRoundCompleted：空/损坏快照安全', () => {
-  assert.deepEqual(detectRoundCompleted(undefined, new Set(), 's1').flips, [])
-  assert.deepEqual(detectRoundCompleted({ byId: {} }, new Set(), 's1').flips, [])
-  assert.deepEqual(detectRoundCompleted({ byId: { s1: null } }, new Set(), 's1').flips, [])
+test('detectTurnCompleted：空/损坏快照安全 + 缺行清理', () => {
+  assert.deepEqual(detectTurnCompleted(undefined, new Map()).flips, [])
+  assert.deepEqual(detectTurnCompleted({ byId: {} }, new Map()).flips, [])
+  const r = detectTurnCompleted({ byId: { s1: null } }, new Map())
+  assert.deepEqual(r.flips, [])
+  // 会话从快照消失（删除）：位表清理，避免重开后旧位误判
+  const prev = new Map([['s1', true], ['s2', false]])
+  const after = detectTurnCompleted({ byId: { s2: { running: false } } }, prev)
+  assert.equal(after.prevRunning.has('s1'), false)
+  assert.equal(after.prevRunning.get('s2'), false)
 })
 
 test('shouldWake：sleep→非 sleep 且非拖拽/无瞬发 → 播 wake', () => {

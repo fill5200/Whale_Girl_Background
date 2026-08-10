@@ -184,11 +184,9 @@ export function nextWorkingRhythm({ now, sessionThink, working, random = Math.ra
 
 /**
  * 回合完成翻转检测：sessions 快照里 completed 从无到有的会话。
- * @param {object} snapshot sessions 快照 { byId: { [id]: { completed, displayTitle } } }
- * @param {Set<string>} seen 已播报过的 completed 会话 id（宿主持有，去重）
- * @param {string} [currentId] 当前会话 id（宿主快照 current；无需跳过的由调用方决定）
- * @returns {{ flips: Array<{ id: string, title: string }>, seen: Set<string> }}
- *   flips=本次新完成的会话；seen=更新后的去重集（宿主保存）
+ * 已废弃（2026-08-10 修复）：官方 sessions 的 completed 是「非选中会话」running→false
+ * 边沿（侧栏 done 提醒语义）——当前会话完成不标记、后台/子会话完成误触发。
+ * 改用 detectTurnCompleted（running 边沿）。
  */
 export function detectRoundCompleted(snapshot, seen, currentId) {
   const byId = snapshot?.byId ?? {}
@@ -229,4 +227,33 @@ export function shouldWake(prevState, nextState, ctx = {}) {
  */
 export function wakeFromInteraction({ sleeping }) {
   return { sleeping: false, wake: sleeping === true }
+}
+
+/**
+ * 回合完成边沿检测（v7，取代 detectRoundCompleted）：sessions 快照里 running
+ * true→false 的会话——「一个 turn 结束」的可靠信号（官方快照 running 字段，
+ * 含当前会话与子会话；completed 字段是「非选中会话」done 提醒语义，不可用）。
+ * @param {object} snapshot sessions 快照 { byId: { [id]: { running, displayTitle } } }
+ * @param {Map<string, boolean>} prevRunning 上次观察的 running 位（宿主持有）
+ * @returns {{ flips: Array<{ id: string, title: string }>, prevRunning: Map<string, boolean> }}
+ *   flips=本次 running→false 的会话；prevRunning=更新后的位表（宿主保存）
+ */
+export function detectTurnCompleted(snapshot, prevRunning) {
+  const byId = snapshot?.byId ?? {}
+  const nextPrev = new Map(prevRunning)
+  const flips = []
+  for (const id of Object.keys(byId)) {
+    const s = byId[id]
+    if (s === null || typeof s !== 'object') continue
+    const running = s.running === true
+    if (nextPrev.get(id) === true && !running) {
+      flips.push({ id, title: s.displayTitle ?? id })
+    }
+    nextPrev.set(id, running)
+  }
+  // 快照缺失的会话（已删除/不再列出）：移除位表，防止重开后旧位误判
+  for (const id of nextPrev.keys()) {
+    if (!(id in byId)) nextPrev.delete(id)
+  }
+  return { flips, prevRunning: nextPrev }
 }

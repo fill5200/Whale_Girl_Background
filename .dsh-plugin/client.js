@@ -108,25 +108,29 @@
     const wait = WORKING_MIN_WAIT_MS + random() * (WORKING_MAX_WAIT_MS - WORKING_MIN_WAIT_MS);
     return { active: true, until: now + wait };
   }
-  function detectRoundCompleted(snapshot, seen, currentId) {
-    const byId = snapshot?.byId ?? {};
-    const flips = [];
-    const nextSeen = new Set(seen);
-    for (const id of Object.keys(byId)) {
-      const s = byId[id];
-      if (s === null || typeof s !== "object") continue;
-      if (s.completed === true && !nextSeen.has(id)) {
-        nextSeen.add(id);
-        flips.push({ id, title: s.displayTitle ?? id });
-      }
-    }
-    return { flips, seen: nextSeen };
-  }
   function shouldWake(prevState, nextState, ctx = {}) {
     return prevState === "sleep" && nextState !== "sleep" && !ctx.dragging && (ctx.transient ?? null) === null;
   }
   function wakeFromInteraction({ sleeping }) {
     return { sleeping: false, wake: sleeping === true };
+  }
+  function detectTurnCompleted(snapshot, prevRunning) {
+    const byId = snapshot?.byId ?? {};
+    const nextPrev = new Map(prevRunning);
+    const flips = [];
+    for (const id of Object.keys(byId)) {
+      const s = byId[id];
+      if (s === null || typeof s !== "object") continue;
+      const running = s.running === true;
+      if (nextPrev.get(id) === true && !running) {
+        flips.push({ id, title: s.displayTitle ?? id });
+      }
+      nextPrev.set(id, running);
+    }
+    for (const id of nextPrev.keys()) {
+      if (!(id in byId)) nextPrev.delete(id);
+    }
+    return { flips, prevRunning: nextPrev };
   }
 
   // .dsh-plugin/client/character.mjs
@@ -1150,25 +1154,19 @@
     armWorking();
     const sessions = ctx.sessions ?? (typeof ctx.get === "function" ? ctx.get("sessions") : void 0);
     if (sessions?.list && typeof sessions.list.getSnapshot === "function") {
-      let seenCompleted = /* @__PURE__ */ new Set();
-      let seeded = false;
+      let prevRunning = /* @__PURE__ */ new Map();
       const onSessions = () => {
         try {
           const snap = sessions.list.getSnapshot();
           sessionMood = deriveSessionMood(snap);
-          if (seeded) {
-            const { flips, seen } = detectRoundCompleted(snap, seenCompleted, snap?.current);
-            seenCompleted = seen;
-            if (flips.length > 0) {
-              celebrateUntil = Date.now() + ROUND_CELEBRATE_MS;
-              for (const f of flips) {
-                if (f.id !== snap?.current) showReply(`\u2728 ${f.title} \u5B8C\u6210\u4E86`);
-              }
+          const { flips, prevRunning: nextPrev } = detectTurnCompleted(snap, prevRunning);
+          prevRunning = nextPrev;
+          if (flips.length > 0) {
+            celebrateUntil = Date.now() + ROUND_CELEBRATE_MS;
+            for (const f of flips) {
+              if (f.id !== snap?.current) showReply(`\u2728 ${f.title} \u5B8C\u6210\u4E86`);
             }
-          } else {
-            seenCompleted = detectRoundCompleted(snap, seenCompleted, snap?.current).seen;
           }
-          seeded = true;
           armWorking();
         } catch {
         }
