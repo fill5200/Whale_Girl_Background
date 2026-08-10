@@ -8,11 +8,16 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { check } from './verify-spec-states.mjs'
-import { STATE_NAMES } from '../../client/logic.mjs'
+import { STATE_NAMES, STATE_TABLE } from '../../client/logic.mjs'
 
 const names = [...STATE_NAMES]
 // 真实 playback 映射（与 assets/manifest.json 一致；测试用简化全 loop + idle blink + walk pingpong）
 const PLAYBACK = Object.fromEntries(names.map((s) => [s, s === 'idle' ? 'blink' : s === 'walk' ? 'pingpong' : s === 'wake' || s === 'error' ? 'once' : 'loop']))
+// 与 STATE_TABLE 行序一致的优先级列表（state-machine.md 格式）。
+function goodPriority() {
+  const rows = STATE_TABLE.map((r, i) => `${i + 1}. \`${r.state}\``)
+  return ['## 优先级（STATE_TABLE 行序，文法单源）', '', ...rows, '', '## 状态转换语义', ''].join('\n')
+}
 
 /** 构造一份与当前 STATE_NAMES 完全一致的 spec 总表（状态总表后紧跟 h3 小节表，验证不误读）。 */
 function goodSpec(playback = PLAYBACK) {
@@ -38,11 +43,12 @@ function goodSpec(playback = PLAYBACK) {
   ].join('\n')
 }
 
-function makeTree(specContent, manifest = null) {
+function makeTree(specContent, manifest = null, stateMachine = goodPriority()) {
   const root = mkdtempSync(join(tmpdir(), 'vspec-'))
   const docs = join(root, 'docs')
   mkdirSync(docs, { recursive: true })
   writeFileSync(join(docs, 'sprites-spec.md'), specContent)
+  writeFileSync(join(docs, 'state-machine.md'), stateMachine)
   if (manifest !== null) {
     const assets = join(root, 'assets')
     mkdirSync(assets, { recursive: true })
@@ -115,4 +121,25 @@ test('拒绝：缺少权威总表标题', () => {
   const { ok, errors } = check(makeTree('# 只有标题\n\n没有总表\n'))
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /缺少「状态总表（权威，N 状态）」标题/)
+})
+
+test('接受：优先级列表行序与 STATE_TABLE 一致', () => {
+  const { ok, errors } = check(makeTree(goodSpec(), null, goodPriority()))
+  assert.equal(ok, true, errors.join('\n'))
+})
+
+test('拒绝：优先级列表行序 ≠ STATE_TABLE（文档与文法单源漂移）', () => {
+  // idle 提到首位——文档行序与 STATE_TABLE 不一致即红
+  const tableOrder = STATE_TABLE.map((r) => r.state)
+  const reordered = ['idle', ...tableOrder.filter((s) => s !== 'idle')]
+  const bad = ['## 优先级（STATE_TABLE 行序，文法单源）', '', ...reordered.map((s, i) => `${i + 1}. \`${s}\``), ''].join('\n')
+  const { ok, errors } = check(makeTree(goodSpec(), null, bad))
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /优先级列表行序.*≠.*STATE_TABLE 行序/)
+})
+
+test('拒绝：缺优先级逐行列表（state-machine 无 N. 行）', () => {
+  const { ok, errors } = check(makeTree(goodSpec(), null, '## 优先级\n\ndrag > idle > burst\n'))
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /缺少「## 优先级」逐行列表/)
 })

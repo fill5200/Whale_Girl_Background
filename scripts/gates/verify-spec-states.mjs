@@ -4,7 +4,9 @@
 // 必须同时改 spec 与 STATE_NAMES，任一漏改即红；防止文档漂移），
 // 或 STATE_TABLE 行的状态（含 burst 的 resolve 值）不在 STATE_NAMES（文法漂移），
 // 或 spec 状态总表的播放行为列 ≠ assets/manifest.json 每角色的 playback 值
-// （playback 语义级配错盲区：枚举合法但模式不符——idle 配 loop、walk 配 loop 等）。
+// （playback 语义级配错盲区：枚举合法但模式不符——idle 配 loop、walk 配 loop 等），
+// 或 docs/state-machine.md 优先级逐行列表的行序 ≠ STATE_TABLE 行序
+// （文档优先级是 STATE_TABLE 的行序家——单测不再拷贝 order 数组，此处机械守护）。
 // 只读、确定性。
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -16,6 +18,8 @@ const ROOT = resolve(import.meta.dirname, '../..')
 const TITLE_RE = /^## 状态总表（权威，(\d+) 状态）$/
 // 表格状态行：`| \`name\` | 触发 | 帧数 | motion | \`playback\` | 画面 |`（表头/分隔行除外）。
 const STATE_ROW_RE = /^\| `([a-z-]+)` \|.*\| `([a-z]+)` \|/
+// 优先级逐行列表行：`N. ...`（行内可含多个状态 token，如 `eat` / `play`；全角括号注释忽略）。
+const PRIORITY_ROW_RE = /^\d+\.\s+/
 
 /** 校验 spec 状态总表与 STATE_NAMES/STATE_TABLE/manifest playback 一致。返回 { ok, errors }。 */
 export function check(root = ROOT) {
@@ -92,7 +96,43 @@ export function check(root = ROOT) {
   } catch {
     // manifest 不可读/不可解析：verify-assets 门禁负责报（此处跳过，不重复报）
   }
+  // 优先级列表 ↔ STATE_TABLE 行序（文档为行序家；单测不再拷贝 order 数组）。
+  const docOrder = parsePriorityList(join(root, 'docs', 'state-machine.md'))
+  if (docOrder === null) {
+    errors.push('docs/state-machine.md 缺少「## 优先级」逐行列表（N. 行，verify-spec-states 机械校验行序）')
+  } else {
+    const tableOrder = STATE_TABLE.map((r) => r.state)
+    if (JSON.stringify(docOrder) !== JSON.stringify(tableOrder)) {
+      errors.push(`优先级列表行序 [${docOrder.join(', ')}] ≠ STATE_TABLE 行序 [${tableOrder.join(', ')}]（文档与文法单源漂移）`)
+    }
+  }
   return { ok: errors.length === 0, errors }
+}
+
+/** 解析 docs/state-machine.md 优先级逐行列表 → 状态 token 序列；缺列表返回 null。 */
+export function parsePriorityList(file) {
+  let lines
+  try {
+    lines = readFileSync(file, 'utf8').split('\n')
+  } catch {
+    return null
+  }
+  const order = []
+  let inList = false
+  for (const line of lines) {
+    if (line.startsWith('## 优先级')) { inList = true; continue }
+    if (inList) {
+      if (line.startsWith('## ')) break
+      if (PRIORITY_ROW_RE.test(line)) {
+        // 剥离全角括号注释（burst 行内展开的 4 状态不算顶层 token），取行内全部反引号 token
+        // （`eat` / `play` 一行即两个连续行——文档行序 token 序列须等于 STATE_TABLE 行序）。
+        const withoutNotes = line.replace(/（[^）]*）/g, '')
+        const tokens = [...withoutNotes.matchAll(/`([a-z-]+)`/g)].map((m) => m[1])
+        if (tokens.length > 0) order.push(...tokens)
+      }
+    }
+  }
+  return order.length > 0 ? order : null
 }
 
 // CLI 入口（被 import 时不执行）。

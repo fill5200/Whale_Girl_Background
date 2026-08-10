@@ -171,11 +171,15 @@
     return character?.states?.[stateName];
   }
 
+  // src/routes.mjs
+  var ROUTE_PREFIX = "/plugins/vlln/whale-girl";
+  var STATE_PATH = `${ROUTE_PREFIX}/state`;
+  var INTERACT_PATH = `${ROUTE_PREFIX}/interact`;
+  var CONFIG_PATH = `${ROUTE_PREFIX}/config`;
+  var ASSETS_PATH = `${ROUTE_PREFIX}/assets`;
+
   // client/index.mjs
-  var STATE_PATH = "/plugins/vlln/whale-girl/state";
-  var INTERACT_PATH = "/plugins/vlln/whale-girl/interact";
-  var CONFIG_PATH = "/plugins/vlln/whale-girl/config";
-  var ASSETS_URL = "/plugins/vlln/whale-girl/assets";
+  var ASSETS_URL = ASSETS_PATH;
   var MANIFEST_URL = `${ASSETS_URL}/manifest.json`;
   var CFG_DEFAULTS = {
     size: 110,

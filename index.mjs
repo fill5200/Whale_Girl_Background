@@ -1,6 +1,6 @@
 // whale-girl Node half：积累型账本宿主 + assets 静态服务 + 活动/事件推导 + 状态持久化。
 // 契约：contributes.tools 与下方注册的工具逐名一致（verify-contributes 门禁守护）；
-// 路由路径与 client bundle 一致（见 client/index.mjs 的 STATE_PATH/INTERACT_PATH/ASSETS_URL）；
+// 路由端点单一来源 src/routes.mjs（verify-routes-sync 门禁守护，改前缀只改那里）；
 // activity 是派生字段，不写入账本（账本保持纯函数积累，见 src/pet-state.mjs）。
 // 事件机制（v2，零负反馈）：任务完成 → 资历 +XP/称号/回忆 + celebrate；失败 → 只计数 +
 // error(4s) → disappointed(6s) 瞬发（任务失败与请求错误同一负面窗口，总 10s）；新会话 → welcome；
@@ -23,10 +23,8 @@ import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.m
 
 export const name = 'whale-girl'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
-
-export const STATE_PATH = '/plugins/vlln/whale-girl/state'
-export const INTERACT_PATH = '/plugins/vlln/whale-girl/interact'
-export const CONFIG_PATH = '/plugins/vlln/whale-girl/config'
+// 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
+export { STATE_PATH, INTERACT_PATH, CONFIG_PATH } from './src/routes.mjs'
 
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024

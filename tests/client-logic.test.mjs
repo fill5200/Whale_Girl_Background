@@ -182,10 +182,15 @@ test('STATE_TABLE 行序即优先级：手动验证关键竞争', () => {
   assert.equal(pickState({ ...IDLE, sessionThink: true, celebrateUntil: 2000, now: 1000 }), 'celebrate')
 })
 
-test('STATE_TABLE 全序机械断言：行序 = 文档声明的优先级序（防漂移）', () => {
-  // 权威顺序（docs/state-machine.md 优先级行）：burst 是动态解析行，resolve 4 状态。
-  const order = ['drag', 'idle', 'burst', 'eat', 'play', 'wake', 'wait', 'celebrate', 'working', 'think', 'joy', 'sleep', 'walk', 'idle']
-  assert.deepEqual(STATE_TABLE.map((r) => r.state), order)
+test('STATE_TABLE 全序由 verify-spec-states 门禁守护（state-machine.md 优先级列表 ↔ 行序）', () => {
+  // 行序一致性由门禁机械校验（state-machine.md 优先级列表为行序家）——单测不拷贝 order
+  // 数组（避免第三个家，见决策记录 2026-08-10-doc-system-single-source-and-gates.md）。
+  // 此处只保留结构性断言：表非空、含 burst 动态解析行、末行 idle 兜底。
+  assert.ok(STATE_TABLE.length >= 10)
+  assert.equal(STATE_TABLE.some((r) => r.state === 'burst' && typeof r.resolve === 'function'), true)
+  const last = STATE_TABLE[STATE_TABLE.length - 1]
+  assert.equal(last.state, 'idle')
+  assert.equal(last.when({}), true)
 })
 
 test('拖拽放下缓冲：dragReleaseUntil 内短暂回 idle，再进入底层状态', () => {

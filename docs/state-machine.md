@@ -47,11 +47,21 @@
 
 ## 优先级（STATE_TABLE 行序，文法单源）
 
-```
-drag > dragRelease(idle 缓冲) > burst(welcome/celebrate/error/disappointed)
-> eat/play > wake > wait > 回合完成 celebrate(client 本地窗口)
-> working(随机插曲) > think(常态) > joy > sleep > walk > idle
-```
+逐行列表即行序（`N.` 后的状态 token 与 `client/logic.mjs` 的 `STATE_TABLE` 行序一致，由 verify-spec-states 门禁机械校验——改行序必须同时改本列表与 STATE_TABLE）：
+
+1. `drag`
+2. `idle`（拖拽放下缓冲）
+3. `burst`（`welcome`/`celebrate`/`error`/`disappointed`）
+4. `eat` / `play`（瞬发）
+5. `wake`
+6. `wait`
+7. `celebrate`（回合完成，client 本地窗口）
+8. `working`（随机插曲）
+9. `think`（常态）
+10. `joy`
+11. `sleep`
+12. `walk`
+13. `idle`（兜底）
 
 ## 状态转换语义
 

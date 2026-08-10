@@ -12,11 +12,10 @@
 
 import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
+// 路由端点单一来源（src/routes.mjs，verify-routes-sync 门禁守护）：esbuild 内联进 bundle。
+import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ASSETS_PATH } from '../src/routes.mjs'
 
-const STATE_PATH = '/plugins/vlln/whale-girl/state'
-const INTERACT_PATH = '/plugins/vlln/whale-girl/interact'
-const CONFIG_PATH = '/plugins/vlln/whale-girl/config'
-const ASSETS_URL = '/plugins/vlln/whale-girl/assets'
+const ASSETS_URL = ASSETS_PATH
 const MANIFEST_URL = `${ASSETS_URL}/manifest.json`
 // 客户端运行参数：默认值与 Node half 的 src/config.mjs DEFAULTS 一致（单一来源——
 // 消费端不写第二份默认值，见 verify-config-sync 门禁）。/state 的 configRevision

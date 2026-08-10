@@ -26,18 +26,20 @@
 
 ## 一、事件 → 动作映射（谁能触发什么）
 
+> **触发语义的家在 [state-machine.md](state-machine.md)**（状态清单与触发表 + 触发源表）：窗口时长、优先级、转换语义以其为准，本表不重复。本表只给两件 state-machine 不给的事：**事件源 → 动作的完整映射**与**「角色能改吗」结论**——改触发相关事实先改 state-machine.md，勿只改本表。
+
 | 事件源 | 触发信号 | 动作 | 角色能改吗 |
 |---|---|---|---|
 | 用户拖拽（pointermove>6px） | `dragging` | `drag` | ❌ 触发固定 |
 | 拖拽放下 | `dragReleaseUntil` | `idle`（1.5s 缓冲） | ❌ |
 | 点击喂食/玩耍 | `transient='eat'/'play'` | `eat` / `play` | ❌ |
-| 睡醒过渡（视觉边沿：sleep→非 sleep；交互醒觉：睡着时拖拽/喂食/玩耍/开菜单） | `transient='wake'` | `wake` | ❌ |
+| 睡醒过渡（视觉边沿 / 交互醒觉） | `transient='wake'` | `wake` | ❌ |
 | `tasks.onTaskDone`（completed） | Node burst `celebrate` | `celebrate` | ❌ |
 | 任务升级/称号解锁 | Node burst `celebrate` | `celebrate` | ❌ |
 | `tasks.onTaskDone`（failed） | Node burst `error`→`disappointed` | `error` / `disappointed` | ❌ |
 | `agent/request-error` | Node burst `error`→`disappointed` | `error` / `disappointed` | ❌ |
 | `agent/session-start`（startup） | Node burst `welcome` | `welcome` | ❌ |
-| sessions.list 任一会话 running | client `sessionThink` | `think`（常态）+ `working`（随机插曲，大部分时间 think） | ❌ |
+| sessions.list 任一会话 running | client `sessionThink` | `think`（常态）+ `working`（随机插曲） | ❌ |
 | sessions.list 任一等待批准 | client `sessionWait` | `wait` | ❌ |
 | 互动后短时 | client `joyUntil` | `joy` | ❌ |
 | 空闲 ≥60s | client `sleeping` | `sleep` | ❌ |
