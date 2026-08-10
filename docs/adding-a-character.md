@@ -50,8 +50,8 @@
         "stageSize": 96         //   舞台尺寸 px（默认 110）
       },
       "states": {               // ← 动作槽位表（全量映射——15 状态必须有 sheet）
-        "idle":      { "sheet": "idle.png",      "frames": 3, "fps": 2,  "loop": true },
-        "working":   { "sheet": "working.png",   "frames": 3, "fps": 3,  "loop": true },
+        "idle":      { "sheet": "idle.png",      "frames": 3, "fps": 2,  "playback": "blink" },
+        "working":   { "sheet": "working.png",   "frames": 3, "fps": 3,  "playback": "loop" },
         // 必须填满 15 状态：celebrate/error/disappointed/joy/eat/play/drag/walk/sleep/wake/welcome/think/wait
         // 单帧动作可加 motion 配方（bob/wiggle/squash/shake/sigh/hop/tilt/float/wave）
       }
@@ -68,7 +68,7 @@
 | `sheet` | ✓ | 素材文件名 | 放 `assets/characters/<id>/` |
 | `frames` | ✓ | 帧数 | 多帧横排 sheet；`PNG 宽 = frames × 256` |
 | `fps` | ✓ | 播放帧率 | 正数 |
-| `loop` | ✓ | 是否循环 | 瞬发动作（wake/error）false |
+| `playback` | ✓ | 帧播放模式 | `loop`（正向循环）/`pingpong`（往返，frames≥2）/`once`（播完保持末帧）/`blink`（常态静止+随机动作，frames≥2）——见 sprites-spec「播放行为」表 |
 | `motion` | ✗ | CSS 运动配方 | **仅 `frames:1`** 可配（除 error 定向例外）；白名单：bob/wiggle/squash/shake/sigh/hop/tilt/float/wave |
 
 ### meta 槽位（视觉参数）
@@ -81,7 +81,7 @@
 
 ### ✅ 角色可以（资源级，零代码）
 1. **提供动作资源**：为全部 15 状态填 sheet（全量映射，缺一即门禁拒收）
-2. **调表现参数**：每动作 frames/fps/loop/motion；角色 stageSize
+2. **调表现参数**：每动作 frames/fps/playback/motion；角色 stageSize
 
 ### ❌ 角色不能（行为级，需平台变更）
 1. **新增动作**（如「猫的舔毛」）——那是加状态 = 改 STATE_TABLE + STATE_NAMES + spec + 门禁
@@ -108,6 +108,6 @@
 
 | 门禁 | 校验 |
 |---|---|
-| `verify-assets` | **15 状态全量齐备**/sheet 存在/扩展名白名单/frames 正整数/PNG 宽=帧数×高/motion 白名单 + frames:1/角色 id `[a-z0-9-]`/default 指向存在角色 |
+| `verify-assets` | **15 状态全量齐备**/sheet 存在/扩展名白名单/frames 正整数/**playback 枚举 + 帧数下限**/PNG 宽=帧数×高/motion 白名单 + frames:1/角色 id `[a-z0-9-]`/default 指向存在角色 |
 | `verify-spec-states` | 状态总表 ↔ STATE_NAMES ↔ STATE_TABLE 一致（15 状态封闭集合） |
 | `verify-client-smoke` | 浏览器渲染 + transform 合法 |

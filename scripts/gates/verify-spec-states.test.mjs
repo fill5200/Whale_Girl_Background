@@ -1,6 +1,7 @@
 // 门禁自证：verify-spec-states 必须证明它会拒绝（法则 2）。
 // 归属：门禁源码改动跑本文件（node --test scripts/gates/）。
-// v5：权威集合从 EMOJI 表改为 STATE_NAMES（素材全量契约），并校验 STATE_TABLE 行漂移。
+// v5：权威集合从 EMOJI 表改为 STATE_NAMES（素材全量契约），校验 STATE_TABLE 行漂移，
+// 并校验 spec 状态总表播放行为列 ↔ manifest playback 值（语义级配错盲区）。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -10,10 +11,12 @@ import { check } from './verify-spec-states.mjs'
 import { STATE_NAMES } from '../../client/logic.mjs'
 
 const names = [...STATE_NAMES]
+// 真实 playback 映射（与 assets/manifest.json 一致；测试用简化全 loop + idle blink + walk pingpong）
+const PLAYBACK = Object.fromEntries(names.map((s) => [s, s === 'idle' ? 'blink' : s === 'walk' ? 'pingpong' : s === 'wake' || s === 'error' ? 'once' : 'loop']))
 
 /** 构造一份与当前 STATE_NAMES 完全一致的 spec 总表（状态总表后紧跟 h3 小节表，验证不误读）。 */
-function goodSpec() {
-  const rows = names.map((s) => `| \`${s}\` | 触发 | 1 | — | — | 画面 |`)
+function goodSpec(playback = PLAYBACK) {
+  const rows = names.map((s) => `| \`${s}\` | 触发 | 1 | — | \`${playback[s]}\` | 画面 |`)
   return [
     '# Sprite 素材规格（生图契约）',
     '',
@@ -35,11 +38,16 @@ function goodSpec() {
   ].join('\n')
 }
 
-function makeTree(specContent) {
+function makeTree(specContent, manifest = null) {
   const root = mkdtempSync(join(tmpdir(), 'vspec-'))
-  const p = join(root, 'docs', 'sprites-spec.md')
-  mkdirSync(dirname(p), { recursive: true })
-  writeFileSync(p, specContent)
+  const docs = join(root, 'docs')
+  mkdirSync(docs, { recursive: true })
+  writeFileSync(join(docs, 'sprites-spec.md'), specContent)
+  if (manifest !== null) {
+    const assets = join(root, 'assets')
+    mkdirSync(assets, { recursive: true })
+    writeFileSync(join(assets, 'manifest.json'), JSON.stringify(manifest))
+  }
   return root
 }
 
@@ -48,13 +56,27 @@ test('接受：spec 总表与 STATE_NAMES 逐名一致、声明数正确', () =>
   assert.equal(ok, true, errors.join('\n'))
 })
 
+test('接受：spec 播放行为列与 manifest playback 一致', () => {
+  const manifest = { characters: { 'whale-girl': { states: Object.fromEntries(names.map((s) => [s, { sheet: `${s}.png`, frames: 2, fps: 4, playback: PLAYBACK[s] }])) } }, default: 'whale-girl' }
+  const { ok, errors } = check(makeTree(goodSpec(), manifest))
+  assert.equal(ok, true, errors.join('\n'))
+})
+
+test('拒绝：spec 播放行为列 ≠ manifest playback（语义级配错：idle 配 loop）', () => {
+  const specBad = goodSpec({ ...PLAYBACK, idle: 'loop' }) // spec 说 idle=loop
+  const manifest = { characters: { 'whale-girl': { states: Object.fromEntries(names.map((s) => [s, { sheet: `${s}.png`, frames: 2, fps: 4, playback: PLAYBACK[s] }])) } }, default: 'whale-girl' }
+  const { ok, errors } = check(makeTree(specBad, manifest))
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /characters\.whale-girl\.states\.idle: manifest playback "blink" ≠ spec 状态总表播放行为 "loop"/)
+})
+
 test('拒绝：STATE_NAMES 有但 spec 缺（新增状态漏同步 spec）', () => {
-  const rows = names.filter((s) => s !== 'think').map((s) => `| \`${s}\` | 触发 | 1 | — | — | 画面 |`)
+  const rows = names.filter((s) => s !== 'think').map((s) => `| \`${s}\` | 触发 | 1 | — | \`${PLAYBACK[s]}\` | 画面 |`)
   const spec = [
     '## 状态总表（权威，14 状态）',
     '',
-    '| 状态 | 帧数 |',
-    '|---|---|',
+    '| 状态 | 帧数 | 播放行为 |',
+    '|---|---|---|',
     ...rows,
   ].join('\n')
   const { ok, errors } = check(makeTree(spec))
@@ -63,12 +85,12 @@ test('拒绝：STATE_NAMES 有但 spec 缺（新增状态漏同步 spec）', () 
 })
 
 test('拒绝：spec 有但 STATE_NAMES 缺（删除/改名状态漏同步 logic.mjs）', () => {
-  const rows = [...names, 'teleport'].map((s) => `| \`${s}\` | 触发 | 1 | — | — | 画面 |`)
+  const rows = [...names, 'teleport'].map((s) => `| \`${s}\` | 触发 | 1 | — | \`${PLAYBACK[s] ?? 'loop'}\` | 画面 |`)
   const spec = [
     '## 状态总表（权威，16 状态）',
     '',
-    '| 状态 | 帧数 |',
-    '|---|---|',
+    '| 状态 | 帧数 | 播放行为 |',
+    '|---|---|---|',
     ...rows,
   ].join('\n')
   const { ok, errors } = check(makeTree(spec))
@@ -80,9 +102,9 @@ test('拒绝：声明数与表格行数不符（标题数字漂移）', () => {
   const spec = [
     '## 状态总表（权威，99 状态）',
     '',
-    '| 状态 | 帧数 |',
-    '|---|---|',
-    ...names.map((s) => `| \`${s}\` | 1 |`),
+    '| 状态 | 帧数 | 播放行为 |',
+    '|---|---|---|',
+    ...names.map((s) => `| \`${s}\` | 1 | \`${PLAYBACK[s]}\` |`),
   ].join('\n')
   const { ok, errors } = check(makeTree(spec))
   assert.equal(ok, false)

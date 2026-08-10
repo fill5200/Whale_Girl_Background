@@ -4,7 +4,7 @@
 // factory(require) 返回 Cordis 插件导出面（name/inject/apply）；apply 返回 disposer，
 // 绑定插件 fiber，disable 时清理。零平台模块依赖：CSS 内联注入，动画/拖拽/菜单全部自建。
 //
-// 视觉：sprite sheet 帧播放器（assets/manifest.json 声明 状态→sheet/frames/fps/loop，
+// 视觉：sprite sheet 帧播放器（assets/manifest.json 声明 状态→sheet/frames/fps/playback，
 // 每状态一张横排帧图，透明背景）；sheet 缺失/未加载时显示占位（不再 emoji 降级）。
 // 状态选择与表情映射是纯函数（client/logic.mjs，可单测）；本文件只做 DOM 与计时。
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
@@ -596,6 +596,10 @@ export function apply(ctx = {}) {
     setState(target)
     const cfg = stateOf(character, animState)
     if (cfg && loaded.has(sheetKey(cfg.sheet))) {
+      // playback 合法性自检：门禁保证仓库内 manifest 合法，此处防发布物被改坏时静默僵住。
+      if (cfg.playback !== undefined && !['loop', 'pingpong', 'once', 'blink'].includes(cfg.playback)) {
+        console.warn(`[dsh-pet] 状态 ${animState} playback "${cfg.playback}" 非法，按 loop 播放`)
+      }
       const size = sheetSize.get(sheetKey(cfg.sheet))
       const frameW = size.w / cfg.frames
       if (!showingSprite) {
@@ -657,7 +661,7 @@ export function apply(ctx = {}) {
             // once：播完保持末帧（帧0=起点、末帧=完成态）
             frame = cfg.frames - 1
             if (transient !== null && transient !== 'wake') {
-              resetTransient(now) // 瞬发 once（wake/error）播完即复位（早于超时）
+              resetTransient(now) // 非 wake 瞬发播完即复位（早于超时）；wake 保持末帧直到 WAKE_MS 超时
             }
           }
         }

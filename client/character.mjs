@@ -4,7 +4,7 @@
 //   或 `{ characters: { <id>: { meta?, states } }, default }`。
 // - 角色 character = { id, name?, credit?, meta?, states }；states 是「状态名 → 动画集」
 //   的**全量映射**——15 状态必须全部提供 sheet（不再 emoji 降级，verify-assets 门禁强制）。
-// - 动画集 animation set = manifest.states 条目 { sheet, frames, fps, loop, motion }。
+// - 动画集 animation set = manifest.states 条目 { sheet, frames, fps, playback, motion }。
 // - 角色 id 限制 [a-z0-9-]（进入 URL 路径，防注入；assets 路由另有路径净化兜底）。
 import { STATE_NAMES } from './logic.mjs'
 

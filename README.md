@@ -28,7 +28,7 @@ dsh-pet:
 
 ## 角色（换角色零改代码）
 
-`assets/manifest.json` 是角色索引：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）+ `default`。换角色 = 新增角色目录 + manifest 条目 + 设置 localStorage `dsh-pet:character`（或点菜单「🎭 换角色」按钮循环切换）；缺 sheet 状态自动 emoji 兜底。**完整开发指南（事件→动作映射、动作槽位、扩展边界、动手步骤）见 [docs/adding-a-character.md](docs/adding-a-character.md)**。旧格式顶层 `states`（sheet 平铺 `assets/`）兼容。
+`assets/manifest.json` 是角色索引：`characters.<id>.states`（sheet 在 `assets/characters/<id>/`）+ `default`。换角色 = 新增角色目录 + manifest 条目 + 设置 localStorage `dsh-pet:character`（或点菜单「🎭 换角色」按钮循环切换）；每个角色必须提供**全部 15 状态**的 sheet（素材全量契约，缺一即门禁拒收）。**完整开发指南（事件→动作映射、动作槽位、扩展边界、动手步骤）见 [docs/adding-a-character.md](docs/adding-a-character.md)**。旧格式顶层 `states`（sheet 平铺 `assets/`）兼容。
 
 ## 开发循环
 
@@ -43,11 +43,11 @@ dsh registry uninstall vlln/dsh-pet && dsh registry install ./dsh-pet && dsh reg
 
 ## 素材（sprite sheet）契约
 
-宠物的图是**每状态一张横排帧图**（可含 2~4 个中间帧），由 `assets/manifest.json` 声明。**完整规格（15 状态、帧数、逐状态生图提示、manifest 模板）见 [docs/sprites-spec.md](docs/sprites-spec.md)**；**状态机（状态清单/触发/优先级/扩展指引）见 [docs/state-machine.md](docs/state-machine.md)**，要点：
+宠物的图是**每状态一张横排帧图**（1~3 帧，由状态播放模式决定），由 `assets/manifest.json` 声明。**完整规格（15 状态、帧数、播放行为、逐状态生图提示、manifest 模板）见 [docs/sprites-spec.md](docs/sprites-spec.md)**；**状态机（状态清单/触发/优先级/扩展指引）见 [docs/state-machine.md](docs/state-machine.md)**，要点：
 
 - **生图要求**：**纯绿色 `#00FF00` 背景**（❌ 洋红/粉/紫底——与鲸鱼娘蓝紫粉配色在色域重叠，实测反复出残边；❌ 白/浅灰底；❌ 不要提示透明背景——生图模型会画假透明棋盘格，抠图死局）；每状态一张横排帧图，帧等宽同高；风格一致（参考 `originals/鲸鱼娘.png`，建议先出角色设定图锁定风格）。
-- **投放方式**：图放进 `assets/characters/<角色id>/`（多帧为横排单图），在 `assets/manifest.json` 对应角色的 `states` 加条目——`verify-assets` 门禁保证引用的文件存在、多帧 PNG 尺寸符合帧数、角色 id 合法（缺文件/尺寸不符/非法 id 即门禁红）。
-- **sheet 缺失时该状态用 emoji 兜底**，可增量投放。
+- **投放方式**：图放进 `assets/characters/<角色id>/`（多帧为横排单图），在 `assets/manifest.json` 对应角色的 `states` 加条目（含 `playback` 播放模式）——`verify-assets` 门禁保证引用的文件存在、多帧 PNG 尺寸符合帧数、playback 枚举合法、角色 id 合法（缺文件/尺寸不符/非法 id 即门禁红）。
+- **素材全量契约**：每个角色必须提供全部 15 状态 sheet（不再 emoji 兜底——缺失即门禁拒收）；每状态声明 `playback`（loop/pingpong/once/blink）决定帧如何播放。
 
 ## 结构
 

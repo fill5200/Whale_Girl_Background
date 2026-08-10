@@ -2,7 +2,9 @@
 // 拒绝不变量：spec「状态总表（权威，N 状态）」声明数 ≠ 表格实际状态行数，
 // 或表格状态集合 ≠ client/logic.mjs 的 STATE_NAMES（双向——新增/改名状态
 // 必须同时改 spec 与 STATE_NAMES，任一漏改即红；防止文档漂移），
-// 或 STATE_TABLE 行的状态（含 burst 的 resolve 值）不在 STATE_NAMES（文法漂移）。
+// 或 STATE_TABLE 行的状态（含 burst 的 resolve 值）不在 STATE_NAMES（文法漂移），
+// 或 spec 状态总表的播放行为列 ≠ assets/manifest.json 每角色的 playback 值
+// （playback 语义级配错盲区：枚举合法但模式不符——idle 配 loop、walk 配 loop 等）。
 // 只读、确定性。
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -12,10 +14,10 @@ import { STATE_NAMES, STATE_TABLE } from '../../client/logic.mjs'
 const ROOT = resolve(import.meta.dirname, '../..')
 // 权威总表标题：`## 状态总表（权威，N 状态）`（N 由表格行数验证，防止手改标题数漂移）。
 const TITLE_RE = /^## 状态总表（权威，(\d+) 状态）$/
-// 表格状态行：`| \`name\` | ...`（表头/分隔行除外）。
-const STATE_ROW_RE = /^\| `([a-z-]+)` \|/
+// 表格状态行：`| \`name\` | 触发 | 帧数 | motion | \`playback\` | 画面 |`（表头/分隔行除外）。
+const STATE_ROW_RE = /^\| `([a-z-]+)` \|.*\| `([a-z]+)` \|/
 
-/** 校验 spec 状态总表与 STATE_NAMES/STATE_TABLE 一致。返回 { ok, errors }。 */
+/** 校验 spec 状态总表与 STATE_NAMES/STATE_TABLE/manifest playback 一致。返回 { ok, errors }。 */
 export function check(root = ROOT) {
   const errors = []
   const spec = join(root, 'docs', 'sprites-spec.md')
@@ -27,7 +29,7 @@ export function check(root = ROOT) {
   }
   let declared = null
   let inTable = false
-  const rows = []
+  const rows = [] // { name, playback }
   for (const line of lines) {
     const t = TITLE_RE.exec(line)
     if (t !== null) {
@@ -38,7 +40,7 @@ export function check(root = ROOT) {
     if (inTable) {
       if (line.startsWith('#')) break // 表格结束（下一标题，h2/h3 皆然——状态总表是第一个表）
       const m = STATE_ROW_RE.exec(line)
-      if (m !== null && !line.includes('---')) rows.push(m[1])
+      if (m !== null && !line.includes('---')) rows.push({ name: m[1], playback: m[2] })
     }
   }
   if (declared === null) {
@@ -48,7 +50,7 @@ export function check(root = ROOT) {
   if (rows.length !== declared) {
     errors.push(`状态总表声明 ${declared} 状态，表格实际 ${rows.length} 行（新增/删除状态须同步标题数字与表格）`)
   }
-  const specSet = new Set(rows)
+  const specSet = new Set(rows.map((r) => r.name))
   const nameSet = new Set(STATE_NAMES)
   for (const name of nameSet) {
     if (!specSet.has(name)) errors.push(`client STATE_NAMES 有 ${name}，spec 状态总表缺（须同步 docs/sprites-spec.md）`)
@@ -64,6 +66,31 @@ export function check(root = ROOT) {
   }
   for (const dynamic of ['welcome', 'celebrate', 'error', 'disappointed']) {
     if (!nameSet.has(dynamic)) errors.push(`burst 动态解析值 ${dynamic} 不在 STATE_NAMES`)
+  }
+  // spec 播放行为列 ↔ manifest playback 对照（语义级配错盲区拦截）。
+  const manifestPath = join(root, 'assets', 'manifest.json')
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    const specPlayback = new Map(rows.map((r) => [r.name, r.playback]))
+    const collect = (states, label) => {
+      for (const [name, cfg] of Object.entries(states ?? {})) {
+        if (cfg !== null && typeof cfg === 'object' && typeof cfg.playback === 'string') {
+          const expected = specPlayback.get(name)
+          if (expected !== undefined && cfg.playback !== expected) {
+            errors.push(`${label}.${name}: manifest playback "${cfg.playback}" ≠ spec 状态总表播放行为 "${expected}"（须同步）`)
+          }
+        }
+      }
+    }
+    if (manifest?.characters !== null && typeof manifest?.characters === 'object') {
+      for (const [id, ch] of Object.entries(manifest.characters)) {
+        if (ch !== null && typeof ch === 'object') collect(ch.states, `characters.${id}.states`)
+      }
+    } else {
+      collect(manifest?.states, 'states')
+    }
+  } catch {
+    // manifest 不可读/不可解析：verify-assets 门禁负责报（此处跳过，不重复报）
   }
   return { ok: errors.length === 0, errors }
 }

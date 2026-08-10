@@ -258,3 +258,41 @@ test('拒绝：blink/pingpong 帧数低于下限（交叉校验）', () => {
   assert.match(errors.join('\n'), /playback blink 要求 frames ≥ 2/)
   assert.match(errors.join('\n'), /playback pingpong 要求 frames ≥ 2/)
 })
+
+test('拒绝：playback 字段缺失（undefined）——枚举校验兜住', () => {
+  const bad = fullStates()
+  delete bad.states.idle.playback // 漏配 playback
+  const root = makeTree({ 'assets/manifest.json': bad })
+  writeSheets(root)
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /playback "undefined" 不在/)
+})
+
+test('拒绝：characters 与顶层 states 并存时顶层遗留块同样校验（防死数据盲区）', () => {
+  // characters 全量正常 + 顶层 states 缺必备状态（think）→ 并存时也必须红
+  const bad = {
+    characters: { 'whale-girl': { states: fullStates().states } },
+    default: 'whale-girl',
+    states: (() => { const s = fullStates().states; delete s.think; return s })(),
+  }
+  const root = makeTree({ 'assets/manifest.json': bad })
+  writeSheets(root, 'assets/characters/whale-girl')
+  writeSheets(root, 'assets')
+  const { ok, errors } = check(root)
+  assert.equal(ok, false)
+  assert.match(errors.join('\n'), /states: 缺必备状态 think/)
+})
+
+test('接受：characters 与顶层 states 并存且都全量合法', () => {
+  const good = {
+    characters: { 'whale-girl': { states: fullStates().states } },
+    default: 'whale-girl',
+    states: fullStates().states,
+  }
+  const root = makeTree({ 'assets/manifest.json': good })
+  writeSheets(root, 'assets/characters/whale-girl')
+  writeSheets(root, 'assets')
+  const { ok, errors } = check(root)
+  assert.equal(ok, true, errors.join('\n'))
+})

@@ -665,6 +665,9 @@
       setState(target);
       const cfg2 = stateOf(character, animState);
       if (cfg2 && loaded.has(sheetKey(cfg2.sheet))) {
+        if (cfg2.playback !== void 0 && !["loop", "pingpong", "once", "blink"].includes(cfg2.playback)) {
+          console.warn(`[dsh-pet] \u72B6\u6001 ${animState} playback "${cfg2.playback}" \u975E\u6CD5\uFF0C\u6309 loop \u64AD\u653E`);
+        }
         const size = sheetSize.get(sheetKey(cfg2.sheet));
         const frameW = size.w / cfg2.frames;
         if (!showingSprite) {

@@ -20,7 +20,7 @@
 - **行为层（共通，不可替换）**：15 状态语义、pickState 优先级、过渡语义、motion 白名单、
   帧播放器、拖拽/菜单/状态卡/sessions 订阅/wander——任何角色共享。
 - **角色 character（可替换单元）**：`{ id, name, credit?, meta{ stageSize, maxSprite, anchor }, states: {状态→动画集} }`
-- **动画集 animation set（最小替换单元）**：现 manifest.states 条目 `{ sheet, frames, fps, loop, motion }`，原样保留。
+- **动画集 animation set（最小替换单元）**：现 manifest.states 条目 `{ sheet, frames, fps, playback, motion }`（playback 数据驱动，见 [playback-data-driven](../decisions/implemented/feature/2026-08-09-playback-data-driven.md)）。
 - **主题 skin（暂不落地，接口预留）**：同角色多配色时才有独立存在意义（YAGNI），解析函数签名预留 overlay 位。
 
 ### 数据面
@@ -28,9 +28,10 @@
 // assets/manifest.json 升级为角色索引（兼容顶层 states 旧读）
 { "characters": { "whale-girl": { "meta": { "stageSize": 110, "credit": "ZipZipPipe" },
                                    "states": { /* 现 states 原样搬入 */ } },
-                  "cat": { "meta": { "stageSize": 96 }, "states": { /* 只声明 8 状态 */ } } },
+                  "cat": { "meta": { "stageSize": 96 }, "states": { /* 全部 15 状态 */ } } },
   "default": "whale-girl" }
 // assets/characters/<id>/<sheet>.png —— Node half 零改动（assets 路由已支持子目录）
+// 注：素材全量契约要求每角色 15 状态全有 sheet（缺一即门禁拒收），见 asset-full-contract 决策
 ```
 
 ### 关键改造点（client 三处参数化）

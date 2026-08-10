@@ -71,6 +71,7 @@ test('确定性：显式 now 时相同输入相同输出', () => {
 test('TRANSIENT_MS/JOY_MS 与 STATE_NAMES 完整性（15 状态全量契约）', () => {
   assert.equal(TRANSIENT_MS, 1500)
   assert.equal(JOY_MS, 1600)
+  assert.equal(ROUND_CELEBRATE_MS, 4000) // 回合完成庆祝窗口
   assert.deepEqual(
     [...STATE_NAMES].sort(),
     ['idle', 'working', 'celebrate', 'error', 'disappointed', 'joy', 'eat', 'play', 'drag', 'walk', 'sleep', 'wake', 'welcome', 'think', 'wait'].sort(),
@@ -179,6 +180,12 @@ test('STATE_TABLE 行序即优先级：手动验证关键竞争', () => {
   assert.equal(pickState({ ...IDLE, sessionThink: true, sleeping: true, now: 2500 }), 'think')
   // celebrate（回合完成窗口）低于 wait、高于 think
   assert.equal(pickState({ ...IDLE, sessionThink: true, celebrateUntil: 2000, now: 1000 }), 'celebrate')
+})
+
+test('STATE_TABLE 全序机械断言：行序 = 文档声明的优先级序（防漂移）', () => {
+  // 权威顺序（docs/state-machine.md 优先级行）：burst 是动态解析行，resolve 4 状态。
+  const order = ['drag', 'idle', 'burst', 'eat', 'play', 'wake', 'wait', 'celebrate', 'working', 'think', 'joy', 'sleep', 'walk', 'idle']
+  assert.deepEqual(STATE_TABLE.map((r) => r.state), order)
 })
 
 test('拖拽放下缓冲：dragReleaseUntil 内短暂回 idle，再进入底层状态', () => {

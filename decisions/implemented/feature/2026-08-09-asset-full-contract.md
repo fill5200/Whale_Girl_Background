@@ -28,4 +28,4 @@ Status: implemented
 - EMOJI/emojiFor/emojiOverrides/showEmoji 删除（五处实现移除），状态权威收敛到 STATE_NAMES 单点。
 - 运行时 sheet 加载失败 → 占位 + 警告（异常路径，正常投放不触发）。
 - 测试更新：verify-assets 自证（全量齐备接受/缺状态拒绝/未知状态拒绝）、verify-spec-states 自证（STATE_NAMES 权威）、client-logic/character 测试删 EMOJI 断言。
-- 关联决策：本决策部分取代 character-manifest 的「缺 sheet → emoji 兜底」描述（该记录保留，互链指向本决策）。
+- 关联决策：本决策部分取代 [character-manifest](2026-08-09-character-manifest.md) 的「缺 sheet → emoji 兜底」描述（该记录保留，互链指向本决策）。

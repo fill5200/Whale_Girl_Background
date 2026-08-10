@@ -108,7 +108,8 @@ export function check(root = ROOT) {
   if (manifest === null || typeof manifest !== 'object') {
     return { ok: false, errors: ['assets/manifest.json 必须是对象'] }
   }
-  // 角色索引优先（characters），旧格式 states 兼容（视为单角色，sheet 在平铺 assets/）。
+  // 角色索引（characters）优先；顶层 states（旧格式）若并存也校验——两种格式都校验，
+  // 防止「characters 存在时顶层遗留块无人管」的死数据盲区。
   const hasCharacters = manifest.characters !== undefined
   if (hasCharacters) {
     if (manifest.characters === null || typeof manifest.characters !== 'object' || Array.isArray(manifest.characters)) {
@@ -132,6 +133,14 @@ export function check(root = ROOT) {
     if (manifest.default !== undefined) {
       if (typeof manifest.default !== 'string' || !(manifest.default in manifest.characters)) {
         errors.push(`default "${String(manifest.default)}" 必须指向 characters 中存在的角色`)
+      }
+    }
+    // 并存校验：顶层 states 若存在（旧格式兼容块），按平铺目录同样校验——不允许死数据逃过门禁。
+    if (manifest.states !== undefined) {
+      if (manifest.states === null || typeof manifest.states !== 'object' || Array.isArray(manifest.states)) {
+        errors.push('assets/manifest.json 的顶层 states（兼容块）必须是对象')
+      } else {
+        checkStates(manifest.states, null, errors, root)
       }
     }
   } else {
