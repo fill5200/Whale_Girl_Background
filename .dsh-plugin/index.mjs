@@ -24,7 +24,8 @@ import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.m
 export const name = 'whale-girl'
 export const inject = ['httpServer', 'tools', 'tasks', 'agents']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
-export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX } from './src/routes.mjs'
+import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX } from './src/routes.mjs'
+export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX }
 // client 自执行脚本（build 产物，同目录 client.js；由 UI 路由 /whale-girl/ui.js 服务）。
 const UI_SCRIPT = readFileSync(new URL('./client.js', import.meta.url))
 

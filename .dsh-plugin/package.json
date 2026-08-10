@@ -20,5 +20,9 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-repository-plugin": "0.0.1"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-tools": "0.0.1",
+    "cordis": "^4.0.0-rc.7"
   }
 }

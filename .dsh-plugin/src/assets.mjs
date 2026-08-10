@@ -1,6 +1,7 @@
 // assets 静态服务守卫：路径净化 + MIME 映射（纯函数，零宿主依赖，可单测）。
 // 契约：从请求 pathname 提取相对 assets 目录的安全子路径；含 `..`/`.`/空段/`\`（Windows 分隔符）/绝对路径即拒绝。
 import { ASSETS_PATH } from './routes.mjs'
+export { ASSETS_PATH }
 
 /**
  * 从请求 pathname 提取安全相对路径；非法返回 null。
