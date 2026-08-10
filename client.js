@@ -351,6 +351,7 @@
     menu.append(feedBtn, playBtn, roleBtn);
     const effects = document.createElement("div");
     effects.className = "pet-effects";
+    effects.style.cssText = "position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px); pointer-events: none; overflow: visible; z-index: 2;";
     const hitarea = document.createElement("div");
     hitarea.className = "pet-hitarea";
     hitarea.style.cssText = `position: absolute; inset: 0; cursor: grab; touch-action: none; z-index: 3; border-radius: 8px;`;
@@ -732,8 +733,11 @@
         const heart = document.createElement("div");
         heart.className = "pet-heart";
         heart.textContent = "\u{1F497}";
-        heart.style.left = `${20 + Math.random() * 110}px`;
-        heart.style.top = `${30 + Math.random() * 80}px`;
+        heart.style.cssText = `
+        position: absolute; font-size: 20px; pointer-events: none; line-height: 1;
+        left: ${20 + Math.random() * 110}px; top: ${30 + Math.random() * 80}px;
+        animation: dsh-pet-float 1.8s ease-out forwards; z-index: 3;
+      `;
         effects.appendChild(heart);
         heart.addEventListener("animationend", () => heart.remove());
         setTimeout(() => heart.remove(), 2e3);
@@ -752,6 +756,12 @@
       const bubble = document.createElement("div");
       bubble.className = "pet-bubble";
       bubble.textContent = text;
+      bubble.style.cssText = `
+      position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+      background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px;
+      border-radius: 8px; white-space: nowrap; pointer-events: none; z-index: 3;
+      animation: dsh-pet-pop .25s ease-out;
+    `;
       effects.appendChild(bubble);
       activeBubble = bubble;
       if (typeof onBubbleShown === "function") onBubbleShown();

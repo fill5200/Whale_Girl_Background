@@ -208,6 +208,9 @@ export function apply(ctx = {}) {
   // stage 的 replaceChildren/textContent 不会清掉正在播放的特效）。
   const effects = document.createElement('div')
   effects.className = 'pet-effects'
+  // 关键样式 JS 内联（不依赖 CSS 注入——宿主可能覆盖/清理 style 标签；否则 effects 变
+  // static 参与文档流，heart/bubble 会把 sprite 顶到下面）。
+  effects.style.cssText = 'position: absolute; left: 0; top: 0; width: var(--pet-size, 110px); height: var(--pet-size, 110px); pointer-events: none; overflow: visible; z-index: 2;'
   // 点击热区层：覆盖在角色内容上（贴合内容 bbox），pointer 事件绑此而非 stage——
   // 拖拽/点击热区 = 角色实际轮廓，四周透明边缘不可点。
   const hitarea = document.createElement('div')
@@ -691,8 +694,12 @@ export function apply(ctx = {}) {
       const heart = document.createElement('div')
       heart.className = 'pet-heart'
       heart.textContent = '💗'
-      heart.style.left = `${20 + Math.random() * 110}px`
-      heart.style.top = `${30 + Math.random() * 80}px`
+      // 关键样式 JS 内联（宿主可能清理 CSS 类——position 缺失会参与文档流顶开角色）。
+      heart.style.cssText = `
+        position: absolute; font-size: 20px; pointer-events: none; line-height: 1;
+        left: ${20 + Math.random() * 110}px; top: ${30 + Math.random() * 80}px;
+        animation: dsh-pet-float 1.8s ease-out forwards; z-index: 3;
+      `
       effects.appendChild(heart)
       heart.addEventListener('animationend', () => heart.remove())
       // 兜底超时移除：reduced-motion 下动画被禁用（animation: none），
@@ -717,6 +724,13 @@ export function apply(ctx = {}) {
     const bubble = document.createElement('div')
     bubble.className = 'pet-bubble'
     bubble.textContent = text
+    // 关键样式 JS 内联（宿主可能清理 CSS 类——position 缺失会参与文档流顶开角色）。
+    bubble.style.cssText = `
+      position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
+      background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px;
+      border-radius: 8px; white-space: nowrap; pointer-events: none; z-index: 3;
+      animation: dsh-pet-pop .25s ease-out;
+    `
     effects.appendChild(bubble)
     activeBubble = bubble
     if (typeof onBubbleShown === 'function') onBubbleShown()
