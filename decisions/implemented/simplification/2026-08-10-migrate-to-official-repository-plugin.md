@@ -122,7 +122,7 @@ repository-plugins:
 **残留项（Phase 3 集成冒烟，2026-08-10 headless 已完成）**：
 - [x] config.yaml `repository-plugins.repositories` 真实安装 → RepositoryCache → pnpm 准备 → 挂载（日志无 plugin tree failed to load）——**headless dsh run 实测通过**（exit 0）：mock npm registry 发布 @deepseek-ai 依赖闭包（21 包）→ github: 源经 git insteadOf 重写本地 bare → pnpm 准备（devDep dsh-repository-plugin + dep dsh-tools）→ prepack 生成 wrapper → entry 挂载 → **agent 经 mock LLM 真实调用 pet_feed** → successText 输出
 - [x] 真实工具调用（pet_feed/pet_play/pet_status）——**pet_feed 实测经 agent 调用成功**
-- [~] GUI 页面真实渲染宠物——**web 模式尝试被阻塞**：0809 worktree 的 web profile 依赖不完整（`@deepseek-ai/dsh-client-connection` lib 缺失，ERR_MODULE_NOT_FOUND——环境构建问题非插件问题）；UI 路由/tapIndex 逻辑已由 stub 挂载验证（Phase 3），web 完整渲染待 0809 依赖完整后补
+- [x] GUI 页面真实渲染宠物——**0809 基线 web 模式实测通过**：官方 repository-plugins 机制（home 级 cordis.patch.yml + 预置 RepositoryCache，绕过 github 源与 mock registry）挂载 entry → `/whale-girl/state`、`/whale-girl/ui.js`、`/whale-girl/assets/*`、`/whale-girl/interact` 全 200 → tapIndex 页面注入生效（index.html 含 ui.js script）→ Chrome 无头冒烟「apply 成功、宠物以 sprite 渲染」通过。验证环境依赖：入口依赖 `@deepseek-ai/dsh-tools`（symlink 至 0809 monorepo 构建产物）与 `schemastery`（symlink 至仓库 devDep）在缓存条目内解析——预置缓存是本地验证手段，正式分发仍走 github: 源
 
 **集成冒烟过程中对 entry 的修复**（headless 激活约束）：
 - httpServer 强 inject → **可选服务**（ctx.get 弱获取；web 有则注册 UI，headless 降级无 UI）——官方 entry 语义：headless 无 web 服务器
