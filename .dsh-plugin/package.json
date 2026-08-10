@@ -21,5 +21,7 @@
   "devDependencies": {
     "@deepseek-ai/dsh-repository-plugin": "0.0.1"
   },
-  "dependencies": {}
+  "dependencies": {
+    "schemastery": "^3.18.0"
+  }
 }
