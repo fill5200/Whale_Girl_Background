@@ -1133,14 +1133,17 @@
           host.setAttribute("data-dsh-pet-hidden", "");
           host.removeAttribute("data-dsh-pet-inert");
           host.style.display = "none";
+          host.style.opacity = "";
         } else if (next === "dialog") {
           host.removeAttribute("data-dsh-pet-hidden");
           host.style.display = "";
           host.setAttribute("data-dsh-pet-inert", "");
+          host.style.opacity = ".25";
         } else {
           host.removeAttribute("data-dsh-pet-inert");
           host.removeAttribute("data-dsh-pet-hidden");
           host.style.display = "";
+          host.style.opacity = "";
         }
       }
     };
