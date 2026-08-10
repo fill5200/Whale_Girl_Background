@@ -73,18 +73,12 @@ const CSS = `
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 [data-dsh-pet] .pet-note { color: #AEB6C4; font-size: 11px; line-height: 15px;
   text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-/* 左右对齐变体：宠物贴视口边缘时卡边缘对齐，避免横向溢出。 */
-[data-dsh-pet] .pet-status.pet-status-left { left: 0; transform: translateX(0); }
-[data-dsh-pet] .pet-status.pet-status-right { left: auto; right: 0; transform: translateX(0); }
-[data-dsh-pet]:hover .pet-status.pet-status-left,
-[data-dsh-pet]:focus-within .pet-status.pet-status-left,
-[data-dsh-pet]:hover .pet-status.pet-status-right,
-[data-dsh-pet]:focus-within .pet-status.pet-status-right { transform: translateX(0); }
-/* 贴底翻转：宠物靠近视口底部时状态卡翻到上方（下方是屏幕边缘，卡会溢出/被裁）。 */
-[data-dsh-pet] .pet-status.pet-status-above { top: auto; bottom: calc(100% + 18px); }
-[data-dsh-pet] .pet-status.pet-status-above::after { top: auto; bottom: -5px; }
-/* 气泡激活或菜单打开时状态卡让位隐藏（气泡/菜单优先，见共存策略）。 */
-[data-dsh-pet] .pet-status.pet-status-hidden { opacity: 0 !important; visibility: hidden !important; }
+[data-dsh-pet] .pet-status::after { /* 连接尾：命中区覆盖宠物↔卡片间隙，hover 连续不闪断（main 定位由 JS 内联） */
+  content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
+  transform: translateX(-50%) rotate(45deg); background: rgba(24,28,38,.94);
+  border-top: 1px solid rgba(255,255,255,.10); border-left: 1px solid rgba(255,255,255,.10);
+  border-top-left-radius: 3px; pointer-events: auto; }
+[data-dsh-pet] .pet-status.pet-status-above::after { top: auto; bottom: auto; top: -5px; } /* 贴底翻转：卡在上方，连接尾朝下指向角色 */
 [data-dsh-pet] .pet-menu { display: none; position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%);
   width: max-content; gap: 6px; padding: 6px; border-radius: 8px;
   background: rgba(20,20,28,.72); }
@@ -145,6 +139,53 @@ export function apply(ctx = {}) {
   style.textContent = CSS
   document.head.appendChild(style)
 
+  // ---- 公共面板抽象（v6）----
+  // 状态卡/气泡/菜单都是「相对角色的浮层面板」，样式基调统一（背景/圆角/字体/内边距/
+  // 阴影），差异仅在定位锚点与交互（hover/动画/按钮）。统一基调保证视觉一致；
+  // 关键样式一律 JS 内联（宿主可能覆盖/清理 CSS 注入，见 hitarea/menu 系列决策）。
+  // 基调变量：色板/圆角/字体/内边距单一来源，调整一处全局生效。
+  const PANEL_THEME = {
+    bg: 'rgba(24, 28, 38, .94)',      // 面板背景（状态卡/气泡/菜单统一）
+    border: 'rgba(255,255,255,.10)',  // 边框色（solid 变体用）
+    text: '#E8EBF2',                  // 主文字
+    sub: '#AEB6C4',                   // 次级文字
+    radius: '10px',                   // 圆角（统一）
+    font: '11px',                     // 基础字号（统一）
+    shadow: '0 12px 32px rgba(0,0,0,.38), 0 3px 8px rgba(0,0,0,.28)', // 浮层阴影
+  }
+  /**
+   * 创建浮层面板（状态卡/气泡/菜单共用）。
+   * @param {object} opts
+   * @param {'below'|'above'} [opts.anchor] 相对角色：below=下方（状态卡/菜单）、above=上方（气泡）
+   * @param {'solid'|'plain'} [opts.variant] solid=带边框阴影（状态卡）、plain=纯背景（气泡/菜单）
+   * @param {number} [opts.offsetY] 锚点偏移（below: 角色下方间距；above: 上方间距）
+   * @param {string} [opts.zIndex] 层叠
+   * @param {string} [opts.display] 初始 display
+   * @returns {{ el: HTMLElement, show: () => void, hide: () => void }}
+   */
+  const createPanel = ({ anchor = 'below', variant = 'plain', offsetY = 12, zIndex = '3', display = 'block' } = {}) => {
+    const el = document.createElement('div')
+    const pos = anchor === 'above'
+      ? `top: -${offsetY}px; transform: translate(-50%, -100%);`
+      : `top: calc(100% + ${offsetY}px); transform: translateX(-50%);`
+    const surface = variant === 'solid'
+      ? `background: ${PANEL_THEME.bg}; border: 1px solid ${PANEL_THEME.border}; box-shadow: ${PANEL_THEME.shadow};`
+      : `background: ${PANEL_THEME.bg};`
+    // 关键样式 JS 内联（宿主可能清理 CSS 注入——position 缺失会参与文档流顶开角色）。
+    el.style.cssText = [
+      'position: absolute; left: 50%;', pos,
+      'width: max-content;', surface,
+      `color: ${PANEL_THEME.text}; font-size: ${PANEL_THEME.font};`,
+      `border-radius: ${PANEL_THEME.radius}; z-index: ${zIndex};`,
+      `display: ${display}; pointer-events: none;`,
+    ].join(' ')
+    return {
+      el,
+      show() { el.style.display = display },
+      hide() { el.style.display = 'none' },
+    }
+  }
+
   const host = document.createElement('div')
   host.setAttribute('data-dsh-pet', '')
   host.setAttribute('role', 'group')
@@ -161,19 +202,19 @@ export function apply(ctx = {}) {
   sprite.className = 'pet-sprite'
   stage.appendChild(sprite)
 
-  const status = document.createElement('div')
+  // 状态卡（solid 面板：边框+阴影+blur；hover 显示，含子元素与贴边变体类）。
+  const status = createPanel({ anchor: 'below', variant: 'solid', offsetY: 18, zIndex: '1' }).el
   status.className = 'pet-status'
-  // 关键样式 JS 内联（不依赖 CSS 注入——宿主环境可能覆盖/清理 style 标签，内联保证生效）。
-  status.style.cssText = `
-    position: absolute; left: 50%; top: calc(100% + 18px);
-    transform: translateX(-50%); width: max-content; min-width: 96px;
-    max-width: calc(100vw - 24px); padding: 5px 8px;
-    background: rgba(27,30,40,.94); border: 1px solid rgba(255,255,255,.10);
-    border-radius: 10px; color: #E8EBF2; font-size: 11px;
-    display: grid; gap: 4px; z-index: 1;
-    opacity: 0; visibility: hidden; pointer-events: none;
-    transition: opacity .15s ease-out, visibility 0s linear .2s;
-  `.replace(/\s+/g, ' ')
+  status.style.backdropFilter = 'blur(10px) saturate(1.15)'
+  status.style.padding = '5px 8px'
+  status.style.minWidth = '96px'
+  status.style.maxWidth = 'calc(100vw - 24px)'
+  status.style.display = 'grid'
+  status.style.gap = '4px'
+  status.style.opacity = '0'
+  status.style.visibility = 'hidden'
+  status.style.pointerEvents = 'none'
+  status.style.transition = 'opacity .15s ease-out, visibility 0s linear .2s'
   status.innerHTML = `
     <div class="pet-meta" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
       <span class="pet-lv" style="background:rgba(86,134,254,.16); color:#B7C8FE; border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; line-height:16px; white-space:nowrap;">Lv.1</span>
@@ -188,10 +229,13 @@ export function apply(ctx = {}) {
   metaStats.style.cssText = 'color:#AEB6C4; font-size:11px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap;'
   metaNote.style.cssText = 'color:#AEB6C4; font-size:11px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;'
 
-  const menu = document.createElement('div')
+  // 菜单（plain 面板：纯背景；按钮子元素，toggle 显示）。
+  const menu = createPanel({ anchor: 'below', variant: 'plain', offsetY: 12, zIndex: '4', display: 'none' }).el
   menu.className = 'pet-menu'
-  // 菜单容器/按钮关键样式内联（同状态卡：宿主环境可能覆盖 CSS 注入，内联保证生效）。
-  menu.style.cssText = 'display:none; position:absolute; left:50%; top:calc(100% + 12px); transform:translateX(-50%); width:max-content; gap:6px; padding:6px; border-radius:8px; background:rgba(20,20,28,.72); z-index:4;'
+  menu.style.gap = '6px'
+  menu.style.padding = '6px'
+  menu.style.display = 'none' // 初始隐藏；toggleMenu 切换内联
+  menu.style.pointerEvents = 'auto' // 菜单按钮需可点（覆盖面板默认 pointer-events:none）
   const BTN_STYLE = 'flex:1; border:0; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; background:rgba(255,255,255,.14); color:#fff; font-family:system-ui,sans-serif;'
   const feedBtn = document.createElement('button')
   feedBtn.textContent = '🍗 喂食'
@@ -227,6 +271,7 @@ export function apply(ctx = {}) {
   // status 绝对定位锚定宠物下方（始终不覆盖角色）；宠物贴左右缘 → 边缘对齐防横向溢出。
   // 气泡激活（activeBubble）或拖拽中 → 隐藏让位（气泡/移动是主角）。
   // 显式显示控制（内联 style，不依赖 CSS :hover 层叠——宿主环境可能覆盖样式）。
+  let statusForcedHidden = false // 气泡/拖拽/菜单打开时 true（hover 不显示状态卡）
   const setStatusVisible = (visible) => {
     status.style.opacity = visible ? '1' : '0'
     status.style.visibility = visible ? 'visible' : 'hidden'
@@ -237,11 +282,11 @@ export function apply(ctx = {}) {
   }
   const layoutStatus = () => {
     if (activeBubble !== null || dragging || menu.classList.contains('open')) {
-      status.classList.add('pet-status-hidden')
-      setStatusVisible(false)
+      statusForcedHidden = true
+      setStatusVisible(false) // 气泡/拖拽/菜单打开时隐藏状态卡（内联控制，不依赖 CSS 类）
       return
     }
-    status.classList.remove('pet-status-hidden')
+    statusForcedHidden = false
     const vw = window.innerWidth
     const vh = window.innerHeight
     const rect = host.getBoundingClientRect()
@@ -250,19 +295,40 @@ export function apply(ctx = {}) {
     const nearLeft = rect.left < cardW / 2 - 8
     const nearRight = rect.right > vw - (cardW / 2 - 8)
     const nearBottom = rect.bottom > vh - cardH - 20 // 下方放不下卡（屏幕边缘）→ 翻上方
-    // 翻转/对齐类互斥：先清再设。
-    status.classList.remove('pet-status-left', 'pet-status-right', 'pet-status-above')
-    if (nearBottom) status.classList.add('pet-status-above')
-    if (nearLeft && !nearRight) status.classList.add('pet-status-left')
-    else if (nearRight && !nearLeft) status.classList.add('pet-status-right')
+    // 翻转/对齐：内联设置（CSS 类可能被宿主清理，且面板定位已内联——类无法覆盖内联）。
+    status.style.left = ''
+    status.style.right = ''
+    status.style.bottom = ''
+    status.style.top = ''
+    status.style.transform = ''
+    if (nearBottom) {
+      // 贴底翻转：状态卡翻到角色上方（main 内联；after 连接尾方向由类控制）
+      status.classList.add('pet-status-above')
+      status.style.top = 'auto'
+      status.style.bottom = 'calc(100% + 18px)'
+      status.style.transform = 'translateX(-50%)'
+    } else {
+      status.classList.remove('pet-status-above')
+      status.style.top = 'calc(100% + 18px)'
+      status.style.bottom = 'auto'
+      status.style.transform = 'translateX(-50%)'
+    }
+    if (nearLeft && !nearRight) {
+      status.style.left = '0'
+      status.style.right = 'auto'
+      status.style.transform = 'translateX(0)'
+    } else if (nearRight && !nearLeft) {
+      status.style.left = 'auto'
+      status.style.right = '0'
+      status.style.transform = 'translateX(0)'
+    }
   }
   const onHostEnter = () => {
     layoutStatus()
-    if (!status.classList.contains('pet-status-hidden')) setStatusVisible(true)
+    if (!statusForcedHidden) setStatusVisible(true)
   }
   const onHostLeave = () => {
     if (menu.classList.contains('open')) return
-    status.classList.remove('pet-status-left', 'pet-status-right', 'pet-status-above', 'pet-status-hidden')
     setStatusVisible(false)
   }
   host.addEventListener('mouseenter', onHostEnter)
@@ -279,8 +345,7 @@ export function apply(ctx = {}) {
     // 内联 display 是权威（类规则可能被宿主清理，且内联 display:none 优先级高于
     // .pet-menu.open 类——toggle class 不足以显示/隐藏菜单）。显式切换内联。
     menu.style.display = next ? 'flex' : 'none'
-    status.classList.toggle('pet-status-hidden', next)
-    if (next) setStatusVisible(false)
+    if (next) { statusForcedHidden = true; setStatusVisible(false) }
     host.setAttribute('aria-expanded', String(next))
     if (next) lastActiveAt = Date.now() // 键盘/点击打开菜单也算活跃（防睡着）
     return next
@@ -733,16 +798,13 @@ export function apply(ctx = {}) {
   }
   const showReply = (text) => {
     clearBubble()
-    const bubble = document.createElement('div')
+    // 气泡（plain 面板，角色上方；动画用 Web Animations API 不依赖 CSS 注入）。
+    const bubble = createPanel({ anchor: 'above', variant: 'plain', offsetY: 8, zIndex: '3' }).el
     bubble.className = 'pet-bubble'
     bubble.textContent = text
-    // 关键样式 JS 内联（宿主可能清理 CSS 类——position 缺失会参与文档流顶开角色）。
-    // 定位：角色上方（bottom:100% 之上 8px，translate(-50%,-100%) 让气泡底部贴在角色头顶）。
-    bubble.style.cssText = `
-      position: absolute; left: 50%; top: -8px; transform: translate(-50%, -100%);
-      background: rgba(20,20,28,.85); color: #fff; font-size: 12px; padding: 4px 8px;
-      border-radius: 8px; white-space: nowrap; pointer-events: none; z-index: 3; opacity: 0;
-    `
+    bubble.style.padding = '4px 8px'
+    bubble.style.whiteSpace = 'nowrap'
+    bubble.style.opacity = '0'
     effects.appendChild(bubble)
     // 动画用 Web Animations API（不依赖 CSS 注入的 keyframes——宿主可能清理 style 标签）。
     // 注意动画 transform 覆盖定位 transform，帧里须含 translate(-50%, ...) 保持水平居中。
