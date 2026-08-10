@@ -1,8 +1,8 @@
 // whale-girl 浏览器 half：纯 DOM 自渲染宠物层（A 模式——GUI 内悬浮宠物）。
-// 契约：bundle 顶层调用 window.__ModuleLoader__.load({ id, factory })——id 必须等于插件 id
-// （dsh.plugin.json 的 id），否则 loader 的 arrive() 抛 "loaded without registering"；
-// factory(require) 返回 Cordis 插件导出面（name/inject/apply）；apply 返回 disposer，
-// 绑定插件 fiber，disable 时清理。零平台模块依赖：CSS 内联注入，动画/拖拽/菜单全部自建。
+// 官方 repository-plugin 形态：自执行 UI 脚本（经 entry 的 UI 路由与 httpServer.tapIndex
+// 注入，由页面 <script> 加载；无 __ModuleLoader__/fiber 注入——见决策记录
+// 2026-08-10-migrate-to-official-repository-plugin.md）。零平台模块依赖：CSS 内联注入，
+// 动画/拖拽/菜单全部自建。
 //
 // 视觉：sprite sheet 帧播放器（assets/manifest.json 声明 状态→sheet/frames/fps/playback，
 // 每状态一张横排帧图，透明背景）；sheet 缺失/未加载时显示占位（不再 emoji 降级）。

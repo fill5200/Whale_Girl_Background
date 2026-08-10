@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { check } from './verify-routes-sync.mjs'
 
-const ROUTES_SRC = `export const ROUTE_PREFIX = '/plugins/vlln/whale-girl'
+const ROUTES_SRC = `export const ROUTE_PREFIX = '/whale-girl'
 export const STATE_PATH = \`\${ROUTE_PREFIX}/state\`
 export const INTERACT_PATH = \`\${ROUTE_PREFIX}/interact\`
 export const CONFIG_PATH = \`\${ROUTE_PREFIX}/config\`
@@ -40,13 +40,13 @@ test('接受：三个消费文件都 import 自 routes.mjs、无字面量', () =
 })
 
 test('拒绝：client 手写路由字面量（单一来源被破坏）', () => {
-  const { ok, errors } = check(makeTree({ client: "const STATE_PATH = '/plugins/vlln/whale-girl/state'" }))
+  const { ok, errors } = check(makeTree({ client: "const STATE_PATH = '/whale-girl/state'" }))
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /client\/index\.mjs 手写路由前缀字面量/)
 })
 
 test('拒绝：index.mjs 未从 routes.mjs import（端点散落）', () => {
-  const { ok, errors } = check(makeTree({ node: "export const STATE_PATH = '/plugins/vlln/whale-girl/state'" }))
+  const { ok, errors } = check(makeTree({ node: "export const STATE_PATH = '/whale-girl/state'" }))
   assert.equal(ok, false)
   assert.match(errors.join('\n'), /index\.mjs 未从 src\/routes\.mjs import|index\.mjs 手写路由前缀字面量/)
 })
