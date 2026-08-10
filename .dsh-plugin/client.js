@@ -172,7 +172,7 @@
   }
 
   // .dsh-plugin/src/routes.mjs
-  var ROUTE_PREFIX = "/plugins/vlln/whale-girl";
+  var ROUTE_PREFIX = "/whale-girl";
   var STATE_PATH = `${ROUTE_PREFIX}/state`;
   var INTERACT_PATH = `${ROUTE_PREFIX}/interact`;
   var CONFIG_PATH = `${ROUTE_PREFIX}/config`;

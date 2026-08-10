@@ -3,7 +3,7 @@
 // 任何文件不得手写 '/plugins/...' 字面量（漂移会断端点，见决策记录
 // 2026-08-10-doc-system-single-source-and-gates.md）。
 // 零依赖纯常量：client bundle（esbuild 内联）与 Node half 都可 import。
-export const ROUTE_PREFIX = '/plugins/vlln/whale-girl'
+export const ROUTE_PREFIX = '/whale-girl'
 export const STATE_PATH = `${ROUTE_PREFIX}/state`
 export const INTERACT_PATH = `${ROUTE_PREFIX}/interact`
 export const CONFIG_PATH = `${ROUTE_PREFIX}/config`
