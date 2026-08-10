@@ -11,7 +11,7 @@
           "sheet": "idle.png",
           "frames": 3,
           "fps": 2,
-          "loop": true
+          "loop": false
         },
         "working": {
           "sheet": "working.png",
@@ -110,7 +110,7 @@
       "sheet": "idle.png",
       "frames": 3,
       "fps": 2,
-      "loop": true
+      "loop": false
     },
     "working": {
       "sheet": "working.png",

@@ -10,7 +10,7 @@ import { check } from './verify-config-sync.mjs'
 const CONFIG_SRC = `export const DEFAULTS = Object.freeze({
   size: 110, opacity: 1,
   walk: { enabled: true, minWaitMs: 18000, maxWaitMs: 40000, minMs: 3000, maxMs: 6000, speedPxPerSec: 45 },
-  sleepAfterMs: 60000, pollMs: 3000, idlePauseMs: 3500, bubbleMs: 2500,
+  sleepAfterMs: 60000, pollMs: 3000, bubbleMs: 2500,
   welcomeMs: 6000, celebrateMs: 6000, errorMs: 4000, disappointedMs: 6000,
 })`
 
@@ -30,7 +30,7 @@ test('接受：client CFG_DEFAULTS 与 DEFAULTS 一致', () => {
   const client = `const CFG_DEFAULTS = {
   size: 110, opacity: 1,
   walk: { enabled: true, minWaitMs: 18000, maxWaitMs: 40000, minMs: 3000, maxMs: 6000, speedPxPerSec: 45 },
-  sleepAfterMs: 60000, pollMs: 3000, idlePauseMs: 3500, bubbleMs: 2500,
+  sleepAfterMs: 60000, pollMs: 3000, bubbleMs: 2500,
 }`
   const { ok, errors } = check(makeTree(CONFIG_SRC, client))
   assert.equal(ok, true, errors.join('\n'))
@@ -40,7 +40,7 @@ test('拒绝：client 默认值与 DEFAULTS 不一致（漂移）', () => {
   const client = `const CFG_DEFAULTS = {
   size: 140, opacity: 1,
   walk: { enabled: true, minWaitMs: 18000, maxWaitMs: 40000, minMs: 3000, maxMs: 6000, speedPxPerSec: 45 },
-  sleepAfterMs: 60000, pollMs: 3000, idlePauseMs: 3500, bubbleMs: 2500,
+  sleepAfterMs: 60000, pollMs: 3000, bubbleMs: 2500,
 }`
   const { ok, errors } = check(makeTree(CONFIG_SRC, client))
   assert.equal(ok, false)

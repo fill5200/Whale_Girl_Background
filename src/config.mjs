@@ -28,7 +28,6 @@ export const DEFAULTS = Object.freeze({
   },
   sleepAfterMs: 60000,    // 空闲多久进入睡眠
   pollMs: 3000,           // /state 轮询间隔
-  idlePauseMs: 3500,      // idle 帧停顿
   bubbleMs: 2500,         // 回话气泡时长
   welcomeMs: 6000,        // 欢迎窗口
   celebrateMs: 6000,      // 庆祝窗口
@@ -55,7 +54,6 @@ export function buildSchema() {
       }),
       sleepAfterMs: z.number().min(5000).max(600000).default(DEFAULTS.sleepAfterMs),
       pollMs: z.number().min(1000).max(30000).default(DEFAULTS.pollMs),
-      idlePauseMs: z.number().min(0).max(60000).default(DEFAULTS.idlePauseMs),
       bubbleMs: z.number().min(500).max(10000).default(DEFAULTS.bubbleMs),
       welcomeMs: z.number().min(0).max(30000).default(DEFAULTS.welcomeMs),
       celebrateMs: z.number().min(0).max(30000).default(DEFAULTS.celebrateMs),

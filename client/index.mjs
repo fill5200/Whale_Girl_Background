@@ -10,7 +10,7 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake } from './logic.mjs'
+import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectRoundCompleted, shouldWake, nextBlinkAt } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters, emojiFor } from './character.mjs'
 
 const STATE_PATH = '/plugins/vlln/dsh-pet/state'
@@ -24,7 +24,7 @@ const MANIFEST_URL = `${ASSETS_URL}/manifest.json`
 const CFG_DEFAULTS = {
   size: 110, opacity: 1,
   walk: { enabled: true, minWaitMs: 18000, maxWaitMs: 40000, minMs: 3000, maxMs: 6000, speedPxPerSec: 45 },
-  sleepAfterMs: 60000, pollMs: 3000, idlePauseMs: 3500, bubbleMs: 2500,
+  sleepAfterMs: 60000, pollMs: 3000, bubbleMs: 2500,
 }
 let cfg = { ...CFG_DEFAULTS }
 const TICK_MS = 50
@@ -294,7 +294,10 @@ export function apply(ctx = {}) {
   let animState = null
   let frame = 0
   let frameDirection = 1
-  let idlePausedUntil = 0
+  // idle 随机眨眼（v4）：常态保持帧 0（睁眼），随机间隔眨一次（0→1→2→0）。
+  // nextBlinkAt 决策触发时刻；idleBlinking=眨眼动画进行中（播完回帧 0 静止）。
+  let idleBlinkAt = 0
+  let idleBlinking = false
   let lastFrameAt = 0
   // working 随机插曲（v3）：think 常态、偶尔随机插入 working；由 nextWorkingRhythm 决策，
   // 宿主只做「到点翻转」的薄执行。workingActive 喂 pickState；workingTimer 是翻转闹钟。
@@ -375,7 +378,8 @@ export function apply(ctx = {}) {
     animState = name
     frame = 0
     frameDirection = 1
-    idlePausedUntil = 0
+    idleBlinkAt = 0 // 重进 idle 时重新排随机眨眼
+    idleBlinking = false
     lastFrameAt = 0
     // 运动配方：manifest.motion → 舞台类（emoji 与 sprite 路径都生效；无 motion 时清类）。
     // 快照迭代再删：活 DOMTokenList 边遍历边删可能跳项（当前单类无碍，加固免踩）。
@@ -586,25 +590,35 @@ export function apply(ctx = {}) {
       // frames>1 才走帧循环；frames=1 的单图状态由 manifest.motion 的 CSS 动画驱动，不推进帧
       // （否则会推进到 -width 位置闪空白）。
       if (cfg.frames > 1 && now - lastFrameAt >= 1000 / cfg.fps) {
-        if (animState === 'idle' && idlePausedUntil > now) return
-        if (animState === 'idle' && idlePausedUntil !== 0 && now >= idlePausedUntil) {
-          frame = 0
-          frameDirection = 1
-          idlePausedUntil = 0
-          lastFrameAt = now
-          applyFrame(frameW, frame)
+        // idle 随机眨眼（v4）：常态保持帧 0（睁眼静止），随机间隔眨一次（0→1→2→0）。
+        // 不用固定循环+固定暂停（旧 idlePauseMs 机制）——眨眼应是随机节奏，同 walk/working。
+        if (animState === 'idle') {
+          if (idleBlinking) {
+            // 眨眼动画推进：0→1→2→0（3 帧一次眨眼）
+            lastFrameAt = now
+            frame += 1
+            if (frame >= cfg.frames) {
+              frame = 0 // 眨眼完成：回帧 0 静止，排下一次随机眨眼
+              idleBlinking = false
+              idleBlinkAt = nextBlinkAt({ now })
+            }
+            applyFrame(frameW, frame)
+          } else {
+            // 常态：静止在帧 0；到随机触发时刻开始眨眼
+            if (frame !== 0) {
+              frame = 0
+              applyFrame(frameW, frame)
+            }
+            if (idleBlinkAt === 0) idleBlinkAt = nextBlinkAt({ now })
+            if (now >= idleBlinkAt) idleBlinking = true
+          }
           return
         }
         lastFrameAt = now
         frame += frameDirection
-        if ((animState === 'idle' || animState === 'walk') && cfg.loop && cfg.frames > 1) {
+        if (animState === 'walk' && cfg.loop && cfg.frames > 1) {
           if (frame >= cfg.frames - 1 || frame <= 0) frameDirection *= -1
           frame = Math.max(0, Math.min(cfg.frames - 1, frame))
-          // idle 暂停：往返播放回到帧 0（direction 变 -1 表示折返起点）时停一拍——
-          // 避免「不停循环眨眼」（原判断 frameDirection===1 只在首帧成立，永不暂停）。
-          if (animState === 'idle' && frame === 0 && frameDirection === -1) {
-            idlePausedUntil = now + cfg.idlePauseMs
-          }
         } else if (frame >= cfg.frames) {
           if (cfg.loop) frame = 0
           else {

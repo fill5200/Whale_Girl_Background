@@ -112,6 +112,22 @@ export const WORKING_MAX_WAIT_MS = 30000 // 插曲最大间隔
 export const WORKING_MIN_DUR_MS = 2500   // 插曲最短时长
 export const WORKING_MAX_DUR_MS = 6000   // 插曲最长时长
 
+// idle 随机眨眼参数（L2 语义层，代码级）：常态保持帧 0（睁眼），随机间隔眨一次。
+export const BLINK_MIN_INTERVAL_MS = 3000 // 眨眼最小间隔
+export const BLINK_MAX_INTERVAL_MS = 9000 // 眨眼最大间隔
+
+/**
+ * idle 随机眨眼决策：常态睁眼静止，随机间隔触发一次眨眼（帧 0→1→2→0）。
+ * @param {object} input
+ * @param {number} input.now 当前时刻
+ * @param {() => number} [input.random] 随机源（测试注入；默认 Math.random）
+ * @returns {number} 下次眨眼触发时刻（now + 随机间隔）
+ */
+export function nextBlinkAt({ now, random = Math.random }) {
+  const wait = BLINK_MIN_INTERVAL_MS + random() * (BLINK_MAX_INTERVAL_MS - BLINK_MIN_INTERVAL_MS)
+  return now + wait
+}
+
 /**
  * working 随机插曲决策：会话思考期间偶尔插入 working 工作姿态，其余时间 think 常态。
  * @param {object} input

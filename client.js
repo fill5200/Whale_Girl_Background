@@ -80,6 +80,12 @@
   var WORKING_MAX_WAIT_MS = 3e4;
   var WORKING_MIN_DUR_MS = 2500;
   var WORKING_MAX_DUR_MS = 6e3;
+  var BLINK_MIN_INTERVAL_MS = 3e3;
+  var BLINK_MAX_INTERVAL_MS = 9e3;
+  function nextBlinkAt({ now, random = Math.random }) {
+    const wait = BLINK_MIN_INTERVAL_MS + random() * (BLINK_MAX_INTERVAL_MS - BLINK_MIN_INTERVAL_MS);
+    return now + wait;
+  }
   function nextWorkingRhythm({ now, sessionThink, working, random = Math.random }) {
     if (!sessionThink) return { active: false, until: 0 };
     if (working.active) {
@@ -168,7 +174,6 @@
     walk: { enabled: true, minWaitMs: 18e3, maxWaitMs: 4e4, minMs: 3e3, maxMs: 6e3, speedPxPerSec: 45 },
     sleepAfterMs: 6e4,
     pollMs: 3e3,
-    idlePauseMs: 3500,
     bubbleMs: 2500
   };
   var cfg = { ...CFG_DEFAULTS };
@@ -408,7 +413,8 @@
     let animState = null;
     let frame = 0;
     let frameDirection = 1;
-    let idlePausedUntil = 0;
+    let idleBlinkAt = 0;
+    let idleBlinking = false;
     let lastFrameAt = 0;
     let working = { active: false, until: 0 };
     let workingTimer = null;
@@ -464,7 +470,8 @@
       animState = name;
       frame = 0;
       frameDirection = 1;
-      idlePausedUntil = 0;
+      idleBlinkAt = 0;
+      idleBlinking = false;
       lastFrameAt = 0;
       for (const cls of [...stage.classList]) if (cls.startsWith("pet-motion-")) stage.classList.remove(cls);
       const cfg2 = stateOf(character, name);
@@ -650,23 +657,31 @@
           lastFrameAt = 0;
         }
         if (cfg2.frames > 1 && now - lastFrameAt >= 1e3 / cfg2.fps) {
-          if (animState === "idle" && idlePausedUntil > now) return;
-          if (animState === "idle" && idlePausedUntil !== 0 && now >= idlePausedUntil) {
-            frame = 0;
-            frameDirection = 1;
-            idlePausedUntil = 0;
-            lastFrameAt = now;
-            applyFrame(frameW, frame);
+          if (animState === "idle") {
+            if (idleBlinking) {
+              lastFrameAt = now;
+              frame += 1;
+              if (frame >= cfg2.frames) {
+                frame = 0;
+                idleBlinking = false;
+                idleBlinkAt = nextBlinkAt({ now });
+              }
+              applyFrame(frameW, frame);
+            } else {
+              if (frame !== 0) {
+                frame = 0;
+                applyFrame(frameW, frame);
+              }
+              if (idleBlinkAt === 0) idleBlinkAt = nextBlinkAt({ now });
+              if (now >= idleBlinkAt) idleBlinking = true;
+            }
             return;
           }
           lastFrameAt = now;
           frame += frameDirection;
-          if ((animState === "idle" || animState === "walk") && cfg2.loop && cfg2.frames > 1) {
+          if (animState === "walk" && cfg2.loop && cfg2.frames > 1) {
             if (frame >= cfg2.frames - 1 || frame <= 0) frameDirection *= -1;
             frame = Math.max(0, Math.min(cfg2.frames - 1, frame));
-            if (animState === "idle" && frame === 0 && frameDirection === -1) {
-              idlePausedUntil = now + cfg2.idlePauseMs;
-            }
           } else if (frame >= cfg2.frames) {
             if (cfg2.loop) frame = 0;
             else {
