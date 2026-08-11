@@ -16,6 +16,7 @@ import {
 import { deriveActivity, mergeCelebrate } from './src/activity.mjs'
 import { sanitizeAssetPath, contentTypeFor, ASSETS_PATH } from './src/assets.mjs'
 import { applyAction, isCrossOrigin } from './src/interact.mjs'
+import { parseTurnEvent } from './src/session-events.mjs'
 import { normalizeState, serializeState } from './src/persistence.mjs'
 import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
@@ -139,7 +140,7 @@ export function apply(ctx) {
   // 会话感知（think 陪伴/等待批准/回合完成）改由 Node half 经 `ctx.sessions` 推导后随 /state
   // 轮询下发。信号源：
   // - 思考中（sessionThink）：任一会话处于 turn 之间（有 turn/start 未 turn/end）或已开始未结束
-  // - 等待批准（sessionWait）：turn/end 的 reason 属等待用户（approval 等）
+  // - 等待批准（sessionWait）：turn/end 的 reason.kind === 'blocked'（等待用户批准/权限）
   // - 回合完成（turnCompleted）：turn/end 边沿（每完成一个 turn 触发一次庆祝）
   const sessionsSvc = typeof ctx.get === 'function' ? ctx.get('sessions') : undefined
   let sessionThink = false
@@ -275,23 +276,26 @@ export function apply(ctx) {
         scheduleSave()
       }),
       // 会话事件（v8 会话感知）：跟踪 turn/start · turn/end 边沿驱动 think 陪伴与回合完成庆祝。
-      // sessions 服务缺席时跳过（旧订阅同理降级——宠物照常跑，只是无会话感知）。
-      ...(sessionsSvc !== undefined ? [
-        ctx.on('session/event', (session, event) => {
-          const id = typeof session?.id === 'string' ? session.id : null
-          if (id === null) return
-          if (event?.kind === 'turn/start') {
-            activeTurns.set(id, (activeTurns.get(id) ?? 0) + 1)
-            sessionUpdate()
-          } else if (event?.kind === 'turn/end') {
-            const n = (activeTurns.get(id) ?? 0) - 1
-            if (n <= 0) activeTurns.delete(id)
-            else activeTurns.set(id, n)
-            turnCompleted = true // 每完成一个 turn 触发一次庆祝（activity() 消费）
-            sessionUpdate()
-          }
-        }),
-      ] : []),
+      // 无条件注册（不随 sessionsSvc 缺席而丢）：turnCompleted/celebrate 只依赖事件本身；
+      // sessionThink 聚合（sessionUpdate）在 sessions 服务缺席时降级保持上次值（宠物照常跑）。
+      ctx.on('session/event', (session, event) => {
+        const id = typeof session?.id === 'string' ? session.id : null
+        if (id === null) return
+        const parsed = parseTurnEvent(event)
+        if (parsed === null) return
+        if (parsed.kind === 'start') {
+          activeTurns.set(id, (activeTurns.get(id) ?? 0) + 1)
+          sessionWait = false // 新回合开始，不再处于等待批准
+          sessionUpdate()
+        } else {
+          const n = (activeTurns.get(id) ?? 0) - 1
+          if (n <= 0) activeTurns.delete(id)
+          else activeTurns.set(id, n)
+          turnCompleted = true // 每完成一个 turn 触发一次庆祝（activity() 消费）
+          sessionWait = parsed.blocked // turn/end 的 reason 属等待用户（approval 等）
+          sessionUpdate()
+        }
+      }),
       
       
       
