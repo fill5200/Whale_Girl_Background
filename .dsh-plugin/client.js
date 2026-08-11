@@ -147,6 +147,7 @@
   var INTERACT_PATH = `${ROUTE_PREFIX}/interact`;
   var CONFIG_PATH = `${ROUTE_PREFIX}/config`;
   var ASSETS_PATH = `${ROUTE_PREFIX}/assets`;
+  var EVENTS_PATH = `${ROUTE_PREFIX}/events`;
 
   // .dsh-plugin/client/index.mjs
   var ASSETS_URL = ASSETS_PATH;
@@ -1134,6 +1135,11 @@
     const animTimer = setInterval(tick, TICK_MS);
     scheduleWander();
     armWorking();
+    try {
+      const sse = new EventSource(EVENTS_PATH);
+      sse.onmessage = () => refresh();
+    } catch {
+    }
     armWorking();
     const onVisibility = () => {
       if (document.visibilityState === "visible") refresh();

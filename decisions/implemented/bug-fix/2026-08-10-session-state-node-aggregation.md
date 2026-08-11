@@ -26,3 +26,4 @@ Status: implemented
 - Node half 改动：需 web 重启生效（ESM 缓存）；client 改动重装 + 刷新。
 - 已知边界：`sessionWait`（等待批准）暂未实现（turn/end 的 reason 到 TurnEndReason 映射待下一步）；turn/end 边沿经 3s 轮询采样（比旧快照订阅延迟略增，可接受）。
 - 实现层修正：事件字段是 `type` 不是 `kind`、订阅不随 sessions 服务缺席而丢、sessionWait 已实现（reason.kind === 'blocked'）——见 [2026-08-10-session-event-field.md](2026-08-10-session-event-field.md)（部分取代本记录的实现层陈述）。
+- 轮询采样延迟已被取代：事件响应改经 SSE 即时推送（[2026-08-10-sse-event-push.md](2026-08-10-sse-event-push.md) 部分取代本记录的「3s 轮询采样」陈述）。

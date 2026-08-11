@@ -24,8 +24,8 @@ import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.m
 export const name = 'whale-girl'
 export const inject = ['tasks', 'agents', 'sessions']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
-import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX } from './src/routes.mjs'
-export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX }
+import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH } from './src/routes.mjs'
+export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH }
 // client 自执行脚本（build 产物，同目录 client.js；由 UI 路由 /whale-girl/ui.js 服务）。
 const UI_SCRIPT = readFileSync(new URL('./client.js', import.meta.url))
 
@@ -124,6 +124,18 @@ export function apply(ctx) {
   const scheduleSave = () => {
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => saveState(state), 1000)
+  }
+  // ---- SSE 即时事件（v9：事件 → 宠物反应的延迟从 pollMs 轮询降到单次 /state 往返）----
+  // 事件（turn 边沿/会话启动/任务终态/请求错误）发生时广播，client 收到立即 refresh()
+  // 拉最新 /state——回合完成庆祝/欢迎/思考陪伴不再等下一个轮询周期（默认 3s）。
+  // 轮询保留兜底（SSE 断线/不可用时宠物照常跑，EventSource 内建自动重连）。
+  // 连接管理：res 写入失败（断连）即从集合移除；close 时清理（心跳一并停）。
+  const sseClients = new Set()
+  const broadcastEvent = () => {
+    const line = 'data: {"type":"event"}\n\n'
+    for (const res of sseClients) {
+      try { res.write(line) } catch { sseClients.delete(res) }
+    }
   }
   // 活动推导记账（跨轮询保持；与账本分离，见 src/activity.mjs 契约）。
   const known = new Map()
@@ -251,6 +263,7 @@ export function apply(ctx) {
           scheduleSave()
           emitSignal('failure', { level: state.level })
         }
+        broadcastEvent() // 任务终态 → 即时告知 client（庆祝/失落的窗口即刻生效）
       }),
       ctx.on('agent/request-error', () => {
         // 请求错误（LLM API 抖动，重试后可能成功）只触发 error/disappointed 情绪，
@@ -260,6 +273,7 @@ export function apply(ctx) {
         const now = Date.now()
         errorUntil = Math.max(errorUntil, now + configRef.errorMs)
         disappointedUntil = Math.max(disappointedUntil, now + configRef.errorMs + configRef.disappointedMs)
+        broadcastEvent() // 请求错误 → 惊吓窗口即刻生效
       }),
       ctx.on('agent/session-start', (payload) => {
         const now = Date.now()
@@ -274,6 +288,7 @@ export function apply(ctx) {
           emitSignal('session', { kind: 'resume', level: state.level })
         }
         scheduleSave()
+        broadcastEvent() // 会话启动/续接 → welcome 或账本更新即刻下发
       }),
       // 会话事件（v8 会话感知）：跟踪 turn/start · turn/end 边沿驱动 think 陪伴与回合完成庆祝。
       // 无条件注册（不随 sessionsSvc 缺席而丢）：turnCompleted/celebrate 只依赖事件本身；
@@ -295,6 +310,7 @@ export function apply(ctx) {
           sessionWait = parsed.blocked // turn/end 的 reason 属等待用户（approval 等）
           sessionUpdate()
         }
+        broadcastEvent() // turn 边沿 → think 陪伴/回合完成庆祝即刻下发（不等 pollMs 轮询）
       }),
       
       
@@ -423,6 +439,40 @@ export function apply(ctx) {
           }
           res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
           res.end(UI_SCRIPT)
+        },
+      }),
+      // ---- SSE 事件流（v9）：事件即时下发通道 ----
+      // client 用 EventSource 订阅；收到事件即 refresh() 拉最新 /state（延迟从 pollMs
+      // 降到单次往返）。心跳 25s 注释行防代理/网关空闲断开；close 清理连接与心跳。
+      // 广播失败（断连）由 broadcastEvent 的 try/catch 移除连接，不阻塞事件处理。
+      httpServer.register({
+        kind: 'exact',
+        path: EVENTS_PATH,
+        handler: async (req, res) => {
+          if (req.method !== 'GET') {
+            res.writeHead(405)
+            res.end()
+            return
+          }
+          res.writeHead(200, {
+            'content-type': 'text/event-stream',
+            'cache-control': 'no-cache',
+            connection: 'keep-alive',
+            'x-accel-buffering': 'no',
+          })
+          if (typeof res.flushHeaders === 'function') res.flushHeaders()
+          res.write('retry: 3000\n\n')
+          sseClients.add(res)
+          let heartbeat = null
+          if (typeof res.on === 'function') {
+            res.on('close', () => {
+              clearInterval(heartbeat)
+              sseClients.delete(res)
+            })
+          }
+          heartbeat = setInterval(() => {
+            try { res.write(': ping\n\n') } catch { /* 断连由 close 清理 */ }
+          }, 25000)
         },
       }),
       httpServer.tapIndex((html) =>

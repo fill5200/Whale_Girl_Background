@@ -8,3 +8,4 @@ export const STATE_PATH = `${ROUTE_PREFIX}/state`
 export const INTERACT_PATH = `${ROUTE_PREFIX}/interact`
 export const CONFIG_PATH = `${ROUTE_PREFIX}/config`
 export const ASSETS_PATH = `${ROUTE_PREFIX}/assets`
+export const EVENTS_PATH = `${ROUTE_PREFIX}/events`

@@ -13,7 +13,7 @@
 import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, nextWorkingRhythm, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
 // 路由端点单一来源（src/routes.mjs，verify-routes-sync 门禁守护）：esbuild 内联进 bundle。
-import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ASSETS_PATH } from '../src/routes.mjs'
+import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ASSETS_PATH, EVENTS_PATH } from '../src/routes.mjs'
 
 const ASSETS_URL = ASSETS_PATH
 const MANIFEST_URL = `${ASSETS_URL}/manifest.json`
@@ -1216,6 +1216,17 @@ export function apply(ctx = {}) {
   const animTimer = setInterval(tick, TICK_MS)
   scheduleWander()
   armWorking()
+
+  // ---- SSE 即时事件（v9）：Node half 事件发生时推送，收到立即 refresh() ——
+  // 回合完成庆祝/欢迎/思考陪伴不再等 pollMs 轮询（默认 3s → 单次 /state 往返）。
+  // EventSource 断线自动重连（内建，retry 3s）；轮询保留兜底（SSE 不可用时照常跑）。
+  try {
+    const sse = new EventSource(EVENTS_PATH)
+    sse.onmessage = () => refresh()
+    // onerror 不处理：EventSource 内建自动重连；重连期间轮询兜底，宠物照常。
+  } catch {
+    // EventSource 不可用（罕见）：轮询兜底，宠物照常跑
+  }
 
   // ---- 会话感知（v8：Node half 聚合，退役本地 sessions 订阅）----
   // 自渲染 client 无 ctx.sessions（官方注入面只给 __DSH_BOOT__），会话状态（think/wait/
