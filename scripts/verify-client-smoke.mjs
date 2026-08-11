@@ -5,11 +5,13 @@
 //       舞台有可见内容（.pet-sprite.ready sprite 渲染）。
 // 这是 curl 覆盖不到的 client-apply 验证（P6 缺口实操面）——改 client/ 后跑一次。
 // 非门禁（依赖 Chrome 与运行中的 web）：人工验证步骤，见 AGENTS.md 按改动面选检查。
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
 const CHROME = process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const URL = process.argv[2]
+const DEBUG_PORT = 9240
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 if (!URL) {
   console.error('用法: node scripts/verify-client-smoke.mjs <web-url>')
@@ -47,19 +49,44 @@ function analyze(html) {
   return { errors, stageHasSprite }
 }
 
-function dump() {
-  const res = spawnSync(
-    CHROME,
-    ['--headless=new', '--disable-gpu', '--no-sandbox', '--virtual-time-budget=15000', '--dump-dom', URL],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-  )
-  return res.status === 0 ? res.stdout : ''
+// dump 改 CDP 真实时间模式：`--virtual-time-budget` 与 SSE 长连接（/whale-girl/events
+// EventSource）不兼容——虚拟时间等网络空闲而 SSE 永不空闲，--dump-dom 会挂起。
+// 真实时间下等宠物渲染（assets + 首次 /state 往返）后再抓 DOM，analyze 断言不变。
+async function dump() {
+  const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-sandbox', `--remote-debugging-port=${DEBUG_PORT}`, '--window-size=1280,800', URL], { stdio: 'ignore' })
+  let ws
+  for (let i = 0; i < 40; i++) {
+    await sleep(500)
+    try {
+      const tabs = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json`)).json()
+      const page = tabs.find((t) => t.type === 'page')
+      if (page) { ws = new WebSocket(page.webSocketDebuggerUrl); break }
+    } catch { /* Chrome 未就绪，重试 */ }
+  }
+  if (!ws) { chrome.kill(); return '' }
+  await new Promise((r) => { ws.onopen = r })
+  let id = 0
+  const call = (method, params) => new Promise((resolve) => {
+    const myId = ++id
+    const onMsg = (ev) => {
+      const m = JSON.parse(ev.data)
+      if (m.id === myId) { ws.removeEventListener('message', onMsg); resolve(m.result) }
+    }
+    ws.addEventListener('message', onMsg)
+    ws.send(JSON.stringify({ id: myId, method, params }))
+  })
+  await call('Runtime.enable')
+  // 等宠物渲染：client apply + assets 加载 + 首次 /state 往返（SSE 建立不阻塞）。
+  await sleep(3500)
+  const r = await call('Runtime.evaluate', { expression: 'document.documentElement.outerHTML', returnByValue: true })
+  chrome.kill()
+  return typeof r?.result?.value === 'string' ? r.result.value : ''
 }
 
-// 虚拟时间下资源加载时序不稳定：最多 3 次 dump，任一绿即过。
+// 真实时间下资源加载时序不稳定：最多 3 次 dump，任一绿即过。
 let last = null
 for (let attempt = 1; attempt <= 3; attempt++) {
-  last = analyze(dump())
+  last = analyze(await dump())
   if (last.errors.length === 0) break
   if (attempt < 3) console.error(`[verify-client-smoke] 第 ${attempt} 次 dump 未绿，重试…`)
 }
