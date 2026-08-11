@@ -21,7 +21,7 @@ import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 
 export const name = 'whale-girl'
-export const inject = ['tasks', 'agents']
+export const inject = ['tasks', 'agents', 'sessions']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
 import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX } from './src/routes.mjs'
 export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX }
@@ -134,6 +134,35 @@ export function apply(ctx) {
   let welcomeUntil = 0
   let celebrateUntil = 0
 
+  // ---- 会话状态聚合（v8：官方自渲染 client 无 ctx.sessions——Node half 聚合进 /state）----
+  // client 自执行脚本 `apply({})` 拿不到宿主 sessions 服务（官方注入面只给 __DSH_BOOT__），
+  // 会话感知（think 陪伴/等待批准/回合完成）改由 Node half 经 `ctx.sessions` 推导后随 /state
+  // 轮询下发。信号源：
+  // - 思考中（sessionThink）：任一会话处于 turn 之间（有 turn/start 未 turn/end）或已开始未结束
+  // - 等待批准（sessionWait）：turn/end 的 reason 属等待用户（approval 等）
+  // - 回合完成（turnCompleted）：turn/end 边沿（每完成一个 turn 触发一次庆祝）
+  const sessionsSvc = typeof ctx.get === 'function' ? ctx.get('sessions') : undefined
+  let sessionThink = false
+  let sessionWait = false
+  let turnCompleted = false // 单轮翻转标志：activity() 消费后复位
+  const activeTurns = new Map() // sessionId → turn/start 未 turn/end 计数
+  const sessionUpdate = () => {
+    // 从当前会话列表与 turn 边沿聚合（sessions 服务缺席时保持上次值——宠物照常跑）。
+    if (sessionsSvc === undefined || typeof sessionsSvc.list !== 'function') return
+    try {
+      const sessions = sessionsSvc.list()
+      let thinking = false
+      for (const s of sessions) {
+        if (s === null || typeof s !== 'object') continue
+        const id = typeof s.id === 'string' ? s.id : null
+        if (id !== null && (activeTurns.get(id) ?? 0) > 0) thinking = true
+      }
+      sessionThink = thinking
+    } catch {
+      // 列表异常：保留上次值
+    }
+  }
+
   // ---- pet 服务信号（开放性窄缝，供其他插件 ctx.pet.onSignal 订阅）----
   // 账本信号：celebrate（任务完成/升级）、levelUp（升级）、failure（失败）、session（新会话/续接）。
   // 订阅者回调 (signal, payload)；订阅者异常隔离（不影响宠物本体）。
@@ -183,7 +212,10 @@ export function apply(ctx) {
       name = 'welcome'
       until = welcomeUntil
     }
-    return { name, until }
+    // 会话状态随 /state 下发（client 从轮询读，不再直接订阅 sessions）；turnCompleted 单轮消费。
+    const tc = turnCompleted
+    turnCompleted = false
+    return { name, until, sessionThink, sessionWait, turnCompleted: tc }
   }
 
   // httpServer 可选（headless 无 web 服务器）：有则注册 UI 路由/注入，无则降级为无 UI 工具插件
@@ -242,6 +274,24 @@ export function apply(ctx) {
         }
         scheduleSave()
       }),
+      // 会话事件（v8 会话感知）：跟踪 turn/start · turn/end 边沿驱动 think 陪伴与回合完成庆祝。
+      // sessions 服务缺席时跳过（旧订阅同理降级——宠物照常跑，只是无会话感知）。
+      ...(sessionsSvc !== undefined ? [
+        ctx.on('session/event', (session, event) => {
+          const id = typeof session?.id === 'string' ? session.id : null
+          if (id === null) return
+          if (event?.kind === 'turn/start') {
+            activeTurns.set(id, (activeTurns.get(id) ?? 0) + 1)
+            sessionUpdate()
+          } else if (event?.kind === 'turn/end') {
+            const n = (activeTurns.get(id) ?? 0) - 1
+            if (n <= 0) activeTurns.delete(id)
+            else activeTurns.set(id, n)
+            turnCompleted = true // 每完成一个 turn 触发一次庆祝（activity() 消费）
+            sessionUpdate()
+          }
+        }),
+      ] : []),
       
       
       

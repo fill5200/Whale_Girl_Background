@@ -10,7 +10,7 @@
 // 交互要点：瞬发 eat/play 由 TRANSIENT_MS 超时兜底复位（sheet 缺失也保证不卡死）；
 // pointer capture 只在越过拖拽阈值后启用（纯点击不捕获，菜单按钮 click 正常派发）。
 
-import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, deriveSessionMood, nextWorkingRhythm, detectTurnCompleted, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from './logic.mjs'
+import { TRANSIENT_MS, WAKE_MS, JOY_MS, ROUND_CELEBRATE_MS, pickState, nextWorkingRhythm, shouldWake, nextBlinkAt, nextFacingAt, wakeFromInteraction } from './logic.mjs'
 import { parseCharacters, getCharacter, stateOf, listCharacters } from './character.mjs'
 // 路由端点单一来源（src/routes.mjs，verify-routes-sync 门禁守护）：esbuild 内联进 bundle。
 import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ASSETS_PATH } from '../src/routes.mjs'
@@ -391,7 +391,6 @@ export function apply(ctx = {}) {
   let walkRaf = null
   // 会话感知（P2 思考态）：由 host sessions 服务快照派生的陪伴信号。
   let sessionMood = { thinking: false, waiting: false, titles: [] }
-  let sessionsUnsub = null
 
   // ---- 渲染 ----
   const renderStatus = () => {
@@ -926,6 +925,19 @@ export function apply(ctx = {}) {
       if (act !== null && typeof act === 'object' && typeof act.name === 'string') {
         activity = act
       }
+      // 会话感知（v8）：Node half 把 sessionThink/sessionWait/turnCompleted 聚合进 /state——
+      // 自渲染 client 无 ctx.sessions，改从轮询读。turnCompleted 单轮翻转 → 播回合完成庆祝。
+      if (act !== null && typeof act === 'object') {
+        sessionMood = {
+          thinking: act.sessionThink === true,
+          waiting: act.sessionWait === true,
+          titles: [],
+        }
+        if (act.turnCompleted === true) {
+          celebrateUntil = Date.now() + ROUND_CELEBRATE_MS
+        }
+        armWorking() // 会话活跃状态变化 → 重排 working 插曲（思考开始武装/结束撤防）
+      }
       // sleep 语义：从「进入 idle 的时刻」起算持续空闲（不是从「最后一次活动时刻」——那会停在
       // 工作期间导致 agent 停止后立即判睡）。用户交互（拖拽/喂食/玩耍/开菜单）由
       // releaseInteraction 重置 idleSince（唤醒），此处只消费 Node half activity。
@@ -1205,36 +1217,11 @@ export function apply(ctx = {}) {
   scheduleWander()
   armWorking()
 
-  // ---- 会话感知订阅（P2 思考态）----
-  // 订阅 host sessions 列表：任一活跃会话的 running/pending 驱动陪伴状态（think/wait）。
-  // sessions 服务由 bundle 导出面 inject 声明等待；缺失时降级——宠物照常跑，只是没有思考陪伴。
-  // 回合完成（running true→false 边沿）：所有会话（含当前/子会话）→ celebrateUntil 窗口播庆祝动画；
-  // 气泡只给非当前会话（用户在看的会话无需文字提示，但庆祝动画不跳过——「agent 工作完成」）。
-  // 弃用 completed 字段（官方语义是「非选中会话」done 提醒——见 bug-fix 决策记录）。
-  const sessions = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
-  if (sessions?.list && typeof sessions.list.getSnapshot === 'function') {
-    let prevRunning = new Map() // 上次观察的 running 位（turn 完成边沿检测）
-    const onSessions = () => {
-      try {
-        const snap = sessions.list.getSnapshot()
-        sessionMood = deriveSessionMood(snap)
-        // 回合完成边沿检测（v7）：running true→false = 一个 turn 结束（含当前会话/子会话）。
-        const { flips, prevRunning: nextPrev } = detectTurnCompleted(snap, prevRunning)
-        prevRunning = nextPrev
-        if (flips.length > 0) {
-          celebrateUntil = Date.now() + ROUND_CELEBRATE_MS
-          for (const f of flips) {
-            if (f.id !== snap?.current) showReply(`✨ ${f.title} 完成了`)
-          }
-        }
-        armWorking() // 会话活跃状态变化 → 重排 working 插曲（思考开始武装/结束撤防）
-      } catch {
-        // 快照异常（服务中途消失）：保留上次 mood，下一轮重试
-      }
-    }
-    onSessions()
-    sessionsUnsub = sessions.list.subscribe(onSessions)
-  }
+  // ---- 会话感知（v8：Node half 聚合，退役本地 sessions 订阅）----
+  // 自渲染 client 无 ctx.sessions（官方注入面只给 __DSH_BOOT__），会话状态（think/wait/
+  // 回合完成）改由 Node half 在 /state 下发（refresh 里读 act.sessionThink/sessionWait/
+  // turnCompleted）。不再订阅 host sessions 服务——旧订阅在自渲染形态下 ctx 为空恒失效。
+  armWorking() // 首次武装 working 插曲（后续由 refresh 的 sessionMood 变化驱动）
 
   // 回前台立即刷新（后台标签轮询被节流，状态可能陈旧）。
   const onVisibility = () => {
@@ -1294,7 +1281,6 @@ export function apply(ctx = {}) {
     clearTimeout(wanderTimer)
     if (workingTimer !== null) clearTimeout(workingTimer)
     if (walkRaf !== null) cancelAnimationFrame(walkRaf)
-    if (sessionsUnsub !== null) sessionsUnsub()
     for (const t of bubbleTimers) clearTimeout(t) // 气泡残留计时器一并清
     bubbleTimers.clear()
     clearBubble() // 活动气泡引用清空（DOM 随 host.remove() 移除）

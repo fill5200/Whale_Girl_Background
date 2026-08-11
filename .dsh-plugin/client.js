@@ -67,22 +67,6 @@
     }
     return "idle";
   }
-  function deriveSessionMood(snapshot) {
-    const byId = snapshot?.byId ?? {};
-    let thinking = false;
-    let waiting = false;
-    const titles = [];
-    for (const id of Object.keys(byId)) {
-      const s = byId[id];
-      if (s === void 0 || s === null) continue;
-      if (s.running === true) {
-        thinking = true;
-        titles.push(s.displayTitle ?? id);
-      }
-      if (s.pendingInteraction !== void 0) waiting = true;
-    }
-    return { thinking, waiting, titles };
-  }
   var WORKING_MIN_WAIT_MS = 12e3;
   var WORKING_MAX_WAIT_MS = 3e4;
   var WORKING_MIN_DUR_MS = 2500;
@@ -113,24 +97,6 @@
   }
   function wakeFromInteraction({ sleeping }) {
     return { sleeping: false, wake: sleeping === true };
-  }
-  function detectTurnCompleted(snapshot, prevRunning) {
-    const byId = snapshot?.byId ?? {};
-    const nextPrev = new Map(prevRunning);
-    const flips = [];
-    for (const id of Object.keys(byId)) {
-      const s = byId[id];
-      if (s === null || typeof s !== "object") continue;
-      const running = s.running === true;
-      if (nextPrev.get(id) === true && !running) {
-        flips.push({ id, title: s.displayTitle ?? id });
-      }
-      nextPrev.set(id, running);
-    }
-    for (const id of nextPrev.keys()) {
-      if (!(id in byId)) nextPrev.delete(id);
-    }
-    return { flips, prevRunning: nextPrev };
   }
 
   // .dsh-plugin/client/character.mjs
@@ -497,7 +463,6 @@
     let wanderTimer = null;
     let walkRaf = null;
     let sessionMood = { thinking: false, waiting: false, titles: [] };
-    let sessionsUnsub = null;
     const renderStatus = () => {
       if (pet) {
         metaLv.textContent = `Lv.${pet.level}`;
@@ -930,6 +895,17 @@
         if (act !== null && typeof act === "object" && typeof act.name === "string") {
           activity = act;
         }
+        if (act !== null && typeof act === "object") {
+          sessionMood = {
+            thinking: act.sessionThink === true,
+            waiting: act.sessionWait === true,
+            titles: []
+          };
+          if (act.turnCompleted === true) {
+            celebrateUntil = Date.now() + ROUND_CELEBRATE_MS;
+          }
+          armWorking();
+        }
         const isActive = activity.name !== "idle" || activity.until > Date.now();
         if (isActive) {
           idleSince = 0;
@@ -1158,28 +1134,7 @@
     const animTimer = setInterval(tick, TICK_MS);
     scheduleWander();
     armWorking();
-    const sessions = ctx.sessions ?? (typeof ctx.get === "function" ? ctx.get("sessions") : void 0);
-    if (sessions?.list && typeof sessions.list.getSnapshot === "function") {
-      let prevRunning = /* @__PURE__ */ new Map();
-      const onSessions = () => {
-        try {
-          const snap = sessions.list.getSnapshot();
-          sessionMood = deriveSessionMood(snap);
-          const { flips, prevRunning: nextPrev } = detectTurnCompleted(snap, prevRunning);
-          prevRunning = nextPrev;
-          if (flips.length > 0) {
-            celebrateUntil = Date.now() + ROUND_CELEBRATE_MS;
-            for (const f of flips) {
-              if (f.id !== snap?.current) showReply(`\u2728 ${f.title} \u5B8C\u6210\u4E86`);
-            }
-          }
-          armWorking();
-        } catch {
-        }
-      };
-      onSessions();
-      sessionsUnsub = sessions.list.subscribe(onSessions);
-    }
+    armWorking();
     const onVisibility = () => {
       if (document.visibilityState === "visible") refresh();
     };
@@ -1227,7 +1182,6 @@
       clearTimeout(wanderTimer);
       if (workingTimer !== null) clearTimeout(workingTimer);
       if (walkRaf !== null) cancelAnimationFrame(walkRaf);
-      if (sessionsUnsub !== null) sessionsUnsub();
       for (const t of bubbleTimers) clearTimeout(t);
       bubbleTimers.clear();
       clearBubble();
