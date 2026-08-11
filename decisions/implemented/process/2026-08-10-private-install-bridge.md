@@ -16,7 +16,9 @@ whale-girl 以官方 repository-plugin 格式分发，但官方 `@deepseek-ai/ds
 2. **`dsh-plugin.mjs` / `dsh-plugin-assets/` 提交入库**（过渡期）：官方契约本由 prepack 生成、不入库；预填充桥需要 wrapper 现成可用。入库后 loader 校验与未来 prepack 重生成均不受影响（prepack 生成的 wrapper 与入库版本一致时无冲突；官方发布后此决策废弃时，可移除入库 wrapper 恢复纯 prepack 流程）。
 3. **README 安装章节**写明过渡步骤（先 `prepare-cache.mjs` 再配置 `cordis.patch.yml`），并链接本文。
 
-**废弃条件**：官方发布 `@deepseek-ai/dsh-repository-plugin`（首个 tagged release）后，正常安装流程的 `pnpm install` 可解析 devDep、prepack 自动生成 wrapper——移除本桥（脚本可留作普通安装前的缓存预热或删除），README 恢复纯 config 安装。
+**废弃条件**：`@deepseek-ai/dsh-repository-plugin` 在官方私有 npm 库可见（`npm view @deepseek-ai/dsh-repository-plugin versions` 非 404）后，正常安装流程的 `pnpm install` 可解析 devDep、prepack 自动生成 wrapper——移除本桥（脚本可留作普通安装前的缓存预热或删除），README 恢复纯 config 安装。
+
+**现状更新（2026-08-11 实测）**：官方私有 rc 库已发布（`@deepseek-ai/dsh`、`@deepseek-ai/dsh-tools` 等 `0.0.1-rc.1`，NPM_TOKEN 访问），但 **`@deepseek-ai/dsh-repository-plugin` 仍未发布（私有库 404）**——本桥对参与内测的 token 用户同样必需，不因私有库发布而解除。另：私有库版本为 rc 预发布，`0.0.1`/`^0.0.1` 声明匹配不到（npm 预发布规则），依赖声明须用 `0.0.1-rc.*` 形态。
 
 ## Consequences
 

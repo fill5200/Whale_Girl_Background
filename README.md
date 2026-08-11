@@ -23,7 +23,7 @@ repository-plugins:
     - github:dsh-external/whale-girl#6f6d3f2ec283&path:/.dsh-plugin
 ```
 
-**安装前置（官方包未发布期）**：`@deepseek-ai/dsh-repository-plugin` 是 `private: true`，RepositoryCache 的 `pnpm install` 会因它 404——loader 又硬校验 prepack/devDependencies 声明，不能移除。安装前先预填充缓存，让 loader 跳过安装（见 [decisions/implemented/process/2026-08-10-private-install-bridge.md](decisions/implemented/process/2026-08-10-private-install-bridge.md)）：
+**安装前置（官方私有 rc 库阶段）**：官方 `@deepseek-ai` 私有库已发布（`0.0.1-rc.1`，NPM_TOKEN 访问），但 **`@deepseek-ai/dsh-repository-plugin` 仍未发布（私有库 404，2026-08-11 实测）**——它是 loader 硬校验的 devDep（prepack/devDependencies 声明必须，不能移除），RepositoryCache 的 `pnpm install` 因此失败。安装前先预填充缓存，让 loader 跳过安装（见 [decisions/implemented/process/2026-08-10-private-install-bridge.md](decisions/implemented/process/2026-08-10-private-install-bridge.md)）：
 
 ```sh
 node scripts/prepare-cache.mjs            # 默认 ~/.dsh，ref = 当前仓库 HEAD
