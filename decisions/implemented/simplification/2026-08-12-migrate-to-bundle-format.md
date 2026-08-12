@@ -54,3 +54,8 @@ insert 行挂载），但：`.dsh-plugin` 目录是只读仓库需 hack、client
 - `.dsh-plugin/package.json` 成为不消费的 repository 形态残留（保留供追溯）；包根身份 = 仓库根 package.json。
 - `verify-client-smoke.mjs` 的 DOM 断言基于旧注入形态（服务端 HTML 找宠物元素），转 bundle 后不再适用——浏览器验证以 `verify-client-behavior.mjs`（运行时 querySelector）为准。
 - 门禁与单测保持通过（11 门禁 + 112 单测）；验证站端到端：client 挂载 + 宠物渲染（headless Chrome 实证）。
+- **inject 补 `settings`/`httpServer`**（0811 cordis 严格注入）：`ctx.get('settings')`/
+  `ctx.get('httpServer')` 未在 inject 声明时抛 `cannot get property without inject`，
+  apply 开头即炸、整个 effect 不注册（路由全 fallback）。bundle 形态下 whale-girl
+  只进 web profile（base 层必有 settings，web 组合必有 httpServer），inject 安全；
+  headless 降级设计随 repository 形态废弃（GUI 宠物本就不该装 headless）。

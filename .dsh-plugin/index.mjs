@@ -22,7 +22,7 @@ import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 
 export const name = 'whale-girl'
-export const inject = ['tasks', 'agents', 'sessions']
+export const inject = ['tasks', 'agents', 'sessions', 'settings', 'httpServer']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
 import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH } from './src/routes.mjs'
 export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH }
