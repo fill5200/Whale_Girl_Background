@@ -8,31 +8,23 @@
 
 <p align="center">
   <img src="https://badgen.net/badge/license/BSD-3-Clause/blue" alt="license" />
-  <img src="https://badgen.net/badge/format/official%20repository-plugin/8257D0" alt="official repository-plugin" />
+  <img src="https://badgen.net/badge/format/official%20bundle/8257D0" alt="official bundle" />
 </p>
 
 ---
 
 ## 安装
 
-官方 repository-plugin 格式（`.dsh-plugin/` + `package.json#dsh.entry`）。在 `$DSH_HOME/cordis.patch.yml` 加入（**ref** = 仓库提交的完整哈希，如 `6f6d3f2ec283…`——安装以 ref 锁定，缓存按 ref 不可变，建议用提交哈希而非分支/tag 引用）：
-
-```yaml
-repository-plugins:
-  repositories:
-    - github:dsh-external/whale-girl#6f6d3f2ec283&path:/.dsh-plugin
-```
-
-**安装前置（官方私有 rc 库阶段）**：官方 `@deepseek-ai` 私有库已发布（`0.0.1-rc.1`，NPM_TOKEN 访问），但 **`@deepseek-ai/dsh-repository-plugin` 仍未发布（私有库 404，2026-08-11 实测）**——它是 loader 硬校验的 devDep（prepack/devDependencies 声明必须，不能移除），RepositoryCache 的 `pnpm install` 因此失败。安装前先预填充缓存，让 loader 跳过安装（见 [decisions/implemented/process/2026-08-10-private-install-bridge.md](decisions/implemented/process/2026-08-10-private-install-bridge.md)）：
+官方 **bundle 插件** 格式（仓库根 `package.json` 的 `dsh.bundle` + `dsh.client`）。经官方 profile 管理：
 
 ```sh
-node scripts/prepare-cache.mjs            # 默认 ~/.dsh，ref = 当前仓库 HEAD
-# 或 node scripts/prepare-cache.mjs --home=<隔离 home> --ref=<与 config 行一致的 commit>
+dsh plugin --profile web add "github:dsh-external/whale-girl#main"   # 推荐：git 源一行（构建产物已入库）
+# 或本地目录：dsh plugin --profile web add <whale-girl 本地路径>
 ```
 
-启用后刷新 Web 页面，右下角出现宠物：点击弹出菜单（🍗 喂食 / 🎾 玩耍），拖拽可移动；hover 显示状态条（资历等级/任务数/最近共同回忆）。初始配置/欢迎页（onboarding）宠物隐藏。
+装完 **重启 web**（bundle 层在启动时合成），右下角出现宠物：点击弹出菜单（🍗 喂食 / 🎾 玩耍），拖拽可移动；hover 显示状态条（资历等级/任务数/最近共同回忆）。初始配置/欢迎页（onboarding）宠物隐藏。
 
-更新插件时换成仓库 main 的最新提交哈希（HMR 事务性换代，无需重启）。
+更新插件时 `dsh plugin --profile web update whale-girl`（或换 git 源 ref），重启生效。
 
 ## 使用
 

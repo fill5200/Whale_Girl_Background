@@ -156,4 +156,4 @@ XP/等级/称号/回忆/情绪的完整契约见 [docs/growth-system.md](growth-
 1. 生图产物（3×3 网格，纯色背景）放 `assets/raw/`（gitignored，不入库）。
 2. `python3 scripts/slice-sheet.py assets/raw/<图>.png --sheet 3x3 --states <行状态名> --frames <每行帧数>` → 帧 sheet 写入 `assets/`。
 3. `assets/manifest.json` 加/改条目（`verify-assets` 门禁保证引用与 PNG 尺寸契约，缺文件即红）。
-4. 实况验证：按 [README「安装」](../README.md#安装) 方式重装（`$DSH_HOME/config.yaml` 的 `repository-plugins.repositories`，ref 换成含改动的提交哈希）→ **刷新页面即可**（assets/ manifest 改动无需重启 web——assets 路由按请求读盘）；改 Node half（.dsh-plugin/index.mjs/src）才需重启 web 且日志须无 `plugin tree failed to load`；改 client 后跑 `node scripts/verify-client-smoke.mjs <web-url>`。
+4. 实况验证：按 [README「安装」](../README.md#安装) 方式重装（`dsh plugin --profile web add` git 源）→ **刷新页面即可**（assets/ manifest 改动无需重启 web——assets 路由按请求读盘）；改 Node half（.dsh-plugin/index.mjs/src）才需重启 web 且日志须无 `plugin tree failed to load`；改 client 后跑 `node scripts/verify-client-smoke.mjs <web-url>`。

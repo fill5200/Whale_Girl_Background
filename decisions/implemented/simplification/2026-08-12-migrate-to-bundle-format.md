@@ -28,6 +28,7 @@ Status: implemented
 - **Node half**：删除 `ui.js` 路由 + `httpServer.tapIndex` 注入（client 改由
   client-modules 挂载）；state/interact/config/assets/events 路由保留
 - **`.dsh-plugin/package.json`**：不消费（旧 repository 形态残留），删除 `dsh.entry`/`prepack` 声明，仅保留文件清单与依赖
+- **repository 残留清理**（无风险，零消费审计）：删除 `.dsh-plugin/dsh-plugin.mjs`（wrapper 生成物，bundle 不消费）、`.dsh-plugin/dsh-plugin-assets/`（空目录）、`scripts/prepare-cache.mjs`（repository 预填充脚本，门禁不引用）；`.dsh-plugin/package.json` 的 `files` 清理残留条目 + 移除未发布死依赖 `@deepseek-ai/dsh-repository-plugin`；README 安装章节 + docs/sprites-spec 实况验证改指 bundle 安装
 - 安装方式从「insert 行 hack」变为官方 `dsh plugin --profile web add <仓库根>`（进层栈）
 
 ## Alternatives considered

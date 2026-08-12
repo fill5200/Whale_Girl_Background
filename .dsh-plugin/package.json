@@ -8,13 +8,8 @@
     "src",
     "client",
     "client.js",
-    "assets",
-    "dsh-plugin.mjs",
-    "dsh-plugin-assets"
+    "assets"
   ],
-  "devDependencies": {
-    "@deepseek-ai/dsh-repository-plugin": "0.0.1"
-  },
   "dependencies": {
     "schemastery": "^3.18.0"
   }
