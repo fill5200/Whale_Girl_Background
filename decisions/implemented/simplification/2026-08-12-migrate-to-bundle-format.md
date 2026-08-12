@@ -27,7 +27,7 @@ Status: implemented
   `export const name` + `export function apply`（命名导出，供 bundle 包装）
 - **Node half**：删除 `ui.js` 路由 + `httpServer.tapIndex` 注入（client 改由
   client-modules 挂载）；state/interact/config/assets/events 路由保留
-- **`.dsh-plugin/package.json`**：不消费（旧 repository 形态残留），保持原样
+- **`.dsh-plugin/package.json`**：不消费（旧 repository 形态残留），删除 `dsh.entry`/`prepack` 声明，仅保留文件清单与依赖
 - 安装方式从「insert 行 hack」变为官方 `dsh plugin --profile web add <仓库根>`（进层栈）
 
 ## Alternatives considered

@@ -12,12 +12,6 @@
     "dsh-plugin.mjs",
     "dsh-plugin-assets"
   ],
-  "scripts": {
-    "prepack": "dsh-plugin-prepare"
-  },
-  "dsh": {
-    "entry": "./index.mjs"
-  },
   "devDependencies": {
     "@deepseek-ai/dsh-repository-plugin": "0.0.1"
   },

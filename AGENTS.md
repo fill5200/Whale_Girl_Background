@@ -12,6 +12,7 @@ whale-girl 以官方 **bundle 格式**分发（仓库根 `package.json` 的 `dsh
 
 ```
 .dsh-plugin/index.mjs     Node half 入口：state/interact/config/assets/events 路由 + 事件记账 + ctx.pet 服务（client 经 client-modules 挂载，不再注入页面）
+.dsh-plugin/package.json   不消费的 repository 形态残留（无 dsh 声明，仅保留文件清单）
 .dsh-plugin/src/          Node half 纯逻辑（账本/活动/assets 守卫/配置/signals，零宿主依赖，可单测）
 .dsh-plugin/client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
 .dsh-plugin/client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
