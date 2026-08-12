@@ -1,5 +1,5 @@
 // whale-girl Node half：积累型账本宿主 + assets 静态服务 + 活动/事件推导 + 状态持久化。
-// 契约：官方 bundle 插件的 Node half（完整 Cordis 插件，仓库根 package.json 的 dsh.bundle/dsh.client）；交互经 httpServer 路由；
+// 契约：官方 bundle 插件的 Node half（完整 Cordis 插件，仓库根 package.json 的 dsh.bundle/dsh.client）；交互经 webServer 路由；
 // 路由端点单一来源 src/routes.mjs（verify-routes-sync 门禁守护，改前缀只改那里）；
 // activity 是派生字段，不写入账本（账本保持纯函数积累，见 src/pet-state.mjs）。
 // 事件机制（v2，零负反馈）：任务完成 → 资历 +XP/称号/回忆 + celebrate；失败 → 只计数 +
@@ -22,7 +22,7 @@ import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 
 export const name = 'whale-girl'
-export const inject = ['tasks', 'agents', 'sessions', 'settings', 'httpServer']
+export const inject = ['jobs', 'agents', 'sessions', 'settings', 'webServer']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
 import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH } from './src/routes.mjs'
 export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH }
@@ -61,17 +61,17 @@ function saveState(next) {
 
 /** 收集宿主全部任务：owned（按 agent 遍历，绕过 owner fence）+ unowned，按 id 去重。 */
 function collectTasks(ctx) {
-  const tasks = ctx.tasks
+  const jobs = ctx.jobs
   const seen = new Set()
   const out = []
   for (const agent of ctx.agents.list()) {
-    for (const snapshot of tasks.list(agent)) {
+    for (const snapshot of jobs.list(agent)) {
       if (seen.has(snapshot.id)) continue
       seen.add(snapshot.id)
       out.push({ id: snapshot.id, status: snapshot.status, label: snapshot.label })
     }
   }
-  for (const snapshot of tasks.list()) {
+  for (const snapshot of jobs.list()) {
     if (seen.has(snapshot.id)) continue
     seen.add(snapshot.id)
     out.push({ id: snapshot.id, status: snapshot.status, label: snapshot.label })
@@ -185,7 +185,7 @@ export function apply(ctx) {
     const tasks = collectTasks(ctx)
     const derived = deriveActivity({ tasks, nowMs: now, known, wasWorking, errorMs: configRef.errorMs })
     wasWorking = derived.wasWorking
-    // 账本记账（+XP/失败计数/回忆）已迁入 ctx.tasks.onTaskDone 事件驱动——
+    // 账本记账（+XP/失败计数/回忆）已迁入 ctx.jobs.onJobDone 事件驱动——
     // 页面关闭/轮询缺席时任务终态不漏记；此处只保留展示（working/burst）与活跃时长。
     if (derived.working) {
       state = recordActive(state, now - lastActiveCheck, now).state
@@ -228,10 +228,10 @@ export function apply(ctx) {
     return { name, until, sessionThink, sessionWait, turnCompleted: tc }
   }
 
-  // httpServer 可选（headless 无 web 服务器）：有则注册 state/interact/config/assets/events
+  // webServer 可选（headless 无 web 服务器）：有则注册 state/interact/config/assets/events
   // 路由，无则降级为无 UI 工具插件。client 经官方 client-modules 挂载（__ModuleLoader__
   // 通道），不再由 entry 注入页面（0811 bundle 形态）。
-  const httpServer = typeof ctx.get === 'function' ? ctx.get('httpServer') : undefined
+  const webServer = typeof ctx.get === 'function' ? ctx.get('webServer') : undefined
   ctx.effect(() => {
     const disposers = [
       // pet 服务（开放性窄缝）：只读快照 + 信号订阅。其他插件 inject ['pet']
@@ -244,7 +244,7 @@ export function apply(ctx) {
       // 事件驱动记账（F1）：任务终态恰回调一次，与浏览器轮询解耦——
       // GUI 关闭期间完成/失败的任务也入账（此前靠轮询观察 running 翻转，漏记窗口大）。
       // killed（用户取消）中性：不计 XP、不记失败、不写回忆（F4 语义）。
-      ctx.tasks.onTaskDone((snapshot) => {
+      ctx.jobs.onJobDone((snapshot) => {
         const now = Date.now()
         if (snapshot.status === 'completed') {
           const result = recordTaskCompleted(state, snapshot.label ?? '未命名任务', now)
@@ -313,9 +313,9 @@ export function apply(ctx) {
       
       
       
-      // httpServer 服务存在时（web 模式）：注册 state/interact/config/assets/ui 路由 + 页面注入。
-      ...(httpServer !== undefined ? [
-      httpServer.register({
+      // webServer 服务存在时（web 模式）：注册 state/interact/config/assets/ui 路由 + 页面注入。
+      ...(webServer !== undefined ? [
+      webServer.register({
         kind: 'exact',
         path: STATE_PATH,
         handler: async (req, res) => {
@@ -333,7 +333,7 @@ export function apply(ctx) {
           }
         },
       }),
-      httpServer.register({
+      webServer.register({
         kind: 'exact',
         path: CONFIG_PATH,
         handler: async (req, res) => {
@@ -350,7 +350,7 @@ export function apply(ctx) {
           }
         },
       }),
-      httpServer.register({
+      webServer.register({
         kind: 'exact',
         path: INTERACT_PATH,
         handler: async (req, res) => {
@@ -387,7 +387,7 @@ export function apply(ctx) {
           }
         },
       }),
-      httpServer.register({
+      webServer.register({
         kind: 'prefix',
         path: ASSETS_PATH,
         handler: async (req, res) => {
@@ -425,7 +425,7 @@ export function apply(ctx) {
       // client 用 EventSource 订阅；收到事件即 refresh() 拉最新 /state（延迟从 pollMs
       // 降到单次往返）。心跳 25s 注释行防代理/网关空闲断开；close 清理连接与心跳。
       // 广播失败（断连）由 broadcastEvent 的 try/catch 移除连接，不阻塞事件处理。
-      httpServer.register({
+      webServer.register({
         kind: 'exact',
         path: EVENTS_PATH,
         handler: async (req, res) => {
