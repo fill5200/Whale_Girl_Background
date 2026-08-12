@@ -26,9 +26,6 @@ export const inject = ['tasks', 'agents', 'sessions']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
 import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH } from './src/routes.mjs'
 export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH }
-// client 自执行脚本（build 产物，同目录 client.js；由 UI 路由 /whale-girl/ui.js 服务）。
-const UI_SCRIPT = readFileSync(new URL('./client.js', import.meta.url))
-
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
 
@@ -231,8 +228,9 @@ export function apply(ctx) {
     return { name, until, sessionThink, sessionWait, turnCompleted: tc }
   }
 
-  // httpServer 可选（headless 无 web 服务器）：有则注册 UI 路由/注入，无则降级为无 UI 工具插件
-  // （官方 repository-plugin entry 语义，见迁移决策记录）。
+  // httpServer 可选（headless 无 web 服务器）：有则注册 state/interact/config/assets/events
+  // 路由，无则降级为无 UI 工具插件。client 经官方 client-modules 挂载（__ModuleLoader__
+  // 通道），不再由 entry 注入页面（0811 bundle 形态）。
   const httpServer = typeof ctx.get === 'function' ? ctx.get('httpServer') : undefined
   ctx.effect(() => {
     const disposers = [
@@ -423,24 +421,6 @@ export function apply(ctx) {
           }
         },
       }),
-      // ---- UI 路由 + 页面注入（官方 repository-plugin 形态）----
-      // client 是自执行脚本（build 产物 client.js，无 __ModuleLoader__）；entry 把它作为
-      // /whale-girl/ui.js 提供，并经官方 httpServer.tapIndex 注入 index.html——
-      // 每次页面响应都带上 <script>，宠物自动出现（官方注入面，非自造 patch）。
-      // 防重复：index 已含该 script 时跳过（tap 幂等）。
-      httpServer.register({
-        kind: 'exact',
-        path: `${ROUTE_PREFIX}/ui.js`,
-        handler: async (req, res) => {
-          if (req.method !== 'GET' && req.method !== 'HEAD') {
-            res.writeHead(405)
-            res.end()
-            return
-          }
-          res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
-          res.end(UI_SCRIPT)
-        },
-      }),
       // ---- SSE 事件流（v9）：事件即时下发通道 ----
       // client 用 EventSource 订阅；收到事件即 refresh() 拉最新 /state（延迟从 pollMs
       // 降到单次往返）。心跳 25s 注释行防代理/网关空闲断开；close 清理连接与心跳。
@@ -475,9 +455,6 @@ export function apply(ctx) {
           }, 25000)
         },
       }),
-      httpServer.tapIndex((html) =>
-        html.includes(`${ROUTE_PREFIX}/ui.js`) ? html : html.replace('</body>', `<script src="${ROUTE_PREFIX}/ui.js" defer></script></body>`),
-      ),
       ] : []),
     ]
     return () => {

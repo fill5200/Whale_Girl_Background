@@ -36,9 +36,11 @@ export function esbuildAvailable() {
 }
 
 /**
- * 生成 client.js（自执行 UI 脚本 bundle——官方 repository-plugin 形态，无 __ModuleLoader__
- * 契约；页面加载由 entry 的 UI 路由 + 注入缝驱动，见决策记录
- * 2026-08-10-migrate-to-official-repository-plugin.md）。
+ * 生成 client.js（标准 bundle client——官方 `__ModuleLoader__.load` 契约，0811 形态：
+ * factory 返回 `{ name, apply }`，由 client 内核挂载时调用 apply(ctx)。不再走
+ * entry 的 UI 路由 + tapIndex 注入缝（repository 形态已随 0811 移除）。
+ * 包装方式：esbuild CJS 输出（module/exports 供 factory 作用域）+ 外层
+ * `__ModuleLoader__.load({ id, factory })`（对齐官方 client bundle 产物结构）。
  * @param {{ check?: boolean, root?: string }} opts
  * @returns {{ ok: boolean, errors?: string[], skipped?: string }}
  */
@@ -54,7 +56,7 @@ export function generate({ check = false, root = ROOT } = {}) {
     [
       ENTRY,
       '--bundle',
-      '--format=iife',
+      '--format=cjs',
       '--platform=browser',
       '--target=es2020',
       `--outfile=${tmpOut}`,
@@ -64,7 +66,18 @@ export function generate({ check = false, root = ROOT } = {}) {
   if (res.status !== 0) {
     return { ok: false, errors: [`esbuild 失败：${res.stderr.trim()}`] }
   }
-  const code = readFileSync(tmpOut)
+  const body = readFileSync(tmpOut, 'utf8')
+  const code = Buffer.from(
+    `window.__ModuleLoader__.load({\n`
+    + `\tid: "whale-girl",\n`
+    + `\tfactory: (require) => {\n`
+    + `\t\tvar module = { exports: {} };\n`
+    + `\t\tvar exports = module.exports;\n`
+    + body.replace(/\n$/, '')
+    + `\n\t\treturn module.exports;\n`
+    + `\t}\n`
+    + `});\n`,
+  )
   const outputPath = join(root, '.dsh-plugin', 'client.js')
   if (!check) {
     writeFileSync(outputPath, code)

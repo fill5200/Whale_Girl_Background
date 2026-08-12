@@ -2,16 +2,16 @@
 
 <!-- 常驻层：每个 session 都必须进入上下文的规则。每条 1–3 行、自包含、链接它的家。不放故事、示例、情境流程、任何从被链接的家里复述来的内容。 -->
 
-whale-girl 以官方 repository-plugin 格式分发（`.dsh-plugin/` 子目录 + `package.json#dsh.entry`，见 [decisions/implemented/simplification/2026-08-10-migrate-to-official-repository-plugin.md](decisions/implemented/simplification/2026-08-10-migrate-to-official-repository-plugin.md)）：在 DSH Web GUI 内悬浮的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。架构决策见 [decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md](decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md)；文档规范见 [docs/AGENTS.md](docs/AGENTS.md)。
+whale-girl 以官方 **bundle 格式**分发（仓库根 `package.json` 的 `dsh.bundle` + `dsh.client`，包根 cordis.patch.yml，见 [decisions/implemented/simplification/2026-08-12-migrate-to-bundle-format.md](decisions/implemented/simplification/2026-08-12-migrate-to-bundle-format.md)）：在 DSH Web GUI 内悬浮的桌面宠物（QQ 宠物形态，A 模式——GUI 内）。架构决策见 [decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md](decisions/implemented/architecture/2026-08-08-in-gui-pet-architecture.md)；文档规范见 [docs/AGENTS.md](docs/AGENTS.md)。
 
 ## 当前阶段取舍
 
-**首个版本已分发（官方 repository-plugin 形态）。** 不再有「可自由重命名与重组」的过渡条款——公开 ref 被消费后改名/重组破坏安装；deep-standard 档位重评结论见 [decisions/implemented/process/2026-08-10-l3-tier-review.md](decisions/implemented/process/2026-08-10-l3-tier-review.md)。
+**首个版本已分发（官方 bundle 形态，2026-08-12 起）。** 不再有「可自由重命名与重组」的过渡条款——公开 ref 被消费后改名/重组破坏安装；deep-standard 档位重评结论见 [decisions/implemented/process/2026-08-10-l3-tier-review.md](decisions/implemented/process/2026-08-10-l3-tier-review.md)。
 
 ## 目录布局
 
 ```
-.dsh-plugin/index.mjs     Node half 入口：state/interact/config/assets/ui 路由 + 事件记账 + ctx.pet 服务
+.dsh-plugin/index.mjs     Node half 入口：state/interact/config/assets/events 路由 + 事件记账 + ctx.pet 服务（client 经 client-modules 挂载，不再注入页面）
 .dsh-plugin/src/          Node half 纯逻辑（账本/活动/assets 守卫/配置/signals，零宿主依赖，可单测）
 .dsh-plugin/client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
 .dsh-plugin/client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
@@ -52,7 +52,7 @@ node scripts/build-client.mjs --check   # 校验 .dsh-plugin/client.js 新鲜度
 - **每个非平凡改动必须在同一 PR 内新增或更新至少一条决策记录**；豁免与格式见 [decisions/README.md](decisions/README.md)。
 - **约定必须有门禁。** 机械可查的约定写成只拒绝一条不变量的程序；每个门禁有用非法样例证明它会拒绝的测试。门禁清单的权威是 [scripts/gates/run.mjs](scripts/gates/run.mjs)，本文件不手抄。
 - **生成物一律不手改**：`.dsh-plugin/client.js` 由 [scripts/build-client.mjs](scripts/build-client.mjs) 生成，改 [.dsh-plugin/client/index.mjs](.dsh-plugin/client/index.mjs)；新鲜度由 `--check` 守护。
-- **官方插件契约**：`.dsh-plugin/package.json` 的 `dsh.entry` 指向完整 Cordis 插件（`index.mjs`：`name`/`inject`/`apply`）；`prepack` 必须调用 `dsh-plugin-prepare`（devDep `@deepseek-ai/dsh-repository-plugin`）；`dsh` 字段只允许 `skills`/`mcpServers`/`entry`（官方 schema strict）。
+- **官方插件契约**：仓库根 `package.json` 的 `dsh.bundle.patch` → `cordis.patch.yml`（insert 挂载自身）+ `dsh.client`（platform web）；Node half 入口 `.dsh-plugin/index.mjs`（`name`/`inject`/`apply`）；client 经 `__ModuleLoader__.load` 注册（`.dsh-plugin/client/index.mjs` 命名导出 `name`/`apply`）。
 - **注释与文档写契约，不写推理转录**：行为、时序、异常、后果、所有权、安全使用条件保留；实现叙述、测试走查、评审史、代码复述删除。只写当前态。
 - **一个 PR 一种性质** + 对应标签（feature / bug-fix / doc / testing / cleanup）；独立改动拆开；缺陷在引入它的那个 PR 上修，不往下游打补丁。**PR 性质标签与决策分类是两套词汇**：决策分类是封闭集合（feature/bug-fix/simplification/architecture/process/testing，见 [decisions/README.md](decisions/README.md)）——cleanup 改动进 `simplification/` 目录，doc 改动通常无决策记录（纯文档豁免）。
 - **宿主/平台环境性行为首次复现即沉淀**：如「宿主会清理/覆盖 CSS 注入样式」这类环境事实，第 1 次踩坑就写 bug-fix 决策记录并标注「环境事实」，不等到第 N 次再固化（教训见 hitarea/menu/effects 系列记录）。

@@ -1310,7 +1310,7 @@ export function apply(ctx = {}) {
   }
 }
 
-// 官方 repository-plugin 形态：自执行 UI 脚本——经 entry 的 UI 路由 /whale-girl/ui.js
-// 与官方 httpServer.tapIndex 注入，由页面 <script> 直接加载执行（无 __ModuleLoader__/
-// fiber 注入）。ctx 仅消费 sessions（会话感知）；缺席时降级——宠物照常跑，无思考陪伴。
-apply({})
+// 标准 bundle client 形态（0811）：exports {name, apply} 经 __ModuleLoader__.load
+// 注册，由 client 内核挂载时调用 apply(ctx)。ctx 仅消费 sessions（会话感知）；
+// 缺席时降级——宠物照常跑，无思考陪伴。
+export const name = 'whale-girl'
