@@ -68,7 +68,7 @@ repository-plugins:
 
 ### Phase 0 结论（2026-08-10 官方源码 + e2e fixture 实证）
 
-官方 0809 快照（`421e96f4`）自带 repository-plugin 机制（`packages/self-modification/repository-plugin` + `packages/boot` RepositoryCache；`/tmp/dsh-0809` worktree 已建，含 plugin-registry 集成残留——纯净验证用 detached 新 worktree）。契约确认：
+官方 0809 快照（`421e96f4`）自带 repository-plugin 机制（`packages/self-modification/repository-plugin` + `packages/boot` RepositoryCache；官方 0809 基线验证）。契约确认：
 
 - **`dsh.entry` 是完整 Cordis 插件**：官方 e2e fixture（`apps/cli/tests/fixtures/github-repository-plugin/.dsh-plugin/`）的 entry 是 `export const name/inject/apply(ctx)` 标准 Cordis 形态——与 whale-girl `index.mjs` 同构；`dsh` 字段 schema（`format.ts`）：`skills[]`/`mcpServers?`/`entry?` 至少一个，`prepack` 必须包含 `dsh-plugin-prepare`，devDependencies 必须含 `@deepseek-ai/dsh-repository-plugin`
 - **prepack 产物**：`dsh-plugin.mjs`（固定 wrapper，无 import）+ `dsh-plugin-assets/`（静态资产）
@@ -102,7 +102,7 @@ repository-plugins:
 
 - ~~**dsh.entry 精确契约未实测**~~（Phase 0 已确认，见上节）：声明格式/prepack/containment 均从官方源码与 e2e fixture 实证；entry 全部收进 `.dsh-plugin/`（fixture 证明 skills 可外指，entry 保守收内）
 - **页面注入缝是插件自造职责**（官方 README 实证无第三方 bundle 分发路径）：entry 自渲染 + 插件自带 patch 提供宿主 hole（plugin-registry 同模式先例：插件仓库自带 patches/ 提供宿主 hole，不入官方树）——评估为可解但需投入
-- **基线迁移**：官方 repository-plugin 需 0809 基线（`421e96f4` 已拉取，`/tmp/dsh-0809` worktree 已建）；当前验证站是 0808+patch，验证期间两套并存
+- **基线迁移**：官方 repository-plugin 需 0809 基线（`421e96f4`）；当前验证站是 0808+patch，验证期间两套并存
 - **GUI 兼容**：官方 GUI 注入 `__DSH_BOOT__` 与 registry `__ModuleLoader__` 并存时宠物不得双挂（迁移后旧机制不再加载 whale-girl）
 
 ## 取代检查
