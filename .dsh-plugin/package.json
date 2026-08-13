@@ -12,5 +12,6 @@
   ],
   "dependencies": {
     "schemastery": "^3.18.0"
-  }
+  },
+  "license": "MIT"
 }
