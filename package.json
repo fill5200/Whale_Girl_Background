@@ -12,8 +12,7 @@
     "check:client": "node scripts/build-client.mjs --check"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1",
-    "schemastery": "^3.5.0"
+    "esbuild": "^0.28.1"
   },
   "main": "./.dsh-plugin/index.mjs",
   "exports": {
@@ -29,5 +28,8 @@
     "client": {
       "platform": "web"
     }
+  },
+  "dependencies": {
+    "schemastery": "^3.18.0"
   }
 }
