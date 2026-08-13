@@ -76,7 +76,7 @@ whale-girl:
   sleepAfterMs: 60000
 ```
 
-完整配置项清单与语义层（XP/称号）封闭说明见 `.dsh-plugin/src/config.mjs`。**语义层不可配**（改 XP/称号阈值会破坏积累账本一致性）。
+完整配置项清单与语义层（XP/称号）封闭说明见 `lib/src/config.mjs`。**语义层不可配**（改 XP/称号阈值会破坏积累账本一致性）。
 
 ## 角色
 
@@ -86,7 +86,7 @@ whale-girl:
 
 whale-girl 是官方 repository-plugin 格式的**完整范本**（不绑定具体基线版本，随官方机制演进）——开发新插件可对照：
 
-- **结构**：`.dsh-plugin/`（入口/纯逻辑/client/素材）与 docs/decisions/scripts 分离，见根 [AGENTS.md](AGENTS.md)
+- **结构**：`lib/`（入口/纯逻辑/client/素材）与 docs/decisions/scripts 分离，见根 [AGENTS.md](AGENTS.md)
 - **规范**：门禁（`scripts/gates/run.mjs`）+ 决策记录 + 素材全量契约；开发引导见 plugin-registry 的 [plugin-registry-create skill](https://github.com/vlln/plugin-registry/tree/main/skills/plugin-registry-create) 与 [cookbook](https://github.com/vlln/plugin-registry/blob/main/docs/cookbook/creating-a-repository-plugin.md)，踩过的坑见 [gotchas](https://github.com/vlln/plugin-registry/blob/main/skills/plugin-registry-create/references/gotchas.md)
 
 ## 贡献
