@@ -18,7 +18,7 @@
 官方 **bundle 插件** 格式（仓库根 `package.json` 的 `dsh.bundle` + `dsh.client`）。经官方 profile 管理：
 
 ```sh
-dsh plugin --profile web add "github:dsh-external/whale-girl#main"   # 推荐：git 源一行（构建产物已入库）
+dsh plugin --profile web add "github:vlln/whale-girl#main"   # 推荐：git 源一行（构建产物已入库）
 # 或本地目录：dsh plugin --profile web add <whale-girl 本地路径>
 ```
 
@@ -87,7 +87,7 @@ whale-girl:
 whale-girl 是官方 repository-plugin 格式的**完整范本**（不绑定具体基线版本，随官方机制演进）——开发新插件可对照：
 
 - **结构**：`.dsh-plugin/`（入口/纯逻辑/client/素材）与 docs/decisions/scripts 分离，见根 [AGENTS.md](AGENTS.md)
-- **规范**：门禁（`scripts/gates/run.mjs`）+ 决策记录 + 素材全量契约；开发引导见 plugin-registry 的 [plugin-registry-create skill](https://github.com/dsh-external/plugin-registry/tree/main/skills/plugin-registry-create) 与 [cookbook](https://github.com/dsh-external/plugin-registry/blob/main/docs/cookbook/creating-a-repository-plugin.md)，踩过的坑见 [gotchas](https://github.com/dsh-external/plugin-registry/blob/main/skills/plugin-registry-create/references/gotchas.md)
+- **规范**：门禁（`scripts/gates/run.mjs`）+ 决策记录 + 素材全量契约；开发引导见 plugin-registry 的 [plugin-registry-create skill](https://github.com/vlln/plugin-registry/tree/main/skills/plugin-registry-create) 与 [cookbook](https://github.com/vlln/plugin-registry/blob/main/docs/cookbook/creating-a-repository-plugin.md)，踩过的坑见 [gotchas](https://github.com/vlln/plugin-registry/blob/main/skills/plugin-registry-create/references/gotchas.md)
 
 ## 贡献
 
