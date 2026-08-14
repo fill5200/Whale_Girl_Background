@@ -21,12 +21,13 @@ import { normalizeState, serializeState } from './src/persistence.mjs'
 import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
 import { SNAPSHOT_API_VERSION, TURN_COMPLETED_MS, turnCompletionSnapshot } from './src/snapshot.mjs'
+import { PRESENCE_TTL_MS, pokePresence, companionOnline } from './src/presence.mjs'
 
 export const name = 'whale-girl'
 export const inject = ['jobs', 'agents', 'sessions', 'settings', 'webServer']
 // 路由端点 re-export（来源 src/routes.mjs；保持既有导出面）。
-import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH } from './src/routes.mjs'
-export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH }
+import { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH, PRESENCE_PATH } from './src/routes.mjs'
+export { STATE_PATH, INTERACT_PATH, CONFIG_PATH, ROUTE_PREFIX, EVENTS_PATH, PRESENCE_PATH }
 /** /interact 请求体大小上限（动作只需几字节）。 */
 export const BODY_LIMIT = 1024
 
@@ -144,6 +145,8 @@ export function apply(ctx) {
   let disappointedUntil = 0
   let welcomeUntil = 0
   let celebrateUntil = 0
+  // 桌面伴侣在场窗口（心跳写面，见 src/presence.mjs）：在场时网页端宠物隐藏。
+  let companionUntil = 0
 
   // ---- 会话状态聚合（v8：官方自渲染 client 无 ctx.sessions——Node half 聚合进 /state）----
   // client 自执行脚本 `apply({})` 拿不到宿主 sessions 服务（官方注入面只给 __DSH_BOOT__），
@@ -337,6 +340,7 @@ export function apply(ctx) {
               pet: state,
               activity: act,
               configRevision,
+              companionOnline: companionOnline(companionUntil, Date.now()),
             }, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
@@ -392,6 +396,47 @@ export function apply(ctx) {
             }
             const result = applyAction(state, body.action, configRef.replies)
             json(res, result.status, result.body, { 'cache-control': 'no-store' })
+          } catch (error) {
+            json(res, 500, { error: error instanceof Error ? error.message : String(error) })
+          }
+        },
+      }),
+      // ---- 桌面伴侣在场心跳（显示层写面）：桌面端周期性续命，退出/崩溃后 TTL 过期 ----
+      // 在场期间网页端宠物隐藏（/state 的 companionOnline），避免双宠物；无账本语义，
+      // 与 /interact 同级安全面（跨源校验 + body 上限）。见 src/presence.mjs 契约。
+      webServer.register({
+        kind: 'exact',
+        path: PRESENCE_PATH,
+        handler: async (req, res) => {
+          try {
+            if (req.method !== 'POST') {
+              json(res, 405, { error: 'method not allowed; use POST' }, { allow: 'POST' })
+              return
+            }
+            if (isCrossOrigin(req.headers, req.headers.host)) {
+              json(res, 403, { error: 'cross-origin request rejected' })
+              return
+            }
+            const raw = await readBody(req)
+            if (raw === null) {
+              json(res, 413, { error: 'request body too large' })
+              return
+            }
+            let body
+            try {
+              body = JSON.parse(raw || '{}')
+            } catch {
+              json(res, 400, { error: 'invalid JSON body' })
+              return
+            }
+            if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+              json(res, 400, { error: 'body must be a JSON object' })
+              return
+            }
+            // online 缺省视为上线（裸 {} 即可续命）；false 显式下线（桌面端退出时即时恢复网页端）。
+            const online = body.online !== false
+            companionUntil = pokePresence(companionUntil, Date.now(), online)
+            json(res, 200, { online: companionOnline(companionUntil, Date.now()) }, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
           }

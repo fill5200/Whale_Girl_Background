@@ -964,6 +964,13 @@ export function apply(ctx = {}) {
         const config = await fetchConfig()
         if (config !== null) applyClientConfig(config)
       }
+      // 桌面伴侣在场（/state companionOnline，心跳窗口）：在场期间隐藏网页端宠物，
+      // 避免与桌面端双宠物；下线（心跳过期）后自动恢复显示。
+      const nextCompanion = body?.companionOnline === true
+      if (nextCompanion !== companionOnline) {
+        companionOnline = nextCompanion
+        syncInert()
+      }
       // 睡醒过渡由 tick 视觉边沿触发（animState 离开 sleep 的瞬间播 wake）——见 tick 注释，
       // 不在这里判定（旧逻辑基于 sleeping 变量，会话活跃时永不翻转，见决策记录）。
       failStreak = 0
@@ -1274,19 +1281,21 @@ export function apply(ctx = {}) {
   }
   window.addEventListener('resize', onResize)
 
-  // 页面状态感知：DSH onboarding 向导激活时宠物隐藏（display:none，不挡向导）；
-  // dialog 打开时降为 inert（半透明、不挡点击）。
+  // 页面状态感知：DSH onboarding 向导激活或桌面伴侣在场时宠物隐藏（display:none，
+  // 不挡向导 / 避免双宠物）；dialog 打开时降为 inert（半透明、不挡点击）。
   // onboarding 判定：deepseek-onboarding-title（DSH 向导页面标题，精确标识——
   // 不用宽泛的 [class*="onboarding"] 子串，避免误伤类名含 onboarding 的其它元素）。
+  // companionOnline：/state 下发的桌面伴侣在场窗口（心跳过期自动恢复显示）。
   let pageHidden = false
+  let companionOnline = false
   const syncInert = () => {
     const dialog = document.querySelector('[role="dialog"]') !== null
     const onboarding = document.getElementById('deepseek-onboarding-title') !== null
       || document.querySelector('[aria-labelledby="deepseek-onboarding-title"]') !== null
-    const next = onboarding ? 'onboarding' : dialog ? 'dialog' : null
+    const next = onboarding ? 'onboarding' : companionOnline ? 'companion' : dialog ? 'dialog' : null
     if (next !== pageHidden) {
       pageHidden = next
-      if (next === 'onboarding') {
+      if (next === 'onboarding' || next === 'companion') {
         host.setAttribute('data-whale-girl-hidden', '')
         host.removeAttribute('data-whale-girl-inert')
         // 内联是权威（CSS 规则可能被宿主清理——属性设了但视觉不变）。

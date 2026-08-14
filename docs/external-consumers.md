@@ -8,6 +8,7 @@ Local companion applications may read whale-girl state from a running DSH Web pr
 - `GET /whale-girl/events` is an SSE refresh signal. Fetch `/state` after each message and retain polling as a reconnect fallback.
 - `GET /whale-girl/config` returns the current presentation configuration.
 - `GET /whale-girl/assets/*` serves the character manifest and sprite sheets.
+- `POST /whale-girl/presence` is the desktop-companion heartbeat (display-layer write, cross-origin guarded). A companion application that replaces the in-page pet posts `{ "online": true }` every 15s while running, and `{ "online": false }` on clean exit. While the presence window (45s TTL) is active, `/state` reports `companionOnline: true` and the in-page pet hides itself; if the companion dies without a farewell, the window expires and the in-page pet returns automatically.
 
 The snapshot response is:
 
@@ -23,7 +24,8 @@ The snapshot response is:
     "turnCompleted": false,
     "turnCompletedUntil": 0
   },
-  "configRevision": 1
+  "configRevision": 1,
+  "companionOnline": false
 }
 ```
 

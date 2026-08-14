@@ -180,6 +180,7 @@ var INTERACT_PATH = `${ROUTE_PREFIX}/interact`;
 var CONFIG_PATH = `${ROUTE_PREFIX}/config`;
 var ASSETS_PATH = `${ROUTE_PREFIX}/assets`;
 var EVENTS_PATH = `${ROUTE_PREFIX}/events`;
+var PRESENCE_PATH = `${ROUTE_PREFIX}/presence`;
 
 // .dsh-plugin/client/index.mjs
 var ASSETS_URL = ASSETS_PATH;
@@ -959,6 +960,11 @@ function apply(ctx = {}) {
         const config = await fetchConfig();
         if (config !== null) applyClientConfig(config);
       }
+      const nextCompanion = body?.companionOnline === true;
+      if (nextCompanion !== companionOnline) {
+        companionOnline = nextCompanion;
+        syncInert();
+      }
       failStreak = 0;
       renderStatus();
     } catch {
@@ -1207,13 +1213,14 @@ function apply(ctx = {}) {
   };
   window.addEventListener("resize", onResize);
   let pageHidden = false;
+  let companionOnline = false;
   const syncInert = () => {
     const dialog = document.querySelector('[role="dialog"]') !== null;
     const onboarding = document.getElementById("deepseek-onboarding-title") !== null || document.querySelector('[aria-labelledby="deepseek-onboarding-title"]') !== null;
-    const next = onboarding ? "onboarding" : dialog ? "dialog" : null;
+    const next = onboarding ? "onboarding" : companionOnline ? "companion" : dialog ? "dialog" : null;
     if (next !== pageHidden) {
       pageHidden = next;
-      if (next === "onboarding") {
+      if (next === "onboarding" || next === "companion") {
         host.setAttribute("data-whale-girl-hidden", "");
         host.removeAttribute("data-whale-girl-inert");
         host.style.display = "none";
