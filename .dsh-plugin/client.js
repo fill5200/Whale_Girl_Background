@@ -185,6 +185,7 @@ var EVENTS_PATH = `${ROUTE_PREFIX}/events`;
 var ASSETS_URL = ASSETS_PATH;
 var MANIFEST_URL = `${ASSETS_URL}/manifest.json`;
 var CFG_DEFAULTS = {
+  enabled: true,
   size: 110,
   opacity: 1,
   walk: { enabled: true, minWaitMs: 18e3, maxWaitMs: 4e4, minMs: 3e3, maxMs: 6e3, speedPxPerSec: 45 },
@@ -347,6 +348,7 @@ function apply(ctx = {}) {
     width: var(--pet-size, 110px); height: var(--pet-size, 110px);
     font-family: system-ui, sans-serif; user-select: none; touch-action: none;
     opacity: var(--pet-opacity, 1);`;
+  host.style.display = "none";
   document.body.appendChild(host);
   const stage = document.createElement("div");
   stage.className = "pet-stage";
@@ -896,6 +898,10 @@ function apply(ctx = {}) {
   };
   const applyClientConfig = (config) => {
     if (config === null || typeof config !== "object") return;
+    if (config.enabled === false) {
+      dispose();
+      return;
+    }
     const prevPollMs = cfg.pollMs;
     cfg = { ...CFG_DEFAULTS, ...config };
     if (typeof config.size === "number") {
@@ -1163,17 +1169,29 @@ function apply(ctx = {}) {
       armWorking();
     }, delay);
   };
-  loadAssets();
-  refresh();
-  pollTimer = setInterval(refresh, cfg.pollMs);
-  const animTimer = setInterval(tick, TICK_MS);
-  scheduleWander();
-  armWorking();
-  try {
-    const sse = new EventSource(EVENTS_PATH);
-    sse.onmessage = () => refresh();
-  } catch {
-  }
+  let animTimer = null;
+  let sse = null;
+  const boot = async () => {
+    const config = await fetchConfig();
+    if (config !== null && config.enabled === false) {
+      dispose();
+      return;
+    }
+    if (config !== null) applyClientConfig(config);
+    host.style.display = "";
+    loadAssets();
+    refresh();
+    pollTimer = setInterval(refresh, cfg.pollMs);
+    animTimer = setInterval(tick, TICK_MS);
+    scheduleWander();
+    armWorking();
+    try {
+      sse = new EventSource(EVENTS_PATH);
+      sse.onmessage = () => refresh();
+    } catch {
+    }
+  };
+  boot();
   armWorking();
   const onVisibility = () => {
     if (document.visibilityState === "visible") refresh();
@@ -1216,9 +1234,10 @@ function apply(ctx = {}) {
   const dialogObserver = new MutationObserver(syncInert);
   dialogObserver.observe(document.body, { childList: true, subtree: true });
   syncInert();
-  return () => {
+  const dispose = () => {
     clearInterval(pollTimer);
-    clearInterval(animTimer);
+    if (animTimer !== null) clearInterval(animTimer);
+    if (sse !== null) sse.close();
     clearTimeout(wanderTimer);
     if (workingTimer !== null) clearTimeout(workingTimer);
     if (walkRaf !== null) cancelAnimationFrame(walkRaf);
@@ -1238,6 +1257,7 @@ function apply(ctx = {}) {
     host.remove();
     style.remove();
   };
+  return dispose;
 }
 var name = "whale-girl";
 		return module.exports;

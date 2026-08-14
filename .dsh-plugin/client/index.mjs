@@ -21,7 +21,7 @@ const MANIFEST_URL = `${ASSETS_URL}/manifest.json`
 // 消费端不写第二份默认值，见 verify-config-sync 门禁）。/state 的 configRevision
 // 变化时拉取新值（applyClientConfig），未配置时用默认值。
 const CFG_DEFAULTS = {
-  size: 110, opacity: 1,
+  enabled: true, size: 110, opacity: 1,
   walk: { enabled: true, minWaitMs: 18000, maxWaitMs: 40000, minMs: 3000, maxMs: 6000, speedPxPerSec: 45 },
   sleepAfterMs: 60000, pollMs: 3000, bubbleMs: 2500,
 }
@@ -195,6 +195,8 @@ export function apply(ctx = {}) {
     width: var(--pet-size, 110px); height: var(--pet-size, 110px);
     font-family: system-ui, sans-serif; user-select: none; touch-action: none;
     opacity: var(--pet-opacity, 1);`
+  // enabled 门控引导：先隐藏挂载（不闪一下再消失），boot 取配置判定渲染开关后再显示。
+  host.style.display = 'none'
   document.body.appendChild(host)
 
   const stage = document.createElement('div')
@@ -890,6 +892,12 @@ export function apply(ctx = {}) {
   // 应用客户端配置：尺寸/透明度走 CSS 变量；游走/睡眠/轮询参数更新 cfg（下次行为生效）。
   const applyClientConfig = (config) => {
     if (config === null || typeof config !== 'object') return
+    // 网页端渲染开关：热切换为 false 立即卸载（桌面伴侣并存时避免双宠物）。
+    // 重新启用需刷新页面（client 自渲染无重建路径）；undefined 视为启用（向后兼容）。
+    if (config.enabled === false) {
+      dispose()
+      return
+    }
     const prevPollMs = cfg.pollMs
     cfg = { ...CFG_DEFAULTS, ...config }
     if (typeof config.size === 'number') {
@@ -1211,24 +1219,37 @@ export function apply(ctx = {}) {
     }, delay)
   }
 
-  // ---- 启动 ----
-  loadAssets()
-  refresh()
-  pollTimer = setInterval(refresh, cfg.pollMs)
-  const animTimer = setInterval(tick, TICK_MS)
-  scheduleWander()
-  armWorking()
-
-  // ---- SSE 即时事件（v9）：Node half 事件发生时推送，收到立即 refresh() ——
-  // 回合完成庆祝/欢迎/思考陪伴不再等 pollMs 轮询（默认 3s → 单次 /state 往返）。
-  // EventSource 断线自动重连（内建，retry 3s）；轮询保留兜底（SSE 不可用时照常跑）。
-  try {
-    const sse = new EventSource(EVENTS_PATH)
-    sse.onmessage = () => refresh()
-    // onerror 不处理：EventSource 内建自动重连；重连期间轮询兜底，宠物照常。
-  } catch {
-    // EventSource 不可用（罕见）：轮询兜底，宠物照常跑
+  // ---- 启动（enabled 门控）：先取配置判定网页端渲染开关，禁用时不启动任何计时器并卸载 ----
+  // 双宠物场景：桌面伴侣（外部 HTTP 消费者）并存时用户可在设置关掉网页端宠物；
+  // 引导期 host 已隐藏（不闪一下再消失）；运行中热切换由 applyClientConfig 处理。
+  let animTimer = null
+  let sse = null
+  const boot = async () => {
+    const config = await fetchConfig()
+    if (config !== null && config.enabled === false) {
+      dispose()
+      return
+    }
+    if (config !== null) applyClientConfig(config)
+    host.style.display = ''
+    loadAssets()
+    refresh()
+    pollTimer = setInterval(refresh, cfg.pollMs)
+    animTimer = setInterval(tick, TICK_MS)
+    scheduleWander()
+    armWorking()
+    // ---- SSE 即时事件（v9）：Node half 事件发生时推送，收到立即 refresh() ——
+    // 回合完成庆祝/欢迎/思考陪伴不再等 pollMs 轮询（默认 3s → 单次 /state 往返）。
+    // EventSource 断线自动重连（内建，retry 3s）；轮询保留兜底（SSE 不可用时照常跑）。
+    try {
+      sse = new EventSource(EVENTS_PATH)
+      sse.onmessage = () => refresh()
+      // onerror 不处理：EventSource 内建自动重连；重连期间轮询兜底，宠物照常。
+    } catch {
+      // EventSource 不可用（罕见）：轮询兜底，宠物照常跑
+    }
   }
+  boot()
 
   // ---- 会话感知（v8：Node half 聚合，退役本地 sessions 订阅）----
   // 自渲染 client 无 ctx.sessions（官方注入面只给 __DSH_BOOT__），会话状态（think/wait/
@@ -1288,9 +1309,11 @@ export function apply(ctx = {}) {
   dialogObserver.observe(document.body, { childList: true, subtree: true })
   syncInert()
 
-  return () => {
+  // 卸载（enabled=false 与 loader 卸载共用；幂等——计时器/监听器/节点均可重复清理）。
+  const dispose = () => {
     clearInterval(pollTimer)
-    clearInterval(animTimer)
+    if (animTimer !== null) clearInterval(animTimer)
+    if (sse !== null) sse.close()
     clearTimeout(wanderTimer)
     if (workingTimer !== null) clearTimeout(workingTimer)
     if (walkRaf !== null) cancelAnimationFrame(walkRaf)
@@ -1310,6 +1333,7 @@ export function apply(ctx = {}) {
     host.remove()
     style.remove()
   }
+  return dispose
 }
 
 // 标准 bundle client 形态（0811）：exports {name, apply} 经 __ModuleLoader__.load

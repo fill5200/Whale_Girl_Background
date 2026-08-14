@@ -16,6 +16,7 @@ export const NAMESPACE = 'whale-girl'
 
 /** 体验层默认值（消费端唯一权威）。数值已 clamp 到安全域。 */
 export const DEFAULTS = Object.freeze({
+  enabled: true,          // 网页端渲染开关（桌面伴侣并存时设 false 关闭网页端宠物，避免双宠物）
   size: 110,              // 宠物尺寸 px（stage 盒 + sprite 上限）
   opacity: 1,             // 常态透明度 0.2–1（inert 0.25 是交互态，不在此配）
   walk: {
@@ -42,6 +43,7 @@ export const DEFAULTS = Object.freeze({
 /** schemastery schema（settings.register 用；默认值= DEFAULTS，防双源漂移）。 */
 export function buildSchema() {
   return z.object({
+    enabled: z.boolean().default(DEFAULTS.enabled),
     size: z.number().min(64).max(160).default(DEFAULTS.size),
       opacity: z.number().min(0.2).max(1).default(DEFAULTS.opacity),
       walk: z.object({
