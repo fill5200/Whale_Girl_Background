@@ -29,11 +29,13 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 
+// .dsh-plugin/src/snapshot.mjs
+var TURN_COMPLETED_MS = 4e3;
+
 // .dsh-plugin/client/logic.mjs
 var TRANSIENT_MS = 1500;
 var WAKE_MS = 3e3;
 var JOY_MS = 1600;
-var ROUND_CELEBRATE_MS = 4e3;
 var STATE_NAMES = Object.freeze([
   "idle",
   "working",
@@ -932,8 +934,10 @@ function apply(ctx = {}) {
           waiting: act.sessionWait === true,
           titles: []
         };
-        if (act.turnCompleted === true) {
-          celebrateUntil = Date.now() + ROUND_CELEBRATE_MS;
+        if (Number.isFinite(act.turnCompletedUntil) && act.turnCompletedUntil > Date.now()) {
+          celebrateUntil = Math.max(celebrateUntil, act.turnCompletedUntil);
+        } else if (act.turnCompleted === true) {
+          celebrateUntil = Math.max(celebrateUntil, Date.now() + TURN_COMPLETED_MS);
         }
         armWorking();
       }

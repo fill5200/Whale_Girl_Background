@@ -925,16 +925,18 @@ export function apply(ctx = {}) {
       if (act !== null && typeof act === 'object' && typeof act.name === 'string') {
         activity = act
       }
-      // 会话感知（v8）：Node half 把 sessionThink/sessionWait/turnCompleted 聚合进 /state——
-      // 自渲染 client 无 ctx.sessions，改从轮询读。turnCompleted 单轮翻转 → 播回合完成庆祝。
+      // 会话感知：Node half 把 sessionThink/sessionWait/回合完成窗口聚合进 /state。
+      // 绝对截止时间允许 Web 与外部伴侣同时读取；boolean 仅兼容旧版 Node half。
       if (act !== null && typeof act === 'object') {
         sessionMood = {
           thinking: act.sessionThink === true,
           waiting: act.sessionWait === true,
           titles: [],
         }
-        if (act.turnCompleted === true) {
-          celebrateUntil = Date.now() + ROUND_CELEBRATE_MS
+        if (Number.isFinite(act.turnCompletedUntil) && act.turnCompletedUntil > Date.now()) {
+          celebrateUntil = Math.max(celebrateUntil, act.turnCompletedUntil)
+        } else if (act.turnCompleted === true) {
+          celebrateUntil = Math.max(celebrateUntil, Date.now() + ROUND_CELEBRATE_MS)
         }
         armWorking() // 会话活跃状态变化 → 重排 working 插曲（思考开始武装/结束撤防）
       }

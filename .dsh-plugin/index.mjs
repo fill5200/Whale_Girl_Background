@@ -20,6 +20,7 @@ import { parseTurnEvent } from './src/session-events.mjs'
 import { normalizeState, serializeState } from './src/persistence.mjs'
 import { createSignals } from './src/signals.mjs'
 import { NAMESPACE, DEFAULTS, buildSchema, validateConfig } from './src/config.mjs'
+import { SNAPSHOT_API_VERSION, TURN_COMPLETED_MS, turnCompletionSnapshot } from './src/snapshot.mjs'
 
 export const name = 'whale-girl'
 export const inject = ['jobs', 'agents', 'sessions', 'settings', 'webServer']
@@ -150,11 +151,11 @@ export function apply(ctx) {
   // 轮询下发。信号源：
   // - 思考中（sessionThink）：任一会话处于 turn 之间（有 turn/start 未 turn/end）或已开始未结束
   // - 等待批准（sessionWait）：turn/end 的 reason.kind === 'blocked'（等待用户批准/权限）
-  // - 回合完成（turnCompleted）：turn/end 边沿（每完成一个 turn 触发一次庆祝）
+  // - 回合完成（turnCompleted）：turn/end 边沿后的共享时间窗（每个消费者均可观察）
   const sessionsSvc = typeof ctx.get === 'function' ? ctx.get('sessions') : undefined
   let sessionThink = false
   let sessionWait = false
-  let turnCompleted = false // 单轮翻转标志：activity() 消费后复位
+  let turnCompletedUntil = 0
   const activeTurns = new Map() // sessionId → turn/start 未 turn/end 计数
   const sessionUpdate = () => {
     // 从当前会话列表与 turn 边沿聚合（sessions 服务缺席时保持上次值——宠物照常跑）。
@@ -222,10 +223,14 @@ export function apply(ctx) {
       name = 'welcome'
       until = welcomeUntil
     }
-    // 会话状态随 /state 下发（client 从轮询读，不再直接订阅 sessions）；turnCompleted 单轮消费。
-    const tc = turnCompleted
-    turnCompleted = false
-    return { name, until, sessionThink, sessionWait, turnCompleted: tc }
+    // 绝对截止时间使 /state 成为非消费式快照：Web 与外部伴侣可同时观察同一回合完成。
+    return {
+      name,
+      until,
+      sessionThink,
+      sessionWait,
+      ...turnCompletionSnapshot(turnCompletedUntil, now),
+    }
   }
 
   // webServer 可选（headless 无 web 服务器）：有则注册 state/interact/config/assets/events
@@ -289,7 +294,7 @@ export function apply(ctx) {
         broadcastEvent() // 会话启动/续接 → welcome 或账本更新即刻下发
       }),
       // 会话事件（v8 会话感知）：跟踪 turn/start · turn/end 边沿驱动 think 陪伴与回合完成庆祝。
-      // 无条件注册（不随 sessionsSvc 缺席而丢）：turnCompleted/celebrate 只依赖事件本身；
+      // 无条件注册（不随 sessionsSvc 缺席而丢）：回合完成窗口只依赖事件本身；
       // sessionThink 聚合（sessionUpdate）在 sessions 服务缺席时降级保持上次值（宠物照常跑）。
       ctx.on('session/event', (session, event) => {
         const id = typeof session?.id === 'string' ? session.id : null
@@ -304,7 +309,7 @@ export function apply(ctx) {
           const n = (activeTurns.get(id) ?? 0) - 1
           if (n <= 0) activeTurns.delete(id)
           else activeTurns.set(id, n)
-          turnCompleted = true // 每完成一个 turn 触发一次庆祝（activity() 消费）
+          turnCompletedUntil = Math.max(turnCompletedUntil, Date.now() + TURN_COMPLETED_MS)
           sessionWait = parsed.blocked // turn/end 的 reason 属等待用户（approval 等）
           sessionUpdate()
         }
@@ -327,7 +332,12 @@ export function apply(ctx) {
             // 轮询端点：禁缓存，防止启发式缓存读到冻结状态。
             // 先跑 activity()（有记账副作用），再读 state——响应里的 pet 才是记账后的值。
             const act = activity()
-            json(res, 200, { pet: state, activity: act, configRevision }, { 'cache-control': 'no-store' })
+            json(res, 200, {
+              apiVersion: SNAPSHOT_API_VERSION,
+              pet: state,
+              activity: act,
+              configRevision,
+            }, { 'cache-control': 'no-store' })
           } catch (error) {
             json(res, 500, { error: error instanceof Error ? error.message : String(error) })
           }
