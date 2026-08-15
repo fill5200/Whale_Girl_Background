@@ -76,7 +76,7 @@
 - **JSON 配置**为主形态（`<dshHome>/data/whale-girl/pet.config.json`，按请求读盘 + mtime 缓存，改配置免重启）——已落地为**宿主 settings 配置**（settings.yaml 的 `whale-girl:` section，见 [config-system](../decisions/implemented/feature/2026-08-09-config-system.md)）。
 - **无 Agent 工具面**（2026-08-10 起删除全部 Agent 工具，互动纯 GUI——见 [remove-agent-tools](../decisions/implemented/simplification/2026-08-10-remove-agent-tools.md)）：不向模型开放读写。
 - **不引入脚本 DSL**：规则面用声明式谓词（`{ field, op, value }`，op 白名单枚举）。
-- **第三方插件**：Node half `ctx.provide('pet', service)` 只读服务（账本快照+信号订阅）+
+- **第三方插件**：Node half `ctx.provide('whale-girl.pet', service)` 只读服务（账本快照+信号订阅）+
   client half 文档化 CustomEvent（`whale-girl:say`/`whale-girl:fx`）——生态原生机制，v1 不做「平台」承诺。
 
 ## 三、配置系统（subagent：config）

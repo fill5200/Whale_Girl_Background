@@ -11,7 +11,7 @@ whale-girl 以官方 **bundle 格式**分发（仓库根 `package.json` 的 `dsh
 ## 目录布局
 
 ```
-lib/index.mjs     Node half 入口：state/interact/config/assets/events 路由 + 事件记账 + ctx.pet 服务（client 经 client-modules 挂载，不再注入页面）
+lib/index.mjs     Node half 入口：state/interact/config/assets/events 路由 + 事件记账 + whale-girl.pet 服务（client 经 client-modules 挂载，不再注入页面）
 lib/src/          Node half 纯逻辑（账本/活动/assets 守卫/配置/signals，零宿主依赖，可单测）
 lib/client/       client bundle 源码（纯 DOM 自渲染 + sprite 帧播放器）
 lib/client.js     构建产物（由 scripts/build-client.mjs 生成，勿手改）
