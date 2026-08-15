@@ -28,3 +28,4 @@ Status: implemented
 - 事件流与 /state 共用同一 `session/event` 订阅，无新增宿主导入；sessions 服务缺席时降级为仅事件视图。
 - 未知字段可兼容增补；`activity` 封闭集合外的新取值由消费端兜底显示。
 - 外部消费者仍依赖运行中的 DSH Web profile，并负责断线重连与轮询兜底（与 /state 相同）。
+- 本端点是对 #1 外部只读快照契约（external-consumer contract，作者 xiaoshihou514）的按会话补充：/state 提供聚合情绪，/sessions 提供每会话明细，二者共同支撑桌面伴侣等外部消费者。
