@@ -7,7 +7,7 @@ import {
   createSessionView,
   applySessionView,
   titleFromLog,
-} from '../.dsh-plugin/src/sessions.mjs'
+} from '../lib/src/sessions.mjs'
 
 const ev = (type, data) => ({ type, seq: 1, time: 1, data })
 

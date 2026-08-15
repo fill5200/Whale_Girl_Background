@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PRESENCE_TTL_MS, pokePresence, companionOnline } from '../.dsh-plugin/src/presence.mjs'
+import { PRESENCE_TTL_MS, pokePresence, companionOnline } from '../lib/src/presence.mjs'
 
 test('presence TTL is a positive finite window', () => {
   assert.ok(Number.isFinite(PRESENCE_TTL_MS) && PRESENCE_TTL_MS > 0)

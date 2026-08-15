@@ -10,7 +10,7 @@ Status: implemented
 
 新增 `GET /whale-girl/sessions`，返回 `[{ id, title, activity, since }]` 数组（无 apiVersion——纯列表契约，字段可兼容增补）。`activity` 取值封闭集合：`thinking`（深度思考中）/ `tool:<name>`（执行工具，桌面端对 bash/pwsh 显示"运行命令行中"）/ `waiting`（等待批准）/ `done`（回合完成）。响应 `cache-control: no-store`（活动随事件实时变化）。
 
-数据源是既有 `session/event` 事件流（与 /state 的会话感知同源，不新增宿主依赖）：`turn/start` → thinking、`tool/call`（data.name）→ tool:&lt;name&gt;、`turn/end`（reason.kind === 'blocked' → waiting / 其余 → done）、`session/title`（data.title）→ 标题。纯逻辑在 `.dsh-plugin/src/sessions.mjs`（零宿主依赖，可单测）；Node half 维护 `sessionViews` 账本，事件回调时应用视图更新，`/sessions` 请求时快照。
+数据源是既有 `session/event` 事件流（与 /state 的会话感知同源，不新增宿主依赖）：`turn/start` → thinking、`tool/call`（data.name）→ tool:&lt;name&gt;、`turn/end`（reason.kind === 'blocked' → waiting / 其余 → done）、`session/title`（data.title）→ 标题。纯逻辑在 `lib/src/sessions.mjs`（零宿主依赖，可单测）；Node half 维护 `sessionViews` 账本，事件回调时应用视图更新，`/sessions` 请求时快照。
 
 兜底：未出现在事件流的会话（如插件加载前已存在）用 `sessions.list()` 补录——标题从会话事件日志取最后一个 `session/title`（titleFromLog），`since` 取 `header.createdAt`；列表缺席（headless 无 sessions 服务）时只返回事件视图。列表可用时清理已结束会话的视图（不再出现在列表 → 从响应消失，即"会话结束后框消失"）。
 
