@@ -69,6 +69,7 @@ dsh plugin --profile web add "github:vlln/whale-girl#main"   # 推荐：git 源�
 
 ```yaml
 whale-girl:
+  enabled: true      # 网页端渲染开关（与桌面伴侣并存时设 false 关闭网页端宠物，避免双宠物）
   size: 110          # 宠物尺寸 px（64–160）
   opacity: 1         # 常态透明度（0.2–1）
   walk:

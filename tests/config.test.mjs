@@ -9,6 +9,7 @@ test('NAMESPACE 与 DEFAULTS 完整性', () => {
   assert.equal(NAMESPACE, 'whale-girl')
   assert.equal(typeof DEFAULTS.size, 'number')
   assert.equal(DEFAULTS.size, 110)
+  assert.equal(DEFAULTS.enabled, true)
   assert.equal(DEFAULTS.walk.enabled, true)
   assert.equal(DEFAULTS.walk.maxWaitMs, 40000)
 })

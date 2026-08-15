@@ -96,6 +96,6 @@
 | `tasks.onTaskDone` | 记账 + celebrate/failure 窗口 | `activity` |
 | `agent/session-start` | 会话 XP + welcome 窗口 | `activity` |
 | `agent/request-error` | error/disappointed 窗口 | `activity` |
-| sessions.list 快照 | — | `sessionThink` / `sessionWait` / 回合完成翻转→`celebrateUntil` |
+| sessions.list 快照 | — | `sessionThink` / `sessionWait` / 非消费式回合完成截止时间→`celebrateUntil` |
 | 节奏器（client 本地） | — | `workingActive`（随机插曲）/ `celebrateUntil`（回合完成窗口） |
 | 用户 pointer/点击 | — | `dragging` / `transient` / `joyUntil` / `wakeFromInteraction`（交互醒觉：拖拽/喂食/玩耍/开菜单重置空闲 + 睡着则 wake） |
