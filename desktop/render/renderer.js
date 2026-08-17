@@ -288,6 +288,8 @@
 
   // ---- 交互：点击 / 拖拽 ----
   let dragStart = null
+  let dragging = false // 拖拽中：显示 drag 状态并暂停游走位移（对齐 web 版拖拽动画）
+  let lastEngineAnim = null // 拖拽期间缓存的引擎动画（松手恢复）
   canvas.addEventListener('pointerdown', (e) => {
     dragStart = { x: e.screenX, y: e.screenY, moved: false, px: e.screenX, py: e.screenY }
     canvas.setPointerCapture(e.pointerId)
@@ -300,12 +302,11 @@
       dragStart.moved = true
       dragStart.px = e.screenX
       dragStart.py = e.screenY
-      // 原生拖拽接管（macOS 平滑跟随光标）；未接管场景（合成事件等）下 delta 继续移动。
-      wg.startDrag().catch(() => {})
+      dragging = true
+      switchAnim({ name: 'drag', context: {} }) // 拖拽动画（覆盖引擎状态，游走位移随之暂停）
     }
     if (dragStart.moved) {
-      // delta 移动：与 web 版拖拽一致（经验证路径）；原生接管后 webview 收不到
-      // pointermove，此路自然停，不会叠加。
+      // delta 移动窗口（run6 验证路径）：窗口随光标平移，无反馈环 → 无抖动。
       const ddx = e.screenX - dragStart.px
       const ddy = e.screenY - dragStart.py
       if (ddx !== 0 || ddy !== 0) {
@@ -322,11 +323,17 @@
       sessionStorage.setItem('wg:lastAction', action)
       wg.interact(action)
     }
+    if (dragging) {
+      dragging = false
+      // 恢复拖拽前的引擎动画（拖拽期间缓存；无则 idle）
+      switchAnim(lastEngineAnim ?? { name: 'idle', context: {} })
+    }
     dragStart = null
   })
 
   // ---- IPC 订阅 ----
   wg.onAnim(async (anim) => {
+    if (dragging) { lastEngineAnim = anim; return } // 拖拽期间：缓存引擎动画，显示 drag
     await switchAnim(anim)
   })
   wg.onSnapshot((snap) => {

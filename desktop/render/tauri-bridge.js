@@ -13,7 +13,6 @@
     interact: (action) => invoke('interact', { action }),
     setHitarea: (rect) => invoke('set_hitarea', { rect }),
     dragWindow: (dx, dy) => invoke('drag_window', { dx, dy }),
-    startDrag: () => invoke('start_drag'),
     onAnim: (cb) => listen('wg-anim', (e) => cb(e.payload)),
     onSnapshot: (cb) => listen('wg-snapshot', (e) => cb(e.payload)),
     onReply: (cb) => listen('wg-reply', (e) => cb(e.payload)),

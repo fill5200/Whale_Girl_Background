@@ -159,8 +159,7 @@ pub fn run() {
             get_sheet,
             interact,
             set_hitarea,
-            drag_window,
-            start_drag
+            drag_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

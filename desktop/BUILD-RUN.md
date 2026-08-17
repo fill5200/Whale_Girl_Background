@@ -173,3 +173,7 @@ whale-girl-desktop/
     不叠加）。`drag_window` 命令 clamp 到显示器边界。
 11. **游走位移**：walk 状态期间窗口按 `45px/s`（对齐 web 版 speedPxPerSec，*dpr 转物理像素）沿
     walkDir 平移；`drag_window` 返回是否撞边，renderer 撞边反转朝向（素材朝左基准 flip=-walkDir）。
+12. **拖拽动画**：拖拽超过 6px 阈值后 renderer 本地覆盖为 `drag` 状态（对齐 web 版），松手恢复
+    引擎动画（拖拽期间缓存 lastEngineAnim）；拖拽覆盖使游走位移暂停（animState 不再 walk），
+    消除"边拖边走"抖动。注意 `dragging`/`lastEngineAnim` 必须在处理器前声明（漏声明会让阈值
+    在 `moved=true` 后抛 ReferenceError——窗口能动但动画永远不切换，已踩）。
