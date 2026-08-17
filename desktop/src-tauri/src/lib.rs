@@ -69,13 +69,41 @@ fn set_hitarea(window: Window, rect: Option<serde_json::Value>) {
 }
 
 #[tauri::command]
-fn drag_window(window: Window, dx: f64, dy: f64) {
-    if let Ok(pos) = window.outer_position() {
-        let _ = window.set_position(tauri::PhysicalPosition::new(
-            pos.x + dx as i32,
-            pos.y + dy as i32,
-        ));
+fn drag_window(window: Window, dx: f64, dy: f64) -> Result<bool, String> {
+    // 移动窗口并 clamp 到所在显示器边界；返回是否水平撞边（游走反转朝向用）。
+    let mut pos = window.outer_position().map_err(|e| e.to_string())?;
+    let size = window.outer_size().map_err(|e| e.to_string())?;
+    pos.x += dx as i32;
+    pos.y += dy as i32;
+    let Some(monitor) = window.current_monitor().map_err(|e| e.to_string())? else {
+        let _ = window.set_position(pos);
+        return Ok(false);
+    };
+    let mpos = monitor.position();
+    let msize = monitor.size();
+    let mut hit_x = false;
+    if pos.x < mpos.x {
+        pos.x = mpos.x;
+        hit_x = true;
     }
+    if pos.x + size.width as i32 > mpos.x + msize.width as i32 {
+        pos.x = mpos.x + msize.width as i32 - size.width as i32;
+        hit_x = true;
+    }
+    if pos.y < mpos.y {
+        pos.y = mpos.y;
+    }
+    if pos.y + size.height as i32 > mpos.y + msize.height as i32 {
+        pos.y = mpos.y + msize.height as i32 - size.height as i32;
+    }
+    let _ = window.set_position(pos);
+    Ok(hit_x)
+}
+
+/// 原生窗口拖拽接管（macOS：平滑跟随光标，不受窗口边界/指针捕获限制）。
+#[tauri::command]
+fn start_drag(window: Window) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -131,7 +159,8 @@ pub fn run() {
             get_sheet,
             interact,
             set_hitarea,
-            drag_window
+            drag_window,
+            start_drag
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

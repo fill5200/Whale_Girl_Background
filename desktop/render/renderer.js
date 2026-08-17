@@ -173,6 +173,11 @@
     blinkActive = false
     blinkAt = 0
     lastFrameAt = 0
+    if (name === 'walk') {
+      // 进入游走：随机方向（素材朝左基准：向右走 dir=1 → flip=-1 镜像朝右）。
+      walkDir = Math.random() < 0.5 ? 1 : -1
+      flip = -walkDir
+    }
     applySize()
     const cfg = stateCfg(name)
     if (!cfg) { drawPlaceholder(); return }
@@ -242,6 +247,10 @@
   }
 
   // ---- 主循环（60fps 够了；帧推进按 fps） ----
+  // ---- 游走位移：walk 状态期间窗口沿 walkDir 平移（对齐 web 版 45px/s），撞边反转 ----
+  const WALK_SPEED_PX = 45 // 与 whale-girl walk.speedPxPerSec 一致（CSS px/s，*dpr 转物理像素）
+  let walkDir = 0
+  let lastWalkStepAt = 0
   function loop(now) {
     const cfg = stateCfg(animState)
     if (cfg) {
@@ -249,6 +258,14 @@
       tickFacing(now, cfg)
     } else if (animState) {
       drawPlaceholder()
+    }
+    if (animState === 'walk' && walkDir !== 0 && now - lastWalkStepAt >= 50) {
+      lastWalkStepAt = now
+      const dpr = window.devicePixelRatio || 1
+      const dx = Math.round(WALK_SPEED_PX * 0.05 * walkDir * dpr)
+      wg.dragWindow(dx, 0).then((hit) => {
+        if (hit) { walkDir = -walkDir; flip = -flip } // 撞边反转（素材朝左基准）
+      })
     }
     requestAnimationFrame(loop)
   }
@@ -272,18 +289,30 @@
   // ---- 交互：点击 / 拖拽 ----
   let dragStart = null
   canvas.addEventListener('pointerdown', (e) => {
-    dragStart = { x: e.screenX, y: e.screenY, moved: false }
+    dragStart = { x: e.screenX, y: e.screenY, moved: false, px: e.screenX, py: e.screenY }
     canvas.setPointerCapture(e.pointerId)
   })
   canvas.addEventListener('pointermove', (e) => {
     if (!dragStart) return
     const dx = e.screenX - dragStart.x
     const dy = e.screenY - dragStart.y
-    if (!dragStart.moved && Math.hypot(dx, dy) > 6) dragStart.moved = true
+    if (!dragStart.moved && Math.hypot(dx, dy) > 6) {
+      dragStart.moved = true
+      dragStart.px = e.screenX
+      dragStart.py = e.screenY
+      // 原生拖拽接管（macOS 平滑跟随光标）；未接管场景（合成事件等）下 delta 继续移动。
+      wg.startDrag().catch(() => {})
+    }
     if (dragStart.moved) {
-      wg.dragWindow(dx, dy) // 主进程移动窗口（基于绝对值更稳：传由主进程记录起点）
-      dragStart.x = e.screenX
-      dragStart.y = e.screenY
+      // delta 移动：与 web 版拖拽一致（经验证路径）；原生接管后 webview 收不到
+      // pointermove，此路自然停，不会叠加。
+      const ddx = e.screenX - dragStart.px
+      const ddy = e.screenY - dragStart.py
+      if (ddx !== 0 || ddy !== 0) {
+        wg.dragWindow(ddx, ddy)
+        dragStart.px = e.screenX
+        dragStart.py = e.screenY
+      }
     }
   })
   canvas.addEventListener('pointerup', (e) => {

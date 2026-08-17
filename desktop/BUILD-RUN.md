@@ -168,3 +168,8 @@ whale-girl-desktop/
 ### 已知限制 / 后续（P2）
 - `size` 配置跟随、开机自启、多屏位置记忆为 P2 预留（renderer 已支持，主进程未接牢）。
 - 点击穿透基于内容 bbox 开关，未做逐帧窗口收缩（透明边距可能挡鼠标，P2 增强）。
+10. **拖拽（原生 + delta 兜底）**：`start_dragging()`（原生，真实手势平滑、超窗不断）与 delta 兜底
+    （canvas 监听器内逐事件移动窗口——验证过的路径；原生接管后 webview 收不到 pointermove 自然停，
+    不叠加）。`drag_window` 命令 clamp 到显示器边界。
+11. **游走位移**：walk 状态期间窗口按 `45px/s`（对齐 web 版 speedPxPerSec，*dpr 转物理像素）沿
+    walkDir 平移；`drag_window` 返回是否撞边，renderer 撞边反转朝向（素材朝左基准 flip=-walkDir）。

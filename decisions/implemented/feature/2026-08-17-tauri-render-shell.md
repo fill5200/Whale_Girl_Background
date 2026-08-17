@@ -45,5 +45,7 @@ Status: implemented
   不可；**capability 必须含 `core:event:allow-listen`**——否则 webview 的 `event.listen` 被
   能力系统拦截（invoke 正常但事件全丢，宠物卡初始 idle、点击无反馈，本地部署实测踩中）；
   WKWebView 写 `~/Library/WebKit` 失败仅告警不阻塞渲染。
+- 渲染层行为对齐 web 版：拖拽用原生 `start_dragging` + delta 兜底（canvas 内逐事件移动，
+  `drag_window` clamp 屏幕边界）；walk 状态窗口按 45px/s 平移、撞边反转（Rust 回报）。
 - 引用点：`desktop/src-tauri/`、`desktop/render/tauri-bridge.js`、`desktop/lib/index.mjs`
   （--render-json）、`desktop/package.json`（scripts）、DESIGN/BUILD-RUN（更新）。
