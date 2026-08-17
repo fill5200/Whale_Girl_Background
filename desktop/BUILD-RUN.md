@@ -149,6 +149,10 @@ whale-girl-desktop/
    （否则 `window.__TAURI__` 不存在，bridge 失效）；窗口配置 `transparent/decorations:false/
    alwaysOnTop/skipTaskbar`。macOS 下 WKWebView 写 `~/Library/WebKit` 失败仅告警（降级内存存储，
    不影响渲染）。
+9. **Tauri v2 能力权限（必踩）**：webview 的 `event.listen` 被能力系统拦截——capabilities 缺
+   `core:event:allow-listen` 时监听静默失败（`invoke` 正常但事件全丢，宠物卡在初始 idle、
+   点击无反馈）。必须给 capability 加 `["core:default", "core:event:allow-listen"]`
+   （见 tauri.conf.json `security.capabilities`）。
 
 ## 8. 验收对照（DESIGN §7）
 

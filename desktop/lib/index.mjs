@@ -20,6 +20,9 @@ if (renderJson) {
   // —— JSON-lines 渲染桥：轻量原生渲染壳（Tauri）消费 ——
   // 动画意图/快照/回话写 stdout（每行一个 JSON），命令从 stdin 读（interact/stop）。
   // 渲染壳零引擎改动：与 Electron/headless 共用 createCompanion 与 hooks 接口。
+  // 日志重定向到 stderr：stdout 只承载 JSON 行（渲染壳逐行解析，混入日志行会污染流）。
+  const origLog = console.log.bind(console)
+  console.log = (...args) => process.stderr.write(`${args.join(' ')}\n`)
   const { createCompanion } = await import('./client/companion.mjs')
   const out = (obj) => process.stdout.write(`${JSON.stringify(obj)}\n`)
   const companion = await createCompanion(cfg, {

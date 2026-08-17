@@ -42,6 +42,8 @@ Status: implemented
   任意轻量外壳（Swift/系统托盘等）。
 - Tauri 构建需 cargo（一次性编译 tauri 依赖树 5-15 分钟）；webview 为系统 WebKit（macOS）。
 - 已知：`tauri.conf.json` 的 `macOSPrivateApi`（透明窗）与 `withGlobalTauri`（bridge）缺一
-  不可；WKWebView 写 `~/Library/WebKit` 失败仅告警不阻塞渲染。
+  不可；**capability 必须含 `core:event:allow-listen`**——否则 webview 的 `event.listen` 被
+  能力系统拦截（invoke 正常但事件全丢，宠物卡初始 idle、点击无反馈，本地部署实测踩中）；
+  WKWebView 写 `~/Library/WebKit` 失败仅告警不阻塞渲染。
 - 引用点：`desktop/src-tauri/`、`desktop/render/tauri-bridge.js`、`desktop/lib/index.mjs`
   （--render-json）、`desktop/package.json`（scripts）、DESIGN/BUILD-RUN（更新）。
