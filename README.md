@@ -43,6 +43,20 @@ dsh plugin --profile web add "github:vlln/whale-girl#main"   # 推荐：git 源�
 
 完整状态机（优先级/转换语义/触发源）见 [docs/state-machine.md](docs/state-machine.md)。
 
+## 桌面伴侣（可选）
+
+`desktop/` 是**独立桌面伴侣应用**（Node + Electron 可选渲染壳），把鲸鱼娘渲染到操作系统桌面常驻。**不随 `dsh plugin` 安装**——想要桌宠的用户自行启用：
+
+```sh
+cd desktop
+npm install
+npm run start:desktop      # Electron 透明置顶桌宠（需图形界面）
+# 或 npm run start:headless # 无窗：presence 心跳 + 状态轮询 + SSE
+```
+
+- 消费 whale-girl 既有公开端点（`/state`、`/events`、`/presence`、`/interact`、`/config`、`/assets`），**不改动插件本体**；运行期间网页端宠物自动隐藏（presence 契约），退出或崩溃（TTL 45s 过期）后恢复。
+- 设计与契约见 `desktop/DESIGN.md`、`desktop/BUILD-RUN.md`。
+
 ## 状态预览
 
 | 状态 | 触发 | 预览 |

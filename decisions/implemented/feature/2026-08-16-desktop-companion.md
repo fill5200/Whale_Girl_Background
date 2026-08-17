@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 承接 [GUI 内宠物架构（A 模式）](2026-08-08-in-gui-pet-architecture.md) 的 B' 方向考量——
+> 承接 [GUI 内宠物架构（A 模式）](../architecture/2026-08-08-in-gui-pet-architecture.md) 的 B' 方向考量——
 > 该决策把「OS 原生常驻渲染」列为 future feature；本决策将其落地为独立 `desktop/` 应用，
 > 不改动 A 模式的插件本体。
 

@@ -1,7 +1,5 @@
 # whale-girl 桌面伴侣 — 设计方案（DESIGN.md）
 
-> 版本：v1 · 状态：方案设计 · 归属任务：t1
-> 工作区：`C:\Users\12258\whale-girl-desktop\`
 > 描述对象：为 DSH Web GUI 内的桌面宠物插件 whale-girl 开发一个**独立桌面伴侣应用**，
 > 使其化身显示在桌面上（宠物跑到屏幕角落、常驻），并满足对 whale-girl 既有端点的消费契约。
 
@@ -9,7 +7,7 @@
 
 ## 1. 背景与目标
 
-whale-girl 是一款 DSH Web GUI 插件（`C:\Users\12258\.dsh\profiles\web\node_modules\whale-girl\`），
+whale-girl 是一款 DSH Web GUI 插件（安装在 DSH 的 web profile），
 提供网页内自渲染的桌面宠物（QQ 宠物形态）。宠物只有在浏览器开着 DSH 页面时可见、依赖页面焦点，
 用户不便将其"带到桌面"独立陪伴。
 
@@ -167,14 +165,12 @@ Desktop进程启动
 - **P2-2 多屏/工作区**：记忆上次位置，开机自启（系统托盘）。
 - **P2-3 主题/淡入淡出**：透明度动画、过节彩蛋。
 
-> 交付顺序：P0（心跳+轮询+SSE+渲染）→ P1 → P2。
-
 ---
 
-## 5. 目录结构（建议）
+## 5. 目录结构
 
 ```
-C:\Users\12258\whale-girl-desktop\
+whale-girl-desktop/
 ├─ DESIGN.md                 # 本文件
 ├─ package.json              # ESM, main: lib/index.mjs
 ├─ lib/

@@ -3,8 +3,7 @@
 把 DSH Web GUI 内的桌面宠物插件 **whale-girl** 渲染到操作系统桌面，作为独立伴侣进程常驻屏幕，
 并实时消费 whale-girl 的状态/事件。网页端在桌面伴侣在线时自动隐藏自己的宠物，避免"双宠物"。
 
-- 技术方案与契约：见 [DESIGN.md](./DESIGN.md)（t1 调研输出）
-- 输出目录：`C:\Users\12258\whale-girl-desktop\`
+- 技术方案与契约：见 [DESIGN.md](./DESIGN.md)
 - 集成方式：**外部 HTTP 消费者**，不改 whale-girl 本体（DESIGN §2.1 决策）
 
 ---
@@ -18,7 +17,7 @@
 ## 2. 安装依赖
 
 ```sh
-cd C:\Users\12258\whale-girl-desktop
+cd desktop
 npm install
 ```
 
@@ -80,7 +79,7 @@ npm test
 
 ```
 whale-girl-desktop/
-├─ DESIGN.md              # 设计方案（t1）
+├─ DESIGN.md              # 设计方案
 ├─ package.json           # ESM，main: lib/index.mjs；脚本 start/start:headless/start:desktop/test
 ├─ lib/
 │  ├─ index.mjs           # 入口：headless 还是 Electron 渲染
