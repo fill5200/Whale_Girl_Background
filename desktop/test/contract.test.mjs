@@ -20,12 +20,15 @@ const BASE = loadConfig().baseURL
 
 // live 套件依赖真实 DSH web。探活一次（缓存）来给 describe 动态 skip：
 // 服务不可达 → 套件整体 skip（CI / 无服务环境不误判失败）；WG_LIVE=1 则强制要求真跑。
+// 探活须校验响应是 whale-girl /state 的 JSON 契约（content-type），不能只看 HTTP 成功——
+// 其他服务占用 baseURL（如 DSH GUI 对未知路由回 SPA 壳 200 text/html）会误判在线。
 let _liveProbe = null
 async function liveReachable() {
   if (_liveProbe === null) {
     try {
-      await fetch(`${BASE}/whale-girl/state`, { cache: 'no-store' })
-      _liveProbe = true
+      const res = await fetch(`${BASE}/whale-girl/state`, { cache: 'no-store' })
+      const ct = res.headers.get('content-type') ?? ''
+      _liveProbe = res.ok && ct.includes('application/json')
     } catch {
       _liveProbe = false
     }
