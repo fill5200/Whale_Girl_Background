@@ -45,16 +45,17 @@ dsh plugin --profile web add "github:vlln/whale-girl#main"   # 推荐：git 源�
 
 ## 桌面伴侣（可选）
 
-`desktop/` 是**独立桌面伴侣应用**（Node + Electron 可选渲染壳），把鲸鱼娘渲染到操作系统桌面常驻。**不随 `dsh plugin` 安装**——想要桌宠的用户自行启用：
+`desktop/` 是**独立桌面伴侣应用**（Node 引擎 + Tauri 渲染壳，零运行时依赖），把鲸鱼娘渲染到操作系统桌面常驻。**不随 `dsh plugin` 安装**——想要桌宠的用户自行启用：
 
 ```sh
 cd desktop
-npm install
-npm run start:desktop      # Electron 透明置顶桌宠（需图形界面）
-# 或 npm run start:headless # 无窗：presence 心跳 + 状态轮询 + SSE
+npm install                          # 引擎零依赖
+cd src-tauri && cargo run            # Tauri 透明置顶桌宠（体积 ~10MB 级，推荐）
+# 或 cd desktop && npm run start:headless   # 无窗：presence 心跳 + 状态轮询 + SSE
 ```
 
 - 消费 whale-girl 既有公开端点（`/state`、`/events`、`/presence`、`/interact`、`/config`、`/assets`），**不改动插件本体**；运行期间网页端宠物自动隐藏（presence 契约），退出或崩溃（TTL 45s 过期）后恢复。
+- 渲染壳：Tauri v2（推荐）；Electron 遗留壳保留（`npm i -D electron` 后可用）。
 - 设计与契约见 `desktop/DESIGN.md`、`desktop/BUILD-RUN.md`。
 
 ## 状态预览

@@ -1,7 +1,7 @@
 {
   "name": "whale-girl-desktop",
   "version": "0.1.0",
-  "description": "whale-girl 桌面伴侣：把 DSH Web GUI 内的鲸鱼娘宠物渲染到操作系统桌面",
+  "description": "whale-girl 桌面伴侣：把 DSH Web GUI 内的鲸鱼娘宠物渲染到操作系统桌面（Tauri 渲染壳，零运行时依赖）",
   "type": "module",
   "main": "lib/index.mjs",
   "bin": {
@@ -10,14 +10,13 @@
   "scripts": {
     "start": "node lib/index.mjs",
     "start:headless": "node lib/index.mjs --headless",
-    "start:desktop": "electron .",
+    "start:tauri": "cd src-tauri && cargo run",
+    "build:tauri": "cd src-tauri && cargo build --release",
+    "start:electron": "electron .",
     "test": "node --test \"test/**/*.test.mjs\""
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "^43.4.0"
-  }
+  "license": "MIT"
 }

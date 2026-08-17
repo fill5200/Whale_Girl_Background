@@ -18,27 +18,37 @@
 
 ```sh
 cd desktop
-npm install
+npm install        # 引擎零运行时依赖（Node 引擎脚本无第三方包）
 ```
 
-> ⚠️ Electron 二进制下载在国内网络可能超时。若 `npm install` 后
-> `node_modules\electron\dist\electron.exe` 缺失，用国内镜像补下载：
-> ```powershell
-> $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
-> node node_modules/electron/install.js
-> ```
-> （本机即以此方式成功下载 v43.4.0。）
+**桌面渲染壳（Tauri，推荐）**——构建 Rust 侧（首次编译 tauri 依赖树约 5-15 分钟）：
+
+```sh
+cd desktop/src-tauri
+cargo build        # 产物 target/debug/whale-girl-desktop（CARGO_TARGET_DIR 可指 /tmp 保持仓库干净）
+```
+
+**Electron 遗留壳（可选）**：`npm i -D electron`（二进制约 277MB；国内网络超时用
+`ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` + `electron_config_cache=/tmp/...` 补下载）。
 
 ## 3. 运行
 
-### 桌面模式（推荐）——画宠物到桌面
+### 桌面模式（推荐）——Tauri 渲染壳
 
 ```sh
-npm run start:desktop      # electron .，透明置顶窗渲染宠物
+cd desktop/src-tauri && cargo run          # 或直接运行编译产物
+# 指向非本机 DSH：
+WHALE_GIRL_BASE_URL=http://IP:PORT cargo run
 ```
 
-启动后右下角出现鲸鱼娘宠物（透明窗、置顶、点击可投喂/玩耍、拖拽可换位）。
-退出：关闭宠物窗口 / 托盘退出 / 进程关闭 → 自动发 `POST /presence {online:false}`，网页宠物立即恢复。
+启动后屏幕中央出现鲸鱼娘宠物（150x150 透明窗、置顶、点击可投喂/玩耍、拖拽可换位）。
+退出：关闭窗口 / Ctrl+C → 引擎子进程 `{online:false}` 下线，网页宠物立即恢复。
+
+### 桌面模式（遗留）——Electron 渲染壳
+
+```sh
+cd desktop && npm run start:desktop        # electron .（需先 npm i -D electron）
+```
 
 ### Headless 模式（核心自测 / 无桌面环境）
 
@@ -55,6 +65,7 @@ node lib/index.mjs --base-url=http://IP:PORT   # 指向非本机 DSH
 node lib/index.mjs --poll-ms=5000              # 轮询间隔
 node lib/index.mjs --no-presence               # 不接管在场上线（不隐藏网页宠物）
 node lib/index.mjs --no-render                 # 同 --headless
+node lib/index.mjs --render-json               # JSON-lines 渲染桥（供 Tauri/Swift 等外壳消费）
 ```
 
 环境变量：`WHALE_GIRL_BASE_URL` / `WHALE_GIRL_POLL_MS` / `WHALE_GIRL_HEARTBEAT_MS`。
@@ -128,6 +139,16 @@ whale-girl-desktop/
 4. **Electron 二进制下载**：国内网络默认 CDN 超时，改用 `npmmirror.com` 镜像成功。
 5. **CSRF 面**：桌面本地 HTTP 调用不带 Origin/Sec-Fetch-Site → whale-girl `isCrossOrigin`
    判定为同源，`/presence`、`/interact` 放行（已验证，见测试）。
+6. **renderer 首帧空白（同态早退）**：`switchAnim` 在 `name === animState` 时早退——初始
+   `animState` 即 `'idle'`、宿主空闲时引擎首个动画就是 idle，早退跳过 `ensureSheet` 导致
+   canvas 永远空白（Tauri/Electron 都中招）。修法：同态重入且 sheet 未缓存时补
+   `ensureSheet + drawFrame + reportHitarea`（见 renderer.js）。
+7. **--render-json EPIPE**：渲染壳（父进程）退出后管道关闭，引擎写 stdout 报 EPIPE——
+   `process.stdout.on('error')` 捕获后优雅退出（见 index.mjs）。
+8. **Tauri 透明窗**：`tauri.conf.json` 需 `macOSPrivateApi: true` + `app.withGlobalTauri: true`
+   （否则 `window.__TAURI__` 不存在，bridge 失效）；窗口配置 `transparent/decorations:false/
+   alwaysOnTop/skipTaskbar`。macOS 下 WKWebView 写 `~/Library/WebKit` 失败仅告警（降级内存存储，
+   不影响渲染）。
 
 ## 8. 验收对照（DESIGN §7）
 

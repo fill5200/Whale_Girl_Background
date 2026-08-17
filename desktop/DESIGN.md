@@ -31,30 +31,35 @@ whale-girl 是一款 DSH Web GUI 插件（安装在 DSH 的 web profile），
 ## 2. 技术选型
 
 ### 2.1 运行时与语言
-采用 **Node.js（≥18，ESM）+ Electron 的可选外壳**，拆成两层：
+采用 **Node.js（≥18，ESM）引擎 + 轻量原生渲染壳**，拆成两层：
 
 | 层 | 技术 | 理由 |
 |---|---|---|
 | 核心伴侣逻辑 | Node.js ESM（`lib/`） | 复用 whale-girl 相同的 ESM 形态；纯 HTTP 客户端，零 GUI 依赖，可在 headless 下跑通心跳 |
-| 桌面渲染外壳 | Electron（可选项） | 让 sprite 播到真实桌面（透明窗口、置顶）；Electron 自带 Canvas + 透明 frameless 窗口 |
+| 桌面渲染外壳 | **Tauri v2（推荐）** / Electron（遗留） | 透明窗 + 置顶 + Canvas 帧播放；Tauri 用系统 webview（体积 ~10MB 级 vs Electron 277MB），渲染层 `render/` 双壳复用 |
 | 状态/事件消费 | 原生 `fetch` + `EventSource` | 复用 whale-girl 的 `/state` 轮询 + `/events` SSE 通道 |
 
 > **决策要点**：**不修改 whale-girl 本体**。桌面伴侣只做**外部 HTTP 消费者**，
 > 通过 `/state`、`/events`、`/presence` 等既有公开端点交互 —— 这是风险最低、可回滚的集成方式。
 
-### 2.2 渲染方案二选一（外壳内部）
-1. **Electron 透明窗 + Canvas 帧播放**：沿用 whale-girl sprite 资产，逐帧 `drawImage`。
-   - 优点：与网页端一致、可加点击投喂交互；缺点：打包体积大。
-2. **原生无壳（仅 Node）+ 系统托盘/快捷键**：不做真实桌面绘制，只做心跳 + 状态回读，
-   在托盘提示/通知里展示宠物状态。
-   - 优点：极轻；缺点：无化身、交互弱。
+### 2.2 渲染方案（外壳内部）
+1. **Tauri v2 透明窗 + Canvas 帧播放（推荐，2026-08-17 起）**：`src-tauri/`（Rust）负责窗口
+   （透明/置顶/点击穿透）与资产拉取（ureq 原生 HTTP，无 CORS 面），webview 跑 `render/`
+   同一渲染层（`tauri-bridge.js` 把 `window.whaleGirl` 接到 Tauri IPC，`renderer.js` 零改动）；
+   引擎经 `--render-json`（stdout JSON 行 / stdin 命令）与 Rust 桥接。
+   - 优点：体积小（debug 36MB / release ~10MB 级，无 Chromium 依赖）、跨平台；
+   - 引擎与渲染彻底解耦（渲染壳只是 JSON 行消费者）。
+2. **Electron 透明窗（遗留）**：`lib/render/window.mjs` + `render/preload.cjs`，同一渲染层。
+   - 缺点：Electron 二进制 277MB；保留作跨平台参考与回退（`npm i -D electron` 后可用）。
+3. **原生无壳（仅 Node）+ 系统托盘/快捷键**：不做真实桌面绘制，只做心跳 + 状态回读，
+   在托盘提示/通知里展示宠物状态。headless 模式即此形态。
 
-**推荐**：优先做**方案 2 的完整版 + 方案 1 的渲染**——即 Electron 透明窗负责画宠物，Node 核心负责
-状态与心跳。若首版要最快落地，可先交付**方案 2（无窗、纯心跳 + 托盘）**作为 MVP，再升级到渲染。
+**推荐**：**Tauri 渲染壳**（主）+ Node 引擎（`--render-json`）；headless 为无窗形态。
 
 ### 2.3 依赖
 - Node 侧：`node:fs` / `node:path` / `node:http`（或直接 `fetch`）——**不新增第三方运行时依赖**。
-- Electron 侧（可选）：`electron`。
+- Tauri 侧：`src-tauri/Cargo.toml`（tauri v2 / serde / ureq / base64），构建需 `cargo`。
+- Electron 侧（遗留，可选）：`electron`（`npm i -D electron` 手动安装）。
 - 测试：`node --test`（与 whale-girl 仓库同风格）。
 
 ---

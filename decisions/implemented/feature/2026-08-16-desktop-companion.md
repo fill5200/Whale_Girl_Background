@@ -51,3 +51,6 @@ A 模式宠物只在 DSH Web GUI 页面内可见、依赖页面焦点；用户�
   与 whale-girl 的 assets 净化路径解耦。
 - 安全面：`/presence`、`/interact` 本地调用不带 Origin/Sec-Fetch-Site → `isCrossOrigin` 判定
   同源放行；端到端测试覆盖。
+- 渲染壳选型已被 [2026-08-17-tauri-render-shell.md](2026-08-17-tauri-render-shell.md) 部分取代：
+  Tauri 替代 Electron 为主渲染壳（体积 277MB → ~10MB 级），引擎/契约不变，
+  Electron 保留为遗留。
