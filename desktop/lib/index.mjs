@@ -14,8 +14,44 @@ const log = createLogger({ tag: 'whale-girl-desktop' })
 
 const isElectronMain = typeof process !== 'undefined' && process.versions?.electron !== undefined
 const headless = !cfg.renderEnabled || process.argv.includes('--headless')
+const renderJson = process.argv.includes('--render-json')
 
-if (isElectronMain && !headless) {
+if (renderJson) {
+  // —— JSON-lines 渲染桥：轻量原生渲染壳（Tauri）消费 ——
+  // 动画意图/快照/回话写 stdout（每行一个 JSON），命令从 stdin 读（interact/stop）。
+  // 渲染壳零引擎改动：与 Electron/headless 共用 createCompanion 与 hooks 接口。
+  const { createCompanion } = await import('./client/companion.mjs')
+  const out = (obj) => process.stdout.write(`${JSON.stringify(obj)}\n`)
+  const companion = await createCompanion(cfg, {
+    onSnapshot: (snap) => out({ type: 'snapshot', snapshot: snap }),
+    onAnimation: (anim) => out({ type: 'anim', name: anim.name, context: anim.context }),
+    onReply: (reply) => out({ type: 'reply', reply }),
+  })
+  out({ type: 'ready', baseURL: cfg.baseURL })
+  let buf = ''
+  process.stdin.setEncoding('utf8')
+  process.stdin.on('data', (chunk) => {
+    buf += chunk
+    let nl
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl).trim()
+      buf = buf.slice(nl + 1)
+      if (!line) continue
+      try {
+        const cmd = JSON.parse(line)
+        if (cmd.type === 'interact') companion.interact(cmd.action ?? 'feed')
+        else if (cmd.type === 'stop') companion.stop().then(() => process.exit(0))
+      } catch { /* 忽略坏行 */ }
+    }
+  })
+  const shutdown = () => companion.stop().then(() => process.exit(0))
+  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', shutdown)
+  // 渲染壳（父进程）退出后管道关闭：写 stdout 会 EPIPE——优雅退出而非崩栈。
+  process.stdout.on('error', (err) => {
+    if (err.code === 'EPIPE') process.exit(0)
+  })
+} else if (isElectronMain && !headless) {
   // —— Electron main 路径：桌面渲染 ——
   // 注意：不要顶层 await runDesktop()——runDesktop 内部 await app.whenReady()，
   // 若在入口模块顶层 await，会阻塞 Electron 事件循环导致 ready 永不触发（ESM main 陷阱）。

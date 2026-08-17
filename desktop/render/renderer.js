@@ -156,6 +156,14 @@
     const name = next?.name || 'idle'
     if (name === animState) {
       animCtx = next?.context ?? animCtx
+      // 同态早退兜底：初始 animState 即 'idle' 时（宿主空闲），首帧从没渲染——
+      // 引擎首个动画就是 idle，早退会跳过 ensureSheet 导致永远空白。补一次加载+绘制。
+      const cfg = stateCfg(name)
+      if (cfg && !sheetCache.has(sheetKey(cfg.sheet))) {
+        await ensureSheet(cfg)
+        drawFrame()
+        reportHitarea()
+      }
       return
     }
     animState = name
