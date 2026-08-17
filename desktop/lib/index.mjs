@@ -48,4 +48,6 @@ if (isElectronMain && !headless) {
   }
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  // 兜底：引擎内部异常基本已 catch，未捕获拒绝仅记录不静默（进程保持运行/重试）。
+  process.on('unhandledRejection', (err) => log.warn('unhandled rejection:', err?.message ?? err))
 }

@@ -41,6 +41,7 @@ export async function createCompanion(opts, hooks = {}) {
   const sched = createScheduler({ sleepAfterMs: opts.sleepAfterMs })
 
   // 配置跟随：configRevision 门控（变化才重应用 /config，避免每 3s 拉一次）。
+  // P1-4 预留：/config 拉取已就位，size/opacity 跟随渲染尚未实现（见 DESIGN P1-4）。
   let lastConfigRevision = -1
   const applyRemoteConfig = async () => {
     if (snapshot === null || typeof snapshot.configRevision !== 'number') return

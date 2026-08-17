@@ -158,7 +158,8 @@ Desktop进程启动
 - **P1-1 点击互动**：点击宠物 → `POST /interact {action:feed/play}`，展示气泡回话。
 - **P1-2 资历角标**：显示 `Lv.${level}`、XP、已解锁称号；结算回合完成 `celebrate`。
 - **P1-3 会话状态显示**：消费 `/sessions`，托盘/气泡提示"DSH 思考中 / 等待你批准"。
-- **P1-4 配置跟随**：消费 `/config`，按 `configRevision` 跟随 size/opacity/窗口时长等。
+- **P1-4 配置跟随（已预留，未实现）**：消费 `/config`（configRevision 门控拉取已就位），
+  按 size/opacity 跟随渲染尺寸/透明度尚未实现——renderer 当前用固定 `PET_BASE` 尺寸。
 
 ### 4.3 P2 —— 进阶
 - **P2-1 崩溃自恢复**：监听进程退出信号，非正常退出也兜底自然过期不污染。

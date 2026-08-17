@@ -82,7 +82,6 @@ export function pickAnimation(body, sched = {}) {
       pet: body?.pet ?? null,
       sessionThink: act.sessionThink === true,
       sessionWait: act.sessionWait === true,
-      size: body?.size ?? null,
       until: act.until ?? 0,
     },
   }
