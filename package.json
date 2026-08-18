@@ -40,5 +40,9 @@
   "devDependencies": {
     "esbuild": "^0.28.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vlln/whale-girl.git"
+  }
 }
