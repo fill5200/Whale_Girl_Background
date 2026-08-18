@@ -310,6 +310,14 @@
       const ddx = e.screenX - dragStart.px
       const ddy = e.screenY - dragStart.py
       if (ddx !== 0 || ddy !== 0) {
+        // 拖拽方向 → 朝向（素材朝左基准：向左拖 flip=1 朝左、向右拖 flip=-1 镜像朝右，
+        // 对齐 web 版 drag 朝向逻辑）；方向变化立即重绘，动作间朝向连续。
+        const nextFlip = ddx < 0 ? 1 : -1
+        if (nextFlip !== flip) {
+          flip = nextFlip
+          drawFrame()
+          reportHitarea()
+        }
         wg.dragWindow(ddx, ddy)
         dragStart.px = e.screenX
         dragStart.py = e.screenY

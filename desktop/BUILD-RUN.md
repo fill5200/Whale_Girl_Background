@@ -177,3 +177,5 @@ whale-girl-desktop/
     引擎动画（拖拽期间缓存 lastEngineAnim）；拖拽覆盖使游走位移暂停（animState 不再 walk），
     消除"边拖边走"抖动。注意 `dragging`/`lastEngineAnim` 必须在处理器前声明（漏声明会让阈值
     在 `moved=true` 后抛 ReferenceError——窗口能动但动画永远不切换，已踩）。
+13. **拖拽朝向**：拖拽期间按水平移动方向更新 `flip`（素材朝左基准：向左拖 flip=1、向右拖
+    flip=-1，对齐 web 版 drag 朝向逻辑），方向变化立即 `drawFrame + reportHitarea`。
