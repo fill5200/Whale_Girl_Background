@@ -11,9 +11,50 @@
   <img src="https://badgen.net/badge/format/official%20bundle/8257D0" alt="official bundle" />
 </p>
 
+> **这是 whale-girl 的社区分支（fork）**，在 [原版 vlln/whale-girl](https://github.com/vlln/whale-girl)
+> 基础上新增了 **DSH 全屏背景图** 功能。原版全部功能保持不变，可随时回到上游。
+
 ---
 
-## 安装
+## ✨ 本分支新增：DSH 背景图
+
+点击鲸鱼娘弹出的菜单现在多了一个 **「🖼️ 背景」** 按钮（排在「🍗 喂食 / 🎾 玩耍 / 🎭 换角色」之后），
+点击后弹出背景设置面板：
+
+| 功能 | 说明 |
+|---|---|
+| 📁 **导入图片** | 选择本地图片，自动压缩（最长边 ≤1600px、JPEG）后设为 DSH 全屏背景 |
+| ↩️ **还原默认** | 移除背景图，恢复 DSH 原始主题背景 |
+| **透明度滑条 0–100** | **100% = 默认背景**（图片完全透明）；**0% = 完整图片背景**；中间值平滑过渡 |
+
+特性：
+
+- 背景覆盖整个 DSH 界面（含侧边栏），不遮挡任何点击操作（`pointer-events: none`）
+- 跟随主题：切换亮/暗主题后背景图依然生效（自动重新应用）
+- 持久化在浏览器 localStorage（`whale-girl:background`），刷新页面不丢失
+- 纯客户端实现，不动插件本体状态机、积累账本与外部 API
+
+### 分支安装
+
+```sh
+# 方式一：git 源（推荐，构建产物已入库）
+dsh plugin --profile web add "github:<你的用户名>/<本分支仓库名>#main"
+
+# 方式二：本地目录
+dsh plugin --profile web add <本仓库本地路径>
+```
+
+装完 **重启 web**，然后点鲸鱼娘 → 🖼️ 背景 即可使用。
+
+### 分支与上游差异
+
+- 仅改动客户端源码 `lib/client/index.mjs`（新增背景功能模块）并重新生成 `lib/client.js`
+- 新增决策记录 [decisions/implemented/feature/2026-08-19-background-image.md](decisions/implemented/feature/2026-08-19-background-image.md)
+- Node half（`lib/index.mjs` / `lib/src/`）、设置 schema、积累账本、路由端点全部未动
+
+---
+
+## 安装（原版）
 
 官方 **bundle 插件** 格式（仓库根 `package.json` 的 `dsh.bundle` + `dsh.client`）。经官方 profile 管理：
 
@@ -26,7 +67,7 @@ dsh plugin --profile web add "github:vlln/whale-girl#main"   # 推荐：git 源�
 
 更新插件时 `dsh plugin --profile web update whale-girl`（或换 git 源 ref），重启生效。
 
-## 使用
+## 使用（原版）
 
 | 你做什么 / 发生什么 | 宠物表现 |
 |---|---|
