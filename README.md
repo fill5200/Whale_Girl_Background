@@ -1,4 +1,4 @@
-<h1 align="center">whale-girl</h1>
+<h1 align="center">Whale _ Girl _ Background</h1>
 
 <p align="center">
   <strong>DSH Web GUI 内的桌面宠物（QQ 宠物形态）</strong><br/>
